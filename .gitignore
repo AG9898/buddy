@@ -1,0 +1,16 @@
+node_modules/
+out/
+dist/
+.env
+coverage/
+*.tsbuildinfo
+
+# petdex-bridge Rust build artifacts
+petdex-bridge/target/
+
+# Local runtime state (never commit)
+*.petdex-win/
+
+# OS
+.DS_Store
+Thumbs.db

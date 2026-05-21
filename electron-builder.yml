@@ -1,0 +1,25 @@
+appId: com.buddy.pet
+productName: buddy
+directories:
+  output: dist
+  buildResources: build
+files:
+  - out/**/*
+  - pets/**/*
+win:
+  target:
+    - target: nsis
+      arch: x64
+  icon: build/icon.ico
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: false
+  installerIcon: build/icon.ico
+  uninstallerIcon: build/icon.ico
+  createDesktopShortcut: false
+  createStartMenuShortcut: true
+extraResources:
+  - from: pets/
+    to: pets/
+    filter:
+      - "**/*"

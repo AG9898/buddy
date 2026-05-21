@@ -1,6 +1,253 @@
 {
   "$schema": "./workboard.schema.json",
   "schema_version": "1.0.0",
-  "last_updated": "2026-04-23",
-  "tasks": []
+  "last_updated": "2026-05-21",
+  "tasks": [
+    {
+      "id": "FEAT-01",
+      "title": "Create Electron transparent overlay BrowserWindow",
+      "description": "Implement src/main/avatar-window.ts and the initial src/main/main.ts skeleton. avatar-window.ts exports createAvatarWindow(bounds?) that creates a BrowserWindow with: frame:false, transparent:true, hasShadow:false, skipTaskbar:true, alwaysOnTop:true, focusable:false, thickFrame:false, roundedCorners:false, backgroundColor:'#00000000'. After creation call setVisibleOnAllWorkspaces(true), setAlwaysOnTop(true,'floating'), and display with showInactive(). Implement setIgnoreMouseEvents(true,{forward:true}) by default; add an ipcMain.on('ptr-interactive-changed') handler that toggles it off/on. Add ipcMain.on handlers for 'drag-start', 'drag-move', 'drag-end' that use screen.getCursorScreenPoint() to reposition the window. main.ts calls app.whenReady(), creates the window with hardcoded default bounds (356x320), and loads the renderer index.html. State-store and sidecar integration are out of scope here (FEAT-07).",
+      "status": "todo",
+      "priority": "critical",
+      "group_id": "FEAT",
+      "depends_on": [],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "npm run dev starts without errors and a transparent, frameless window appears on Windows",
+        "Window does not appear in the Windows taskbar",
+        "Window is always on top of other windows",
+        "Mouse clicks pass through the transparent background area (setIgnoreMouseEvents enabled by default)",
+        "Dragging the pet region (ipc: drag-start/drag-move/drag-end) moves the window via screen cursor position"
+      ],
+      "docs": [
+        "docs/ARCHITECTURE.md",
+        "handoff.md"
+      ],
+      "files": [
+        "src/main/main.ts",
+        "src/main/avatar-window.ts"
+      ],
+      "commands": [
+        "npm run lint",
+        "npm run dev"
+      ]
+    },
+    {
+      "id": "FEAT-02",
+      "title": "Implement contextBridge preload API (petApi)",
+      "description": "Implement src/preload/preload.ts to expose window.petApi via contextBridge.exposeInMainWorld. Define all IPC channel names as exported string constants at the top of the file (e.g. CH_STATE_SET, CH_STATE_CHANGE, CH_PTR_INTERACTIVE, CH_DRAG_START, CH_DRAG_MOVE, CH_DRAG_END). The petApi object must expose: setState(state:string) sends CH_STATE_SET to main via ipcRenderer.send; onStateChange(cb:(payload:{state:string})=>void) registers a once-per-message ipcRenderer.on listener for CH_STATE_CHANGE; setPointerInteractive(interactive:boolean) sends CH_PTR_INTERACTIVE; dragStart(offsetX:number,offsetY:number) sends CH_DRAG_START; dragMove() sends CH_DRAG_MOVE; dragEnd() sends CH_DRAG_END. Do not enable nodeIntegration. contextIsolation must be true (set in avatar-window.ts webPreferences).",
+      "status": "todo",
+      "priority": "critical",
+      "group_id": "FEAT",
+      "depends_on": [
+        "FEAT-01"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "window.petApi is accessible in the Electron renderer DevTools console",
+        "All IPC channel name strings are defined as constants in one place in preload.ts",
+        "nodeIntegration is false in the BrowserWindow webPreferences",
+        "npm run lint passes with no TypeScript or ESLint errors"
+      ],
+      "docs": [
+        "docs/ARCHITECTURE.md",
+        "docs/CONVENTIONS.md"
+      ],
+      "files": [
+        "src/preload/preload.ts"
+      ],
+      "commands": [
+        "npm run lint",
+        "npm run build"
+      ]
+    },
+    {
+      "id": "FEAT-03",
+      "title": "Implement state persistence module (state-store.ts)",
+      "description": "Create src/main/state-store.ts. Define and export the AppState interface: { open: boolean, bounds: { x:number, y:number, width:number, height:number }, pet: { id:string, spritesheetPath:string, width:number, height:number, state:string }, byResolution: Record<string,{x:number,y:number,width:number,height:number}> }. Export loadState():AppState (reads %USERPROFILE%/.petdex-win/state.json with fs.readFileSync; returns defaults if missing or invalid), saveState(state:AppState):void, and saveBounds(bounds:Electron.Rectangle):void (updates bounds and byResolution keyed by '${width}x${height}'). Use os.homedir() to build the path. Create the .petdex-win directory with fs.mkdirSync({recursive:true}) if missing. All file I/O is synchronous. Default state: open:true, bounds:{x:1600,y:760,width:356,height:320}, pet:{id:'default',spritesheetPath:'',width:142,height:154,state:'idle'}.",
+      "status": "todo",
+      "priority": "high",
+      "group_id": "FEAT",
+      "depends_on": [],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "loadState() returns valid defaults when ~/.petdex-win/state.json does not exist",
+        "saveState() creates the ~/.petdex-win directory if it does not exist",
+        "A round-trip (saveState then loadState) preserves all fields without loss",
+        "saveBounds() updates byResolution keyed by the current screen resolution string",
+        "npm run lint passes"
+      ],
+      "docs": [
+        "docs/ARCHITECTURE.md",
+        "docs/ENV_VARS.md"
+      ],
+      "files": [
+        "src/main/state-store.ts"
+      ],
+      "commands": [
+        "npm run lint"
+      ]
+    },
+    {
+      "id": "FEAT-04",
+      "title": "Build Svelte pet renderer with sprite animation state machine",
+      "description": "Implement src/renderer/App.svelte and src/renderer/PetSprite.svelte. App.svelte mounts PetSprite and on mount calls window.petApi.onStateChange to receive state-change events from main, forwarding the new state into PetSprite via a Svelte reactive variable. PetSprite.svelte renders a <div data-avatar-mascot='true'> with inline CSS: background-image pointing to the spritesheet, background-size set to columns*100% by rows*100%, and background-position driven by the current frame. Load frame data from pets/default/pet.json (imported as a static JSON asset). The animation loop uses setInterval per-frame with the ms value from the frame entry; on state transitions, clear the previous interval. Implement once:true + fallback: after the last frame plays once, switch to the fallback state. Pointer handling: on pointermove, check event.target.closest('[data-avatar-mascot]') and call petApi.setPointerInteractive(bool). Drag: pointerdown calls petApi.dragStart(offsetX,offsetY), pointermove calls petApi.dragMove(), pointerup calls petApi.dragEnd(). Declare the petApi type on window in a src/renderer/env.d.ts file.",
+      "status": "todo",
+      "priority": "critical",
+      "group_id": "FEAT",
+      "depends_on": [
+        "FEAT-02"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "Pet sprite renders on screen and plays the idle animation on startup",
+        "Calling petApi.setState('running') from DevTools switches to the running animation",
+        "A once:true state (jumping) automatically transitions to idle after one full loop",
+        "Hovering over the pet div calls setPointerInteractive(true); moving off calls setPointerInteractive(false)",
+        "Pointer-dragging the pet div triggers drag-start/drag-move/drag-end IPC events",
+        "npm run lint passes"
+      ],
+      "docs": [
+        "docs/CONVENTIONS.md",
+        "handoff.md"
+      ],
+      "files": [
+        "src/renderer/App.svelte",
+        "src/renderer/PetSprite.svelte",
+        "src/renderer/styles.css"
+      ],
+      "commands": [
+        "npm run lint",
+        "npm run dev"
+      ]
+    },
+    {
+      "id": "FEAT-05",
+      "title": "Add system tray with Show/Hide/Quit",
+      "description": "Create src/main/tray.ts. Export createTray(win:BrowserWindow):Tray and export a mutable isQuitting boolean flag. createTray creates a Tray using the icon at build/tray-icon.png (a 16x16 placeholder PNG — create a minimal 1x1 white PNG if no icon exists yet). Set a context menu with three items: 'Show Pet' calls win.showInactive(), 'Hide Pet' calls win.hide(), 'Quit' sets isQuitting=true and calls app.quit(). Also set the tray tooltip to 'buddy'. In main.ts, after creating the window, add a win.on('close') handler: if !isQuitting, call event.preventDefault() and win.hide(). This keeps the Electron process alive when the user closes the window. The tray icon must remain visible in the system tray while the app is running.",
+      "status": "todo",
+      "priority": "high",
+      "group_id": "FEAT",
+      "depends_on": [
+        "FEAT-01"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "A tray icon appears in the Windows system tray when the app runs",
+        "Clicking Hide Pet removes the window from view without quitting the process (tray icon remains)",
+        "Clicking Show Pet brings the window back using showInactive() without stealing focus",
+        "Clicking Quit fully terminates the Electron process",
+        "Closing the window with the system close button hides it rather than quitting",
+        "npm run lint passes"
+      ],
+      "docs": [
+        "docs/ARCHITECTURE.md"
+      ],
+      "files": [
+        "src/main/tray.ts",
+        "src/main/main.ts"
+      ],
+      "commands": [
+        "npm run lint"
+      ]
+    },
+    {
+      "id": "FEAT-06",
+      "title": "Implement local HTTP sidecar /state endpoint",
+      "description": "Create src/main/sidecar.ts. Export startSidecar(win:BrowserWindow):http.Server and stopSidecar(server:http.Server):void. The server binds to 127.0.0.1 on BUDDY_PORT (process.env.BUDDY_PORT ?? 7777). On first run, generate a random 32-char hex token, write it to %USERPROFILE%/.petdex-win/runtime/update-token (create directories as needed), and read it back on subsequent runs. Handle POST /state: require Content-Type:application/json, parse body (max 4KB), validate X-Petdex-Update-Token header against the stored token, require a non-empty state string field, then call win.webContents.send('pet:state-change',{state}). Respond 200 {ok:true} on success. Handle GET /health: respond 200 {status:'ok'} with no token check. All other routes: 404. Wrong method on /state: 405. Bad payload: 400. Token mismatch: 401. All responses are JSON with Content-Type:application/json.",
+      "status": "todo",
+      "priority": "high",
+      "group_id": "FEAT",
+      "depends_on": [
+        "FEAT-01"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "GET /health returns {status:'ok'} with 200 without requiring a token",
+        "POST /state with correct token and {state:'running'} returns {ok:true} and triggers pet:state-change IPC",
+        "POST /state with missing or wrong token returns 401",
+        "POST /state with missing state field returns 400",
+        "Unknown routes return 404; wrong method on /state returns 405",
+        "The token file is created at ~/.petdex-win/runtime/update-token on first run",
+        "npm run lint passes"
+      ],
+      "docs": [
+        "docs/ARCHITECTURE.md",
+        "docs/ENV_VARS.md"
+      ],
+      "files": [
+        "src/main/sidecar.ts"
+      ],
+      "commands": [
+        "npm run lint"
+      ]
+    },
+    {
+      "id": "FEAT-07",
+      "title": "Wire main process — integrate modules, startup restore, bounds saving",
+      "description": "Update src/main/main.ts to integrate all Phase 1 modules into a complete startup sequence. On app.whenReady(): (1) call loadState() to get persisted state; (2) create the overlay window via createAvatarWindow(state.bounds); (3) call createTray(win); (4) call startSidecar(win); (5) load the renderer (loadURL or loadFile for index.html); (6) wait for the renderer to signal ready via ipcMain.once('renderer-ready') before calling win.showInactive() if state.open is true. Wire bounds saving: on ipcMain.on('drag-end') call saveBounds(win.getBounds()); on screen.on('display-metrics-changed') call saveBounds(win.getBounds()); on win.on('close') (when isQuitting) call saveState({...loadState(), open:win.isVisible(), bounds:win.getBounds()}). On app.on('before-quit') set isQuitting=true, save final state, call stopSidecar. App.svelte must send 'renderer-ready' on mount so main knows the renderer is live before showing the window.",
+      "status": "todo",
+      "priority": "high",
+      "group_id": "FEAT",
+      "depends_on": [
+        "FEAT-01",
+        "FEAT-02",
+        "FEAT-03",
+        "FEAT-04",
+        "FEAT-05",
+        "FEAT-06"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "App starts, renderer signals ready, window appears at the last saved position",
+        "Dragging the pet and restarting the app shows the pet at the dragged position",
+        "Changing display resolution saves the new bounds to state.json under byResolution",
+        "Quitting via tray persists the window open/closed state; restart respects it",
+        "npm run lint passes",
+        "npm run build completes without error"
+      ],
+      "docs": [
+        "docs/ARCHITECTURE.md",
+        "handoff.md"
+      ],
+      "files": [
+        "src/main/main.ts",
+        "src/renderer/App.svelte"
+      ],
+      "commands": [
+        "npm run lint",
+        "npm run build"
+      ]
+    },
+    {
+      "id": "FEAT-08",
+      "title": "Implement Codex hooks install command",
+      "description": "Create src/main/hooks-install.ts. Export installHooks(options:{codex?:boolean}):HookInstallResult where HookInstallResult is {installed:string[], skipped:string[], errors:string[]}. For Codex: read %USERPROFILE%/.codex/hooks.json (create as [] if missing). The hook mapping is: UserPromptSubmit->jumping, PreToolUse->running, PostToolUse->idle, PermissionRequest->waiting, Stop->waving. Each hook entry should have type:'command' and command: the curl one-liner that POSTs to the sidecar with the update token. Before appending, check if an entry for that event+command already exists to ensure idempotency. Write the updated array back. Export a second function getHooksStatus():Record<string,boolean> that returns which hooks are currently installed. Add a tray menu item 'Install Hooks' (in tray.ts) that calls installHooks({codex:true}) and shows a dialog.showMessageBox with the result summary.",
+      "status": "todo",
+      "priority": "medium",
+      "group_id": "FEAT",
+      "depends_on": [
+        "FEAT-07"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "installHooks({codex:true}) writes valid JSON entries to ~/.codex/hooks.json",
+        "Re-running installHooks is idempotent (duplicate entries are not created)",
+        "getHooksStatus() accurately reflects which hooks are present in hooks.json",
+        "The tray Install Hooks item shows a success/failure dialog after running",
+        "npm run lint passes"
+      ],
+      "docs": [
+        "docs/ARCHITECTURE.md",
+        "handoff.md"
+      ],
+      "files": [
+        "src/main/hooks-install.ts",
+        "src/main/tray.ts"
+      ],
+      "commands": [
+        "npm run lint"
+      ]
+    }
+  ]
 }

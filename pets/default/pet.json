@@ -1,0 +1,61 @@
+{
+  "id": "default",
+  "name": "Default Pet",
+  "spritesheet": "spritesheet.webp",
+  "frameWidth": 142,
+  "frameHeight": 154,
+  "columns": 8,
+  "rows": 9,
+  "states": {
+    "idle": {
+      "frames": [
+        { "row": 0, "col": 0, "ms": 280 },
+        { "row": 0, "col": 1, "ms": 110 }
+      ]
+    },
+    "running": {
+      "frames": [
+        { "row": 7, "col": 0, "ms": 120 },
+        { "row": 7, "col": 1, "ms": 120 },
+        { "row": 7, "col": 2, "ms": 120 }
+      ]
+    },
+    "waiting": {
+      "frames": [
+        { "row": 6, "col": 0, "ms": 150 },
+        { "row": 6, "col": 1, "ms": 150 }
+      ]
+    },
+    "jumping": {
+      "frames": [
+        { "row": 3, "col": 0, "ms": 100 },
+        { "row": 3, "col": 1, "ms": 100 },
+        { "row": 3, "col": 2, "ms": 100 },
+        { "row": 3, "col": 3, "ms": 100 }
+      ],
+      "once": true,
+      "fallback": "idle"
+    },
+    "waving": {
+      "frames": [
+        { "row": 4, "col": 0, "ms": 150 },
+        { "row": 4, "col": 1, "ms": 150 },
+        { "row": 4, "col": 2, "ms": 150 }
+      ],
+      "once": true,
+      "fallback": "idle"
+    },
+    "failed": {
+      "frames": [
+        { "row": 5, "col": 0, "ms": 200 },
+        { "row": 5, "col": 1, "ms": 200 }
+      ]
+    },
+    "review": {
+      "frames": [
+        { "row": 8, "col": 0, "ms": 200 },
+        { "row": 8, "col": 1, "ms": 200 }
+      ]
+    }
+  }
+}
