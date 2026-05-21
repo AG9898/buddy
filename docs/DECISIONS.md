@@ -54,19 +54,62 @@ What existing code or docs does this affect?>
 
 ## Open Decisions
 
-<!-- TODO: Add open decisions here using the template above.
-Number them OPEN-01, OPEN-02, etc. in the order they are raised.
--->
-
 *(No open decisions yet.)*
 
 ---
 
 ## Resolved Decisions
 
-<!-- TODO: Add resolved decisions here using the resolved template above.
-Number them RESOLVED-01, RESOLVED-02, etc. in the order they are resolved.
-Resolutions are append-only — never edit a resolved decision block.
--->
+### RESOLVED-01 — Electron + Svelte over Tauri
 
-*(No resolved decisions yet.)*
+**Resolved:** 2026-05-21
+
+**Decision:** Use Electron for the main process and Svelte + TypeScript + Vite for the renderer.
+
+**Why:** Electron's BrowserWindow API gives precise control over transparent overlays on Windows — specifically `thickFrame: false`, `roundedCorners: false`, `setIgnoreMouseEvents`, and `showInactive`. These behaviors are critical for a frameless, click-through pet overlay and are not reliably accessible through Tauri's WebView2 wrapper.
+
+**Alternatives rejected:** Tauri (insufficient low-level Windows overlay control via WebView2); plain Win32 (excessive boilerplate with no web renderer, making sprite animation and state UI impractical).
+
+**Affects:** [ARCHITECTURE.md](ARCHITECTURE.md), [CONVENTIONS.md](CONVENTIONS.md)
+
+---
+
+### RESOLVED-02 — Rust for petdex-bridge (WSL bridge CLI)
+
+**Resolved:** 2026-05-21
+
+**Decision:** petdex-bridge is a Rust binary cross-compiled to `x86_64-unknown-linux-gnu` for execution inside WSL.
+
+**Why:** Rust cross-compiles cleanly to Linux (for WSL) with zero runtime dependencies. The resulting binary is ~2 MB, starts in milliseconds, and can be called directly from shell hooks (`.zshrc`/`.bashrc`) without requiring Node, Python, or any other runtime to be present in the WSL environment.
+
+**Alternatives rejected:** Node.js script (requires Node installed in WSL, slow startup latency for a hook); Go (viable but Rust fits the project's existing preferences); Python (too heavy for a lightweight hook bridge invoked on every tool call).
+
+**Affects:** [ARCHITECTURE.md](ARCHITECTURE.md)
+
+---
+
+### RESOLVED-03 — Codex-compatible sprite sheet format
+
+**Resolved:** 2026-05-21
+
+**Decision:** Use Codex's pixel-art sprite sheet format — an 8-column × 9-row PNG/WebP grid with a companion JSON state machine that defines frame sequences per named pet state.
+
+**Why:** Direct format compatibility means sprites already present in `~/.codex/pets` can be used in buddy without any conversion step. The format is simple to render with CSS `background-position` animation, well-understood from the open-source Codex implementation, and supports all required pet states (idle, running, waiting, jumping, waving, failed, review).
+
+**Alternatives rejected:** Lottie (incompatible with existing Codex pixel-art sprites and requires vector artwork); CSS/SVG animation (insufficient expressiveness for multi-state, frame-by-frame pixel art).
+
+**Affects:** [CONVENTIONS.md](CONVENTIONS.md)
+
+---
+
+### RESOLVED-04 — Local HTTP transport for hook events
+
+**Resolved:** 2026-05-21
+
+**Decision:** Hook events are delivered via `POST http://127.0.0.1:7777/state` (port configurable via `BUDDY_PORT`). The Electron sidecar listens on this port. petdex-bridge running in WSL reaches the Windows host using WSL's automatic localhost passthrough.
+
+**Why:** WSL2 automatically routes `localhost` traffic to the Windows host, making HTTP the simplest possible cross-boundary transport. HTTP is language-agnostic (any hook script can use `curl` or `petdex-bridge`), debuggable with standard tools, and requires no special IPC setup or kernel-level configuration. The token-based auth header (`X-Petdex-Update-Token`) provides sufficient security since the server is bound to loopback only.
+
+**Alternatives rejected:** Windows named pipes (fragile and inconsistently accessible from WSL2); Unix sockets (not available cross-OS between WSL and Windows); stdout/stdin relay (requires a persistent process attached to the hook, which is impractical for shell hooks).
+
+**Affects:** [ARCHITECTURE.md](ARCHITECTURE.md), [ENV_VARS.md](ENV_VARS.md)

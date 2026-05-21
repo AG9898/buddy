@@ -22,12 +22,7 @@ moving any file under `docs/`, update this file in the same commit.
 | [`docs/workboard.schema.json`](workboard.schema.json) | JSON Schema contract for workboard structure and required task fields |
 | [`docs/workboard.md`](workboard.md) | Workboard semantics, field definitions, and agent usage rules |
 
-<!-- TODO: Add project-specific docs below as needed. Examples:
-| [`docs/SCHEMA.md`](SCHEMA.md) | Database schema and migration history |
-| [`docs/API.md`](API.md) | API endpoint contracts |
-| [`docs/STYLE_GUIDE.md`](STYLE_GUIDE.md) | UI style system and design direction |
-| [`docs/DEPLOYMENT.md`](DEPLOYMENT.md) | Deployment runbook |
--->
+| [`handoff.md`](../handoff.md) | Implementation reference: Codex architecture notes, Electron window options, hook model, sprite format |
 
 ---
 

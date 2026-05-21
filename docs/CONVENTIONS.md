@@ -17,144 +17,162 @@ These apply across every stack in this project.
 - **No business logic in route handlers.** Route handlers call service functions; service
   functions call domain modules or data helpers.
 - **No orphaned code.** Dead code is removed — not commented out, not wrapped in a flag.
-- <!-- TODO: Add universal rules specific to this project. -->
+- **No direct writes to Codex internal state files.** Treat `.codex-global-state.json` as
+  read-only reference only — never write to it.
+- **IPC channel names are constants.** All IPC channel name strings are defined in
+  `src/preload/preload.ts`. Never hardcode channel name strings in main or renderer files.
+- **HTTP sidecar binds 127.0.0.1 only.** Never bind to 0.0.0.0 or any non-loopback address.
 
 ---
 
-## <!-- TODO: Stack 1 — e.g. "Frontend (TypeScript / React / Next.js)" -->
+## Stack 1 — Electron Main (TypeScript / Node.js)
 
 ### Language and Types
 
-<!-- TODO: Type strictness, lint rules, and disallowed constructs.
-
-Examples:
-- TypeScript strict mode is enabled — no `any`; prefer `unknown` + type narrowing.
-- All exported functions must have explicit return types.
-- Prefer named exports over default exports for non-page modules.
-- `console.log` is banned in production paths — use the project logger.
--->
+- TypeScript strict mode is enabled — no `any`; use `unknown` + type narrowing.
+- All exported functions have explicit return types.
+- Named exports only — no default exports outside of Electron entry points (`main.ts`).
+- `console.log` is banned in production paths — use the project logger (`src/main/logger.ts`).
 
 ### Module and File Organization
 
-<!-- TODO: Where do specific types of files go?
-
-Examples:
-- Components: `src/components/<domain>/<ComponentName>.tsx`
-- Services (API wrappers): `src/services/<domain>.ts`
-- Route Handlers: `src/app/api/<path>/route.ts`
-- Tests: collocated as `<name>.test.ts` or grouped in `src/__tests__/`
-- Shared helpers: `src/lib/<concern>.ts`
--->
+- `src/main/` — one file per concern: `avatar-window.ts`, `state-store.ts`, `sidecar.ts`,
+  `tray.ts`, `hooks-install.ts`.
+- `src/preload/preload.ts` — single preload file; exposes only `petApi` via
+  `contextBridge.exposeInMainWorld`.
+- State read/write is isolated to `state-store.ts` — no other file writes to `state.json`.
+- HTTP sidecar is isolated to `sidecar.ts` — no other file creates an HTTP server.
 
 ### Naming Conventions
 
-<!-- TODO: Variable, function, file, and component naming rules.
-
-Examples:
-- React components: PascalCase (`SessionCard.tsx`)
-- Utility functions and hooks: camelCase (`useSessionState`)
-- Constants: UPPER_SNAKE_CASE
-- Filenames: kebab-case for utilities (`route-handler-auth.ts`), PascalCase for components
-- Route segments: kebab-case (`/new-session`)
--->
+- Files: `kebab-case.ts`
+- Exported functions: camelCase; exported classes: PascalCase
+- IPC channel names: `kebab-case` strings, defined as constants in `preload.ts`
+  (e.g., `pet:state-change`, `drag-start`)
+- Constants: `UPPER_SNAKE_CASE`
 
 ### Patterns
 
-<!-- TODO: 2–4 idiomatic patterns this stack must follow.
-
-Examples:
-- API calls go through typed service wrappers — never raw `fetch` inside components.
-- Route Handlers share a server-only helper layer for auth, caching, and timeout fetches.
-  Do not re-inline those concerns per handler.
-- State management uses [Zustand / Redux / React Context — pick one and document it here].
-- All same-origin Route Handlers export `maxDuration` to match the backend timeout window.
--->
+- **IPC:** main sends to renderer via `win.webContents.send(channel, payload)`. Renderer
+  listens via `petApi.onXxx()`. All bridge calls go through `contextBridge` — never enable
+  `nodeIntegration`.
+- **Click-through toggling:** renderer calls `petApi.setPointerInteractive(bool)`, main
+  handles `setIgnoreMouseEvents` accordingly.
+- **State persistence:** always read state at startup via `state-store.ts`; always write
+  state on `close`, `drag-end`, `display-change`, and `app-quit` events.
 
 ---
 
-## <!-- TODO: Stack 2 — e.g. "Backend (Python / FastAPI)" -->
+## Stack 2 — Svelte Renderer (Svelte / TypeScript / Vite)
+
+### Language and Types
+
+- TypeScript strict mode — same rules as the main process.
+- Svelte component props are typed with `export let prop: Type`.
+- No direct `window` or `document` access for Electron IPC — use `petApi` from
+  `contextBridge` only.
+
+### Module and File Organization
+
+- One `.svelte` file per visual component.
+- Shared types: `src/renderer/types.ts`.
+- Animation logic: colocated in `PetSprite.svelte` — not extracted into a separate service.
+
+### Naming Conventions
+
+- Svelte components: `PascalCase.svelte`
+- CSS classes: `kebab-case`
+- Reactive state variables: camelCase
+
+### Patterns
+
+- **Sprite animation:** CSS `background-position` on a `<div>` with known grid dimensions
+  (8 columns × 9 rows). Position formula: `col / (columns - 1) * 100%` for X,
+  `row / (rows - 1) * 100%` for Y.
+- **Animation loop:** `setInterval`-based with per-frame duration sourced from the `pet.json`
+  state machine definition.
+- **Pointer interactivity:** `pointermove` handler on the root element;
+  `event.target.closest('[data-avatar-mascot]')` determines whether the cursor is over the
+  interactive region.
+- **Dragging:** `pointerdown` starts drag, `pointermove` sends `drag-move` via `petApi`,
+  `pointerup` ends the drag and sends `drag-end`.
+
+---
+
+## Stack 3 — petdex-bridge (Rust)
+
+### Language and Types
+
+- Rust 2021 edition.
+- `cargo fmt` and `cargo clippy -- -D warnings` must pass before any commit.
+- Use `thiserror` for error types; avoid `unwrap()` in production paths — use `?`
+  propagation throughout.
+- No `unsafe` blocks.
 
 ### Module Structure
 
-<!-- TODO: How routers, services, and schemas are organized.
+- Single binary crate in `petdex-bridge/`.
+- `src/main.rs` — CLI arg parsing (clap), token reading, HTTP POST to sidecar.
+- No library crate needed — keep it a single file unless the binary grows significantly.
 
-Examples:
-- One router file per domain: `participants.py`, `sessions.py`, `scoring.py`
-- Register all routers in `main.py` with explicit prefixes
-- Schemas in `app/schemas/`, one file per domain, grouping `*Create` / `*Response` / `*Update`
-- Services in `app/services/`, one file per domain
-- Domain constants in `app/config.py` — never hardcode them in routers or services
--->
+### Naming Conventions
 
-### Types and Validation
+- `snake_case` for all Rust identifiers (standard Rust conventions).
+- CLI subcommands: `state <name>`, `up`, `down`, `doctor`.
 
-<!-- TODO: Type strictness and validation rules.
+### Patterns
 
-Examples:
-- All path functions and Pydantic models must be fully typed.
-- Request bodies: `...Create` schema. Responses: `...Response` schema.
-- Never return SQLAlchemy ORM objects from endpoints — always serialize to `...Response`.
-- Enums for fixed-vocabulary fields (status, role, category).
--->
-
-### Scoring / Pure Modules
-
-<!-- TODO: If the project has pure computation modules, define their contract here.
-
-Example:
-- One file per instrument in `app/scoring/`: `digitspan.py`, `uls8.py`, etc.
-- Each file exposes exactly one public function: `score(raw: ...) -> ScoredResult`
-- Scoring functions are pure — no DB calls, no side effects, testable in isolation.
--->
-
-### Auth
-
-<!-- TODO: How auth dependencies are structured in route handlers.
-
-Example:
-- `Depends(get_current_lab_member)` on all RA-only endpoints.
-- `Depends(get_current_admin)` on admin-only endpoints.
-- Participant endpoints: validate `session_id` existence + `status == "active"` before accepting data.
-- All Supabase Auth SDK calls isolated in `app/auth.py`.
--->
-
-### DB Access
-
-<!-- TODO: Rules for DB interactions.
-
-Example:
-- Alembic for all schema changes. Always review generated migration before committing.
-- `DATABASE_URL` from environment only — never hardcode connection strings.
-- FK constraints enforced at DB level, not just application level.
-- All tables get `created_at TIMESTAMPTZ DEFAULT NOW()`.
-- UUIDs generated server-side: `uuid.uuid4()`. Never trust client-generated IDs.
--->
+- **Token resolution:** read from `$HOME/.petdex-win/runtime/update-token`; accept
+  `BUDDY_TOKEN` env var as an override.
+- **HTTP client:** use `ureq` (sync, small binary footprint) — not `reqwest` (async, large).
+- **Exit codes:** 0 on success, non-zero on connection failure. Electron not running is a
+  common and expected case — do not panic, just exit with a non-zero code.
 
 ---
 
-## Database
+## Sprite / pet.json Format
 
-<!-- TODO: Cross-stack DB rules.
+The `pets/<id>/pet.json` file defines the sprite state machine consumed by both the renderer
+and any tooling that manages pet state. The format is:
 
-Examples:
-- Migrations only — never ALTER TABLE or DROP COLUMN directly.
-- All schema changes go through the migration tool (Alembic / Flyway / Prisma migrate).
-- FK constraints enforced at the DB level.
-- All tables have a `created_at` timestamp column with server-side default.
--->
+```json
+{
+  "id": "hirono-bear",
+  "name": "Hirono Bear",
+  "spritesheet": "spritesheet.webp",
+  "frameWidth": 142,
+  "frameHeight": 154,
+  "columns": 8,
+  "rows": 9,
+  "states": {
+    "idle":    { "frames": [{"row":0,"col":0,"ms":280},{"row":0,"col":1,"ms":110}] },
+    "running": { "frames": [{"row":7,"col":0,"ms":120},{"row":7,"col":1,"ms":120}] },
+    "waiting": { "frames": [{"row":6,"col":0,"ms":150},{"row":6,"col":1,"ms":150}] },
+    "jumping": { "frames": [{"row":3,"col":0,"ms":100},{"row":3,"col":1,"ms":100}], "once": true, "fallback": "idle" },
+    "waving":  { "frames": [{"row":4,"col":0,"ms":150},{"row":4,"col":1,"ms":150}], "once": true, "fallback": "idle" },
+    "failed":  { "frames": [{"row":5,"col":0,"ms":200}] },
+    "review":  { "frames": [{"row":8,"col":0,"ms":200},{"row":8,"col":1,"ms":200}] }
+  }
+}
+```
+
+- `once: true` — the animation plays exactly once, then transitions to the `fallback` state.
+  States without `once` loop indefinitely.
+- `fallback` — the state to enter when a `once` animation completes. Must be a valid state key.
+- **CSS background-position formula:**
+  - X: `col / (columns - 1) * 100%`
+  - Y: `row / (rows - 1) * 100%`
 
 ---
 
 ## Testing
 
-<!-- TODO: Reference TESTING.md rather than restating its conventions here.
-Add only the rules that affect how code is written (not how tests are run).
-
-Examples:
-- Every new public service function requires a unit test.
-- Scoring tests are pure input/output — no mocks required.
-- Any route change touching auth must include an assertion in the route-topology test.
--->
+- Every new public function in `sidecar.ts` or `state-store.ts` requires a Vitest unit test
+  before the task is marked done.
+- Svelte unit tests must not launch Electron — mock `petApi` via `vi.mock`.
+- State machine tests are pure input/output — no mocks needed.
+- Any change to an IPC channel name must include an updated assertion in the E2E test for
+  that channel.
 
 Full testing guide: [`TESTING.md`](TESTING.md)
 
@@ -167,12 +185,22 @@ Hard rules. Agents follow these unconditionally.
 - Never commit secrets or credentials to source control.
 - Never bulk-rewrite `docs/workboard.json` — use targeted edits only.
 - Never bypass or weaken the auth middleware on protected routes.
-- Never use `any` (TypeScript) or untyped function signatures (Python) in new code.
-- <!-- TODO: Add project-specific never rules. -->
+- Never use `any` in TypeScript new code.
+- Never write to `%USERPROFILE%\.codex\.codex-global-state.json` — treat Codex state as
+  read-only reference only.
+- Never set `nodeIntegration: true` in `webPreferences` — all renderer↔main communication
+  goes through `contextBridge`.
+- Never bind the HTTP sidecar to anything other than `127.0.0.1`.
+- Never store or commit the update token (`BUDDY_TOKEN` / `update-token` file contents) in
+  source code.
 
 ## Always
 
 - Always run the fast verification suite before marking a task done.
 - Always update `docs/` files when public behavior, interfaces, or invariants change.
-- Always use the project logger — not `console.log` / `print` — in production paths.
-- <!-- TODO: Add project-specific always rules. -->
+- Always use the project logger (`src/main/logger.ts`) — not `console.log` — in production
+  paths.
+- Always call `showInactive()` to display the pet window — never `show()`, which would steal
+  focus from the user's foreground application.
+- Always save window bounds on: `close`, `drag-end`, `display-change`, and `app-quit` events.
+- Always validate the `X-Petdex-Update-Token` header before acting on any sidecar request.

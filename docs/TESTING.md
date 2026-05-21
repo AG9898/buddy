@@ -9,67 +9,57 @@
 ## Quick Start
 
 ```bash
-# TODO: Replace with the actual commands for this project.
+# Run all Svelte/TS unit tests
+npm test
 
-# Run all tests
-# e.g. npm test
-# e.g. cd backend && PYTHONPATH=. .venv/bin/pytest tests/ -v
-# e.g. cargo test --workspace
-
-# Run a single file
-# e.g. npm test -- src/services/scoring.test.ts
-# e.g. PYTHONPATH=. .venv/bin/pytest tests/test_scoring_digitspan.py -v
+# Run a single test file
+npm test -- src/renderer/PetSprite.test.ts
 
 # Run with coverage
-# e.g. npm run test:coverage
-# e.g. PYTHONPATH=. .venv/bin/pytest tests/ --cov=app
+npm run test:coverage
+
+# Run Rust unit tests
+cd petdex-bridge && cargo test
+
+# Run Electron E2E tests (requires Windows, launches Electron)
+npm run test:e2e
 ```
 
 ---
 
 ## Test Stacks
 
-<!-- TODO: One row per test stack. -->
-
 | Stack | Tool | Version | Location | Run Command |
 |---|---|---|---|---|
-| <!-- TODO: e.g. Frontend --> | <!-- TODO: e.g. vitest --> | <!-- TODO --> | <!-- TODO: e.g. `src/**/*.test.ts` --> | <!-- TODO: e.g. `npm test` --> |
-| <!-- TODO: e.g. Backend --> | <!-- TODO: e.g. pytest --> | <!-- TODO --> | <!-- TODO: e.g. `backend/tests/` --> | <!-- TODO: e.g. `PYTHONPATH=. .venv/bin/pytest tests/` --> |
+| Svelte/TS unit | Vitest | latest | `src/**/*.test.ts` | `npm test` |
+| Rust unit | cargo test | (project Rust version) | `petdex-bridge/src/**` | `cd petdex-bridge && cargo test` |
+| Electron E2E | Playwright + electron-playwright-helpers | latest | `tests/e2e/` | `npm run test:e2e` |
 
 ---
 
 ## What Is Covered
 
-<!-- TODO: Describe what the test suite covers at a high level.
-Be honest about gaps — this helps agents make good decisions about where to add tests.
+**Svelte unit tests:** PetSprite animation state machine (frame sequencing, state
+transitions, `once` + `fallback` logic), pointer interactivity detection logic, App
+component IPC event handling.
 
-Example:
-**Backend:** scoring modules (pure unit), service logic (mocked collaborators), router endpoints
-(auth and response shape), import/export flows, analytics parity (fixture-based).
+**Rust unit tests:** petdex-bridge CLI arg parsing, HTTP payload construction, token file
+reading, exit codes on connection failure.
 
-**Frontend:** same-origin Route Handler auth and cache behavior, route-topology guard assertions,
-utility modules (status mapping, display formatting, error resolution).
+**Electron E2E:** Window appears at startup, pet state changes via HTTP POST animate
+correctly, state persists across restart, tray Show/Hide/Quit work.
 
-**Not covered:** end-to-end browser tests, visual regression, load testing.
--->
+**Not covered (yet):** Visual regression, multi-monitor DPI scaling, packaged installer
+smoke test, Windows-native hook execution.
 
 ---
 
 ## Test File Inventory
 
-<!-- TODO: List every test file with its domain and coverage scope.
-Keep this table up to date — add a row when adding a new test file.
+*(No test files yet — fill in as the suite grows.)*
 
 | File | Domain | What It Covers |
 |---|---|---|
-| `test_scoring_foo.py` | Scoring | `score()` pure function — all correct, all wrong, mixed inputs |
-| `test_service_bar.py` | Service | Business logic with mocked DB session |
-| `test_router_baz.py` | Router | Endpoint auth, response shape, error codes |
-| `foo.test.ts` | Frontend | Route Handler cache hit/miss/auth failure |
-| `route-topology.test.ts` | Frontend | Asserts middleware + layout guard wiring on all RA routes |
--->
-
-*(No test files yet — fill in as the suite grows.)*
 
 ---
 
@@ -77,38 +67,90 @@ Keep this table up to date — add a row when adding a new test file.
 
 ### Rules
 
-<!-- TODO: Hard rules for tests in this project. Agents follow these unconditionally.
-
-Examples:
-- Unit tests must not hit a live database — use fakes (`SimpleNamespace`, `_FakeAsyncSession`) or mocks.
-- Scoring functions are pure — test with plain input/output; no mocks required.
-- Any route change that touches auth must include an assertion in the route-topology test file.
-- Analytics / parity tests are blocking — a parity failure means the PR does not merge.
-- New public service functions require at least one unit test before the task is marked done.
--->
+- Svelte unit tests must not launch Electron — use `vi.mock` for any `petApi` /
+  `contextBridge` calls.
+- State machine tests are pure input/output — no mocks needed.
+- E2E tests run only on Windows — guard with
+  `if (process.platform !== 'win32') test.skip(...)` at the top of every E2E file.
+- Any change to an IPC channel name must include an updated assertion in the E2E test for
+  that channel.
+- New public functions in `sidecar.ts` or `state-store.ts` require a Vitest unit test
+  before the task is marked done.
 
 ### Patterns
 
-<!-- TODO: Idiomatic test patterns for this project.
+**Svelte unit tests:**
 
-Backend (Python) example:
-- Service isolation: mock imported collaborators via `unittest.mock.patch`.
-- Async tests: use `@pytest.mark.anyio` or `IsolatedAsyncioTestCase`.
-- Fake DB session: define `_FakeAsyncSession` inline with the expected method surface only.
+```typescript
+// Import component with @testing-library/svelte; assert DOM state after dispatching events.
+import { render, fireEvent } from '@testing-library/svelte';
+import PetSprite from './PetSprite.svelte';
 
-Frontend (TypeScript) example:
-- Module mocking: `vi.mock('../lib/supabase')` at the top of the test file.
-- Route Handler tests: call the exported `GET`/`POST` function directly with a mock `Request`.
-- Avoid testing implementation details — test behavior through the public interface.
--->
+test('transitions to fallback after once animation completes', async () => {
+  const { component } = render(PetSprite, { props: { state: 'jumping' } });
+  // assert frame sequence and eventual fallback to 'idle'
+});
+```
+
+**petApi mock:**
+
+```typescript
+vi.mock('../preload/preload', () => ({
+  petApi: {
+    onStateChange: vi.fn(),
+    setPointerInteractive: vi.fn(),
+    setState: vi.fn(),
+    dragStart: vi.fn(),
+    dragMove: vi.fn(),
+    dragEnd: vi.fn(),
+  },
+}));
+```
+
+**Rust unit tests:**
+
+```rust
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parses_state_subcommand() {
+        let args = Args::parse_from(["bridge", "state", "running"]);
+        assert_eq!(args.subcommand, Subcommand::State { name: "running".into() });
+    }
+
+    #[test]
+    fn builds_correct_payload() {
+        let payload = build_payload("running");
+        assert_eq!(payload["state"], "running");
+    }
+}
+```
+
+**Electron E2E:**
+
+```typescript
+import { _electron as electron } from 'playwright';
+import { findLatestBuild, parseElectronApp } from 'electron-playwright-helpers';
+
+test('window appears at startup', async () => {
+  const appInfo = parseElectronApp(findLatestBuild());
+  const app = await electron.launch({ args: [appInfo.main] });
+  const page = await app.firstWindow();
+  await page.waitForSelector('[data-avatar-mascot]');
+  await app.close();
+});
+
+test('state change via HTTP POST updates animation', async () => {
+  // launch app, POST to sidecar, assert renderer DOM reflects new state
+});
+```
 
 ### Adding a New Test File
 
-<!-- TODO: Step-by-step process for adding a test file.
-
-Example:
-1. Name the file following the project convention (e.g. `test_<domain>_<layer>.py`).
-2. Place it in the correct test directory (e.g. `backend/tests/`).
-3. Add a row to the Test File Inventory table above.
-4. Run the full suite to confirm no regressions before committing.
--->
+1. Name it `<component>.test.ts` for Svelte/TS, or add a `#[cfg(test)]` module inline for
+   Rust.
+2. Place it in the same directory as the file it tests (colocated).
+3. Add a row to the **Test File Inventory** table above.
+4. Run `npm test` (and `cargo test` for Rust) to confirm no regressions before committing.

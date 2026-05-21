@@ -1,115 +1,99 @@
-# PRD — <Project Name>
+# PRD — buddy
 
-<!-- TODO: Replace <Project Name> above. -->
-<!-- TODO: Update the status table each time scope or delivery state changes.     -->
-
-> **Status** (<!-- TODO: YYYY-MM-DD -->)
+> **Status** (2026-05-21)
 >
 > | Track | State |
 > |---|---|
-> | Shipped | <!-- TODO: list shipped capabilities, or "Nothing shipped yet." --> |
-> | In Progress | <!-- TODO: active workboard items, or "See docs/workboard.json." --> |
-> | Planned | <!-- TODO: next scope boundary, or "None yet confirmed." --> |
+> | Shipped | Nothing shipped yet. |
+> | In Progress | See docs/workboard.json. |
+> | Planned | Phase 1 MVP — see Scope below. |
 
 ---
 
 ## Objective
 
-<!-- TODO: 2–4 sentences. What does this product do and for whom?
-What problem does it solve? What is the core value proposition?
-
-Example:
-Internal lab-operated web app for running cognitive assessments with research participants.
-RAs manage sessions from a dashboard; participants complete keyboard-only tasks and surveys.
-All data is auto-scored, stored, and viewable by the lab team without manual export steps.
--->
+buddy is a standalone Windows desktop app that renders a floating, always-on-top, transparent pixel-art pet character that reacts to AI coding assistant activity in real time. It is for developers running Codex or Claude Code on Windows or Windows+WSL who want ambient visual feedback about what their AI agent is doing. It solves the gap left by Petdex — which only ships macOS binaries — giving Windows developers the same live pet overlay experience without requiring macOS or a second machine.
 
 ---
 
 ## Users
 
-<!-- TODO: Define each user role. Be concrete about permissions and access model.
-
-Example:
-- **Admin** — configures the system, manages users, controls data access.
-- **RA (Research Assistant)** — creates and monitors sessions, views dashboard, imports/exports data.
-- **Participant** — completes tasks and surveys; no login required; identified by session ID only.
--->
+- **Developer** — single local user; no login, no account, no server. Runs AI coding assistants (Codex, Claude Code) on Windows or Windows+WSL. Installs buddy once per machine and interacts with it via system tray, a CLI command, and shell hooks. Has full control over the pet window (show/hide/move/quit).
 
 ---
 
 ## Scope
 
-<!-- TODO: Define scope clearly per phase. Each phase has a concrete delivery boundary. -->
+### Phase 1 — MVP
 
-### Phase 1 — <!-- TODO: Name (e.g. "MVP", "Core Data Collection") -->
+- Electron transparent always-on-top frameless window on Windows desktop
+- Render one sprite sheet with CSS background-position animation (Codex-compatible format)
+- Pet state machine: idle, running, waiting, jumping, waving, failed, review
+- Persist open state and window bounds across app restarts (`%USERPROFILE%\.petdex-win\state.json`)
+- System tray icon with Show / Hide / Quit menu items
+- Local HTTP endpoint `POST /state` listening on `127.0.0.1:7777` (configurable via `BUDDY_PORT`)
+- CLI command (`petdex-win state <state>`) to manually send a state update
+- `petdex-win hooks install` command that writes valid Codex `hooks.json` entries
+- Codex hook event → pet state mapping: UserPromptSubmit → jumping, PreToolUse → running, PostToolUse → idle, PermissionRequest → waiting, Stop → waving
 
-<!-- TODO: Bullet list of features delivered in this phase.
-Example:
-- Keyboard-only Backwards Digit Span task
-- Four survey instruments (ULS-8, CES-D 10, GAD-7, CogFunc 8a)
-- Auto-scoring for all instruments
-- Session creation and data access via database UI
--->
+### Phase 2 — WSL Bridge and Claude Code Integration
 
-### Phase 2 — <!-- TODO: Name -->
-
-<!-- TODO: Bullet list.
-Example:
-- RA dashboard with session KPIs
-- Import/export page (CSV/XLSX, preview-first)
-- Participant demographics collection at session start
--->
+- `petdex-bridge` Rust CLI cross-compiled for Linux/WSL (`x86_64-unknown-linux-gnu`)
+- WSL shell hook integration: `.zshrc`/`.bashrc` hooks call `petdex-bridge`, which POSTs events to the Windows HTTP sidecar via WSL localhost passthrough
+- Claude Code hook detection and shell hook installation
+- Sprite creation tooling supporting Codex-compatible sprite sheet format
+- Multi-monitor and per-resolution DPI support (separate bounds per display config)
+- Custom pet loading from `~/.codex/pets` or `%USERPROFILE%\.petdex-win\pets`
 
 ### Out of Scope
 
-<!-- TODO: Explicitly list what this project does NOT do.
-This section prevents scope creep and guides agent decision-making.
-
-Example:
-- No real-time collaboration features.
-- No public-facing analytics dashboard.
-- No native mobile app — web only.
-- No automated email or notification system.
--->
+- No OAuth, accounts, login, or cloud sync of any kind.
+- No marketplace or gallery for sharing pets.
+- No auto-updater or telemetry.
+- No multi-agent or multi-user server.
+- No mobile app.
+- No public analytics dashboard.
+- No macOS or Linux native app target — Windows-only.
+- No reading from or writing to Codex's internal state files (`.codex-global-state.json`).
 
 ---
 
 ## Success Criteria
 
-<!-- TODO: Measurable outcomes that define "done" for this project or current phase.
-Each criterion should be verifiable.
+### Phase 1
 
-Example:
-- End-to-end session completes without manual scoring intervention.
-- All data is linked to participant_uuid + session_id.
-- Lab team can view all stored results without direct database access.
-- RA login is gated at the server edge — no client-side-only auth.
--->
+- Pet window appears on the Windows desktop after `npm run dev` or packaged app launch.
+- Pet animates through idle, running, and waiting states in response to Codex hook events.
+- Window survives minimize and close of the main Codex window (always-on-top, independent process).
+- State (open boolean, window bounds) persists correctly across full app restart.
+- `petdex-win hooks install` writes syntactically valid Codex `hooks.json` entries that Codex loads without error.
+
+### Phase 2
+
+- `petdex-bridge` binary builds cleanly with `cargo build --target x86_64-unknown-linux-gnu` and runs in WSL without additional runtime dependencies.
+- Claude Code shell hooks installed via `petdex-bridge hooks install --shell zsh` (or bash) trigger visible pet state changes on the Windows display.
+- Per-resolution window bounds are stored and restored correctly when switching between monitor configurations.
 
 ---
 
 ## Constraints
 
-<!-- TODO: Technical, legal, or operational constraints that bound the solution.
-Agents use this section to rule out implementation approaches that violate project requirements.
-
-Example:
-- Participants are anonymous — no names or other direct identifiers stored.
-- Data must remain in Canada (data residency requirement).
-- System must work on iOS Safari 16+ and Chrome 110+.
-- No third-party analytics SDKs that transmit participant behavior data off-site.
--->
+- Windows-only (win32). No macOS or Linux native app target is planned or supported.
+- Electron transparent windows on Windows require `thickFrame: false` and `roundedCorners: false` — do not remove these flags.
+- The local HTTP server must bind to `127.0.0.1` only. Binding to `0.0.0.0` is a security violation.
+- All incoming HTTP requests to `/state` must be validated against the `X-Petdex-Update-Token` header (token stored at `%USERPROFILE%\.petdex-win\runtime\update-token`). Requests without a valid token must be rejected.
+- Must not read from or write to Codex's internal state files (`.codex-global-state.json` or similar).
+- WSL agents cannot launch or inspect Windows GUI processes directly — all test instructions must be explicit and manual or use the CLI/HTTP interface.
+- Custom pet directories must follow the Codex format: a named directory containing `pet.json` and `spritesheet.webp`.
+- No hardcoded credentials, tokens, or paths — all configuration via environment variables or well-known state file locations.
 
 ---
 
 ## Non-Goals
 
-<!-- TODO: Explicitly call out what this project intentionally will not do.
-Useful for ruling out well-intentioned but out-of-scope additions.
-
-Example:
-- Not a general-purpose survey platform — purpose-built for this lab's instruments.
-- Not a real-time monitoring system — data is reviewed asynchronously.
-- Not a participant-facing portal — participants only see their active task session.
--->
+- Not a general-purpose desktop widget platform — purpose-built for AI coding assistant feedback.
+- Not a real-time remote monitoring system — events are local, fire-and-forget HTTP POSTs.
+- Not a multi-user or networked application — single developer, single machine only.
+- Not a sprite editor or full art tool — sprite creation support is limited to format compatibility helpers.
+- Not an auto-updater — distribution and updates are manual or handled externally.
+- Not a replacement for Codex or Claude Code — buddy only listens to their events and displays a pet; it does not control or inspect the AI agents.

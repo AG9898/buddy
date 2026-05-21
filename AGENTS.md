@@ -1,4 +1,4 @@
-# <Project Name> — Agent Working Guide
+# buddy — Agent Working Guide
 
 <!-- AGENTS.md is the canonical file. CLAUDE.md is a symlink to it.              -->
 <!-- To set up after copying this file: ln -sf AGENTS.md CLAUDE.md               -->
@@ -6,82 +6,93 @@
 <!-- This file is a LIVING DOCUMENT — not a static README.                       -->
 <!-- Agents update it after every task cycle with new discoveries and constraints.-->
 <!-- Engineers seed it at project setup with known pitfalls and architecture.     -->
-<!--                                                                              -->
-<!-- TODO: Replace every placeholder marked with TODO before committing.          -->
-<!-- TODO: Delete comment blocks after filling them in.                           -->
 
 ---
 
 ## Overview
 
-<!-- TODO: 2–4 sentences. What does this project do? What is the agent's primary -->
-<!-- role here? Where is the canonical task queue?                                -->
-<!--                                                                              -->
-<!-- Example:                                                                     -->
-<!-- This is the backend API for the Acme data pipeline. Agents implement        -->
-<!-- workboard tasks: features, fixes, schema migrations, and infra changes.     -->
-<!-- The canonical task queue is docs/workboard.json.                            -->
-<!-- Skills are available at .claude/skills/ (synced from ag.dev).              -->
+buddy is a Windows floating desktop pet app built with Electron + Svelte + TypeScript and a Rust WSL bridge (petdex-bridge). Agents implement workboard tasks: Electron window setup, Svelte renderer, HTTP sidecar, tray, hook integration, and Rust bridge. The canonical task queue is docs/workboard.json. Reference handoff.md for Codex architecture details, Electron window options, and hook model.
 
 ---
 
 ## Quick Start
 
-<!-- TODO: Exact commands to get a working dev environment. No prose.            -->
-
 ```bash
 # Install dependencies
-# TODO: e.g. npm install / pip install -r requirements.txt / cargo build
+npm install
 
 # Run tests
-# TODO: e.g. npm test / pytest / cargo test --workspace
+npm test
 
-# Start local server
-# TODO: e.g. npm run dev / uvicorn app.main:app --reload
+# Start dev app (Electron + Vite)
+npm run dev
 
 # Lint / typecheck
-# TODO: e.g. npm run lint / ruff check . / cargo clippy
+npm run lint
+
+# Build petdex-bridge (WSL bridge, requires cross-compile toolchain in WSL)
+cd petdex-bridge && cargo build --release --target x86_64-unknown-linux-gnu
 ```
 
 ---
 
 ## Build & Verification Commands
 
-<!-- TODO: Commands agents must run to verify their changes before marking done. -->
-<!-- Mark each as fast (< 10 s) or slow. Agents prefer fast checks.             -->
-<!-- Never skip a fast check. Skip slow checks only when the task says so.      -->
-
 | Command | What it checks | Speed |
 |---------|---------------|-------|
-| <!-- TODO: `npm test` --> | <!-- TODO: unit + integration tests --> | fast |
-| <!-- TODO: `npm run lint` --> | <!-- TODO: lint + types --> | fast |
-| <!-- TODO: `npm run build` --> | <!-- TODO: production build --> | slow |
+| `npm test` | Vitest unit tests (Svelte, TS) | fast |
+| `npm run lint` | ESLint + svelte-check + tsc --noEmit | fast |
+| `cd petdex-bridge && cargo clippy -- -D warnings` | Rust lint | fast |
+| `npm run build` | Electron production build (electron-builder) | slow |
+| `npm run test:e2e` | Playwright Electron E2E (Windows only) | slow |
 
 ---
 
 ## Repository Structure
 
-<!-- TODO: Top-level directory map. One line per entry. Be precise.              -->
-
 ```
-<!-- TODO:
-src/           Application source
-docs/          Project docs and task queue
-  INDEX.md        Documentation navigation map
-  PRD.md          Product requirements and scope
-  ARCHITECTURE.md System topology and boundaries
-  CONVENTIONS.md  Coding standards and patterns
-  DECISIONS.md    Architectural decision log
-  ENV_VARS.md     Environment variable matrix
-  TESTING.md      Test strategy and inventory
-  workboard.json  Canonical task queue
-  workboard.schema.json JSON Schema for task queue
-  workboard.md    Workboard field definitions and usage rules
-tests/         Test suite
-scripts/       Utility scripts
-.claude/       Claude harness config
-  skills/      Synced skills (do not edit here — edit source in ag.dev)
--->
+buddy/
+  package.json          — Electron app dependencies and npm scripts
+  vite.config.ts        — Vite config for Svelte renderer + Electron main bundling
+  tsconfig.json         — TypeScript config (strict mode)
+  electron-builder.yml  — Windows installer/packager config
+  src/
+    main/
+      main.ts           — Electron entry: app lifecycle, tray, startup restore
+      avatar-window.ts  — BrowserWindow: transparent overlay creation, click-through, drag IPC
+      state-store.ts    — read/write %USERPROFILE%\.petdex-win\state.json
+      sidecar.ts        — local HTTP server on 127.0.0.1:BUDDY_PORT (/state endpoint)
+      tray.ts           — system tray icon and Show/Hide/Quit context menu
+      hooks-install.ts  — writes Codex/Claude Code hooks.json entries
+    preload/
+      preload.ts        — contextBridge: exposes petApi to renderer (setState, onStateChange, drag events, setPointerInteractive)
+    renderer/
+      index.html        — Electron renderer entry
+      App.svelte        — root Svelte component, IPC event listener
+      PetSprite.svelte  — sprite animation state machine, pointer/drag handling
+      styles.css
+  petdex-bridge/
+    Cargo.toml
+    src/
+      main.rs           — CLI (clap): state <name>, POSTs to Electron HTTP sidecar
+  pets/
+    default/
+      pet.json          — sprite state machine (Codex-compatible format)
+      spritesheet.webp  — 8×9 pixel-art grid
+  docs/
+    INDEX.md            — navigation map (this file's pair)
+    PRD.md              — product requirements
+    ARCHITECTURE.md     — system topology and component responsibilities
+    CONVENTIONS.md      — coding standards (TS, Svelte, Rust, sprite format)
+    DECISIONS.md        — architectural decision log
+    ENV_VARS.md         — environment variable matrix
+    TESTING.md          — test strategy: Vitest, cargo test, Playwright E2E
+    workboard.json      — canonical task queue
+    workboard.schema.json
+    workboard.md
+  .claude/skills/       — project skills (query-workboard, start-task, etc.)
+  AGENTS.md             — this file (symlinked as CLAUDE.md)
+  handoff.md            — implementation reference (Codex architecture, hook model, Electron options)
 ```
 
 Docs navigation: [`docs/INDEX.md`](docs/INDEX.md)
@@ -90,50 +101,37 @@ Docs navigation: [`docs/INDEX.md`](docs/INDEX.md)
 
 ## Architecture
 
-<!-- TODO: 5–10 bullets summarizing the constraints that matter most for day-to-day   -->
-<!-- implementation. Focus on constraints, not descriptions. Keep this section brief — -->
-<!-- the deep-dive lives in docs/ARCHITECTURE.md.                                      -->
+- Electron main process manages a transparent, frameless, always-on-top, non-focusable `BrowserWindow`. State persists to `%USERPROFILE%\.petdex-win\state.json`.
+- Local HTTP sidecar (`sidecar.ts`) listens on `127.0.0.1:BUDDY_PORT`. Hook events arrive here from both Windows CLI and WSL petdex-bridge.
+- Svelte renderer (`src/renderer/`) drives sprite animation via CSS `background-position` on an 8×9 spritesheet. State machine defined in `pet.json`.
+- `petdex-bridge` (Rust, `petdex-bridge/`) is a Linux binary that runs in WSL. Shell hooks call it; it POSTs events to the Windows HTTP sidecar via localhost passthrough.
+- All renderer↔main communication goes through the `petApi` contextBridge defined in `preload.ts`. IPC channel names are constants — never hardcoded strings.
 
-- <!-- TODO: e.g. "All external I/O goes through the adapter layer in src/adapters/." -->
-- <!-- TODO: e.g. "Database schema lives in db/migrations/. Never alter tables directly." -->
-- <!-- TODO: e.g. "Public API surface is defined in src/api/schema.ts. Do not break it." -->
-- <!-- TODO: e.g. "Auth is handled exclusively in src/middleware/auth.ts." -->
-- <!-- TODO: e.g. "Config is read from environment variables only. No hardcoded values." -->
-
-Full topology, component responsibilities, data flow, and deployment targets: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
+Full topology: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
 
 ---
 
 ## Code Style & Constraints
 
-<!-- TODO: Hard rules for this codebase. Agents follow these unconditionally.         -->
-<!-- Keep this section to the most critical never/always rules only.                  -->
-<!-- Full conventions, naming rules, and per-stack patterns: docs/CONVENTIONS.md      -->
-
 ### Never
 
 - Never commit secrets or credentials.
 - Never bulk-rewrite `docs/workboard.json`; use targeted edits only.
-- <!-- TODO: e.g. "Never use `any` in TypeScript." -->
-- <!-- TODO: e.g. "Never use `console.log` in production paths; use the logger." -->
-- <!-- TODO: e.g. "Never mutate shared state outside the store layer." -->
+- Never write to `%USERPROFILE%\.codex\.codex-global-state.json` — Codex internals are off-limits.
+- Never set `nodeIntegration: true` — use contextBridge only.
+- Never bind the HTTP sidecar to `0.0.0.0`.
 
 ### Always
 
 - Always run the fast verification suite before marking a task done.
 - Always update relevant `docs/` files when behavior changes.
-- <!-- TODO: e.g. "Always write a test for new public functions." -->
-- <!-- TODO: e.g. "Always use the project logger (src/lib/logger.ts), not console." -->
+- Always use `showInactive()` to display the pet — never `show()`.
+- Always save window bounds on close, drag-end, and display-change events.
+- Always validate `X-Petdex-Update-Token` before acting on sidecar requests.
 
 ### Patterns
 
-<!-- TODO: 2–4 idiomatic patterns agents should follow.                         -->
-<!-- Examples:                                                                   -->
-<!-- - Error handling: use Result<T, AppError>, not thrown exceptions.          -->
-<!-- - API routes: follow the pattern in src/api/routes/example.ts.            -->
-<!-- - DB queries: use the repository pattern in src/db/repositories/.         -->
-
-Full convention guide: [`docs/CONVENTIONS.md`](docs/CONVENTIONS.md)
+Full guide: [`docs/CONVENTIONS.md`](docs/CONVENTIONS.md)
 
 ---
 
@@ -178,10 +176,6 @@ Targeted edit rules:
 - Only update the status fields of the task currently being worked.
 - Roll back `in_progress → todo` if blocked mid-task and unresolved.
 
-<!-- TODO: Note any project-specific workboard conventions here.                -->
-<!-- e.g. "Group IDs in this project: ENGINE, MODEL, INFRA, FOUND."            -->
-<!-- e.g. "Critical tasks in the INFRA group are never skipped mid-sprint."    -->
-
 ---
 
 ## Agent Workflow
@@ -206,28 +200,18 @@ Stop and report (do not continue) when:
 - A verification command fails and the fix is not obvious.
 - An irreversible action (migration, destructive write, external publish) is required
   and the task does not explicitly authorize it.
-- <!-- TODO: Add project-specific stop conditions. -->
+- WSL localhost passthrough not routing (test: `curl http://127.0.0.1:7777/health` from WSL fails).
+- Electron transparent window fails to render on the target Windows system (DPI/HDR issue).
+- `cargo build --target x86_64-unknown-linux-gnu` fails (missing cross-compile toolchain in WSL).
+- An irreversible action (writing hooks.json, modifying Codex config) is required and not explicitly authorized by the task.
 
 ---
 
 ## Debugging & Gotchas
 
-<!-- TODO: Known traps, environment quirks, or non-obvious behaviors.           -->
-<!-- This section grows over time as agents discover issues.                    -->
-<!-- Examples:                                                                   -->
-<!-- - "The test suite requires a local Postgres instance on port 5432.         -->
-<!--    Run `docker compose up -d db` before running tests."                    -->
-<!-- - "The linter is strict about import order. Run `npm run lint:fix`         -->
-<!--    to auto-fix before committing."                                          -->
-<!-- - "Migration files must be named YYYYMMDD_NNN_description.sql or the      -->
-<!--    runner will silently skip them."                                         -->
-
 ---
 
 ## Environment Variables
-
-<!-- TODO: List any variable whose name agents need to know to run the project locally. -->
-<!-- Do not put secret values here. Full matrix with ownership and defaults:            -->
 
 See [`docs/ENV_VARS.md`](docs/ENV_VARS.md) for the canonical variable and secret matrix.
 
@@ -235,21 +219,13 @@ See [`docs/ENV_VARS.md`](docs/ENV_VARS.md) for the canonical variable and secret
 
 ## Testing
 
-<!-- TODO: Fast check agents must run before marking any task done.             -->
-
-Full test strategy, file inventory, and patterns for writing new tests: [`docs/TESTING.md`](docs/TESTING.md)
+`npm test` (Vitest), `cargo test`, `npm run test:e2e` (Electron E2E, Windows only). Full guide: [`docs/TESTING.md`](docs/TESTING.md).
 
 ---
 
 ## Deployment
 
-<!-- TODO: How to deploy — or confirm it is CI-only and agents must not deploy. -->
-<!-- If agents should never deploy, say so explicitly.                          -->
-<!--                                                                            -->
-<!-- Example (CI-only):                                                         -->
-<!-- Deployments are CI-only. Never manually push to production.               -->
-<!-- Staging deploys automatically on merge to `main`.                         -->
-<!-- Production requires a tagged release via the GitHub release workflow.     -->
+`npm run build` produces a Windows installer via electron-builder. `petdex-bridge` is a standalone Linux binary distributed separately for WSL installation.
 
 ---
 
@@ -274,6 +250,3 @@ Do not reorganize or rewrite existing entries — append only.
 ---
 
 ## Discoveries
-
-<!-- Agents: append new discoveries here after each task cycle.                 -->
-<!-- Engineers: seed this section with known pitfalls at project setup time.    -->
