@@ -54,7 +54,19 @@ What existing code or docs does this affect?>
 
 ## Open Decisions
 
-*(No open decisions yet.)*
+### OPEN-01 — Icon and spritesheet art generation via pet hatch skill
+
+**Question:** Should buddy adopt the Codex pet hatch skill as the canonical workflow for generating `build/icon.ico` and final `pets/default/spritesheet.webp` artwork?
+
+**Context:** The codex pet hatch skill is a markdown-driven image-generation workflow that produces Codex-compatible pixel-art spritesheets and accompanying `pet.json` state machines. Using it for buddy means: (a) the same tool that generates Codex pets generates buddy's default pet, keeping the two ecosystems consistent; (b) future users who want a custom pet already have a familiar workflow. Currently `build/icon.ico` is absent (blocking the full installer build) and `pets/default/spritesheet.webp` is a color-grid placeholder. The pet hatch skill was not planned at project start but fits naturally; adopting it will require adapting the skill's prompts and output paths for the buddy context.
+
+**Options under consideration:**
+1. **Adopt pet hatch skill (adapted)** — edit the skill's markdown to output `build/icon.ico` and `pets/default/spritesheet.webp` at the correct dimensions. The skill becomes the canonical art-generation path going forward. Tradeoff: requires skill editing work; adds an optional dependency on Codex image generation.
+2. **Bespoke static assets** — commission or hand-craft `icon.ico` and `spritesheet.webp` separately, commit them as binary blobs. Tradeoff: simpler dependency graph but no repeatable generation workflow; harder to retheme.
+
+**Blocking:** Full release build (`npm run build`) fails without `build/icon.ico`. The placeholder spritesheet unblocks development but is not shippable. Tracks as `ASSET-01` on the workboard.
+
+**See also:** [`docs/ARCHITECTURE.md`](ARCHITECTURE.md), [`docs/workboard.json`](workboard.json)
 
 ---
 

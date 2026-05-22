@@ -37,6 +37,32 @@ npm run test:e2e
 
 ---
 
+## Windows Build Notes
+
+### Locked-down machines (no Administrator rights / no Developer Mode)
+
+`npm run build` will fail with a symlink-privilege error during the `electron-builder` step because `winCodeSign` extracts archives that contain symlinks, which require either Administrator rights or Windows Developer Mode to create.
+
+Use the local build script instead:
+
+```powershell
+npm run build:win:local
+```
+
+This runs `electron-vite build && electron-builder --win --config.win.signAndEditExecutable=false --publish never`, bypassing the code-signing helper. It produces a working `dist\buddy Setup 0.1.0.exe` but without signed executables or customized executable metadata. **Do not use this for release builds** — those must run on CI or a machine with symlink privileges.
+
+Full local smoke-test sequence for a locked-down machine:
+
+```powershell
+npm install
+npm test
+npm run lint
+npm run build:app
+npm run build:win:local
+```
+
+---
+
 ## What Is Covered
 
 **Svelte unit tests:** PetSprite animation state machine (frame sequencing, state

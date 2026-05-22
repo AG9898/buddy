@@ -1,7 +1,7 @@
 {
   "$schema": "./workboard.schema.json",
   "schema_version": "1.0.0",
-  "last_updated": "2026-05-22T10:28:00Z",
+  "last_updated": "2026-05-22T12:00:00Z",
   "tasks": [
     {
       "id": "FEAT-01",
@@ -289,6 +289,34 @@
       ],
       "commands": [
         "npm run lint"
+      ]
+    },
+    {
+      "id": "ASSET-01",
+      "title": "Generate production icon and default spritesheet via pet hatch skill",
+      "description": "Adapt the Codex pet hatch skill for buddy to produce two assets: (1) build/icon.ico — a 256x256 Windows application icon for the buddy pet character, referenced by electron-builder.yml for the installer and executable; (2) pets/default/spritesheet.webp — the production-quality 8-column x 9-row pixel-art spritesheet at 142x154px per frame (1136x1386px total) replacing the current color-grid placeholder. The pet hatch skill is a markdown-driven Codex image generation workflow; it will need to be edited so its output paths and frame dimensions match buddy's expectations. Once real assets exist, remove or replace the placeholder spritesheet and ensure electron-builder.yml icon references resolve correctly so 'npm run build' completes without --config.win.icon=null workarounds. See OPEN-01 in DECISIONS.md for the full decision context.",
+      "status": "todo",
+      "priority": "high",
+      "group_id": "ASSET",
+      "depends_on": [],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "build/icon.ico exists and is a valid Windows icon file at 256x256px minimum",
+        "pets/default/spritesheet.webp contains real pixel-art frames (not the color-grid placeholder)",
+        "npm run build completes without --config.win.icon=null or --config.win.signAndEditExecutable=false workarounds on a machine with symlink privileges",
+        "The pet character is visually recognizable and consistent between the installer icon and the in-app sprite",
+        "pet.json frame dimensions (142x154) match the new spritesheet exactly"
+      ],
+      "docs": [
+        "docs/DECISIONS.md",
+        "docs/ARCHITECTURE.md"
+      ],
+      "files": [
+        "build/icon.ico",
+        "pets/default/spritesheet.webp"
+      ],
+      "commands": [
+        "npm run build:app"
       ]
     }
   ]

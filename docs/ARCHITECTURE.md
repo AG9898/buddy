@@ -153,7 +153,7 @@ buddy has no user-facing authentication. Access to the HTTP sidecar is secured b
 | Dependency | Purpose | Required / Optional |
 |---|---|---|
 | Electron | BrowserWindow, IPC, system tray, app packaging shell | Required |
-| electron-forge | npm package publishing and production build tooling (replaces electron-builder) | Required (production build) |
+| electron-builder | npm package publishing and production build tooling | Required (production build) |
 | Svelte + Vite | Renderer framework and dev/build tooling | Required |
 | commander (or yargs) | CLI entry point (`buddy` command) argument parsing | Required |
 | Rust toolchain (`x86_64-unknown-linux-gnu` cross-compile target) | Build petdex-bridge for WSL | Required (for WSL hook support) |
@@ -167,7 +167,7 @@ There are no cloud services, no managed databases, no auth providers, and no ext
 | Environment | Electron app | petdex-bridge | State file |
 |---|---|---|---|
 | Local dev | `npm run dev` — Electron + Vite dev server on localhost | `cargo build --release --target x86_64-unknown-linux-gnu`, binary copied to WSL `$PATH` | `%USERPROFILE%\.petdex-win\state.json` (created on first run) |
-| Production | `npm install -g buddy` — electron-forge packages the app; the npm package ships the Electron binary and exposes the `buddy` CLI via the `bin` field | `npm install -g buddy-bridge` inside WSL — ships the pre-built `x86_64-unknown-linux-gnu` binary | Same path — persisted across updates |
+| Production | `npm install -g buddy` — electron-builder packages the app; the npm package ships the Electron binary and exposes the `buddy` CLI via the `bin` field | `npm install -g buddy-bridge` inside WSL — ships the pre-built `x86_64-unknown-linux-gnu` binary | Same path — persisted across updates |
 | WSL-only install | `npm install -g buddy` in WSL — CLI detects WSL, installs shell hooks, and invokes the Windows-side `buddy.exe` via WSL interop to launch the GUI | Same as above | Same path |
 
 See [`ENV_VARS.md`](ENV_VARS.md) for the canonical variable and secret matrix per environment.
@@ -185,4 +185,4 @@ See [`ENV_VARS.md`](ENV_VARS.md) for the canonical variable and secret matrix pe
 - **WSL agents cannot launch Windows GUI processes directly.** The supported path is WSL interop: invoking `buddy.exe` from a WSL shell hands execution off to the Windows host. Do not attempt `electron .` or direct GUI invocations from within a WSL shell.
 - **WSL interop is optional infrastructure, not a hard requirement.** The CLI must detect when `/proc/version` does not contain `Microsoft` or when `cmd.exe` is not reachable, and print a clear fallback message rather than crashing.
 - **petdex-bridge must be cross-compiled for `x86_64-unknown-linux-gnu`.** Do not use the host Rust target for this binary — it must run inside WSL, not on the Windows host.
-- **electron-forge is the only supported packaging tool.** electron-builder must not be introduced; it is incompatible with the npm distribution model.
+- **electron-builder is the packaging tool.** Configuration lives in `electron-builder.yml`. Do not swap to another packager without updating `electron-builder.yml`, `package.json` scripts, and this doc.

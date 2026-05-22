@@ -10,6 +10,7 @@
     "dev": "electron-vite dev",
     "build": "electron-vite build && electron-builder",
     "build:app": "electron-vite build",
+    "build:win:local": "electron-vite build && electron-builder --win --config.win.signAndEditExecutable=false --publish never",
     "lint": "svelte-check --tsconfig ./tsconfig.json && tsc --noEmit -p tsconfig.node.json",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && svelte-check --tsconfig ./tsconfig.json",
     "test": "vitest run",

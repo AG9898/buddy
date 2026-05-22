@@ -43,7 +43,8 @@ cd petdex-bridge && cargo build --release --target x86_64-unknown-linux-gnu
 | `npm test` | Vitest unit tests (Svelte, TS) | fast |
 | `npm run lint` | ESLint + svelte-check + tsc --noEmit | fast |
 | `cd petdex-bridge && cargo clippy -- -D warnings` | Rust lint | fast |
-| `npm run build` | Electron production build (electron-builder) | slow |
+| `npm run build` | Electron production build (electron-builder) — requires symlink privilege on Windows | slow |
+| `npm run build:win:local` | Local smoke build — skips code signing, works without Developer Mode | slow |
 | `npm run test:e2e` | Playwright Electron E2E (Windows only) | slow |
 
 ---
@@ -256,3 +257,9 @@ Do not reorganize or rewrite existing entries — append only.
 
 ### 2026-05-22 — electron must be in devDependencies for electron-builder
 electron-builder rejects builds if `electron` is listed under `dependencies` instead of `devDependencies`. The original package.json had it under `dependencies`, causing a hard build failure. Move it to `devDependencies` to fix this.
+
+### 2026-05-22 — npm run build fails on locked-down Windows machines (no Developer Mode)
+`electron-builder` downloads `winCodeSign` which contains symlinks; creating symlinks requires Administrator or Developer Mode. Use `npm run build:win:local` (added to package.json) which passes `--config.win.signAndEditExecutable=false --publish never` to skip the code-signing helper. This is safe for smoke builds but must not be used for release packaging.
+
+### 2026-05-22 — pets/default/spritesheet.webp is a placeholder; real art TBD via pet hatch skill
+The committed `pets/default/spritesheet.webp` is a generated color-grid placeholder (1136×1386px, 142×154 per frame, 8×9 grid) so the app renders without a missing-asset crash. Real artwork will be generated via the codex pet hatch skill — see OPEN-01 in DECISIONS.md and the ASSET-01 workboard task.
