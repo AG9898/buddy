@@ -18,6 +18,7 @@ moving any file under `docs/`, update this file in the same commit.
 | [`docs/DECISIONS.md`](DECISIONS.md) | Architectural decision log (open and resolved) |
 | [`docs/ENV_VARS.md`](ENV_VARS.md) | Canonical environment variable and secret matrix |
 | [`docs/TESTING.md`](TESTING.md) | Test strategy, how to run, file inventory, and writing new tests |
+| [`docs/windowstesting.md`](windowstesting.md) | Windows local build issues, no-admin workarounds, and packaging notes |
 | [`docs/workboard.json`](workboard.json) | Active task queue (canonical board) |
 | [`docs/workboard.schema.json`](workboard.schema.json) | JSON Schema contract for workboard structure and required task fields |
 | [`docs/workboard.md`](workboard.md) | Workboard semantics, field definitions, and agent usage rules |
