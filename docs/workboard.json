@@ -155,7 +155,7 @@
       "id": "FEAT-06",
       "title": "Implement local HTTP sidecar /state endpoint",
       "description": "Create src/main/sidecar.ts. Export startSidecar(win:BrowserWindow):http.Server and stopSidecar(server:http.Server):void. The server binds to 127.0.0.1 on BUDDY_PORT (process.env.BUDDY_PORT ?? 7777). On first run, generate a random 32-char hex token, write it to %USERPROFILE%/.petdex-win/runtime/update-token (create directories as needed), and read it back on subsequent runs. Handle POST /state: require Content-Type:application/json, parse body (max 4KB), validate X-Petdex-Update-Token header against the stored token, require a non-empty state string field, then call win.webContents.send('pet:state-change',{state}). Respond 200 {ok:true} on success. Handle GET /health: respond 200 {status:'ok'} with no token check. All other routes: 404. Wrong method on /state: 405. Bad payload: 400. Token mismatch: 401. All responses are JSON with Content-Type:application/json.",
-      "status": "todo",
+      "status": "done",
       "priority": "high",
       "group_id": "FEAT",
       "depends_on": [
