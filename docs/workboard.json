@@ -7,7 +7,7 @@
       "id": "FEAT-01",
       "title": "Create Electron transparent overlay BrowserWindow",
       "description": "Implement src/main/avatar-window.ts and the initial src/main/main.ts skeleton. avatar-window.ts exports createAvatarWindow(bounds?) that creates a BrowserWindow with: frame:false, transparent:true, hasShadow:false, skipTaskbar:true, alwaysOnTop:true, focusable:false, thickFrame:false, roundedCorners:false, backgroundColor:'#00000000'. After creation call setVisibleOnAllWorkspaces(true), setAlwaysOnTop(true,'floating'), and display with showInactive(). Implement setIgnoreMouseEvents(true,{forward:true}) by default; add an ipcMain.on('ptr-interactive-changed') handler that toggles it off/on. Add ipcMain.on handlers for 'drag-start', 'drag-move', 'drag-end' that use screen.getCursorScreenPoint() to reposition the window. main.ts calls app.whenReady(), creates the window with hardcoded default bounds (356x320), and loads the renderer index.html. State-store and sidecar integration are out of scope here (FEAT-07).",
-      "status": "todo",
+      "status": "done",
       "priority": "critical",
       "group_id": "FEAT",
       "depends_on": [],
