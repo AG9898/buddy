@@ -124,7 +124,7 @@
     {
       "id": "FEAT-05",
       "title": "Add system tray with Show/Hide/Quit",
-      "description": "Create src/main/tray.ts. Export createTray(win:BrowserWindow):Tray and export a mutable isQuitting boolean flag. createTray creates a Tray using the icon at build/tray-icon.png (a 16x16 placeholder PNG — create a minimal 1x1 white PNG if no icon exists yet). Set a context menu with three items: 'Show Pet' calls win.showInactive(), 'Hide Pet' calls win.hide(), 'Quit' sets isQuitting=true and calls app.quit(). Also set the tray tooltip to 'buddy'. In main.ts, after creating the window, add a win.on('close') handler: if !isQuitting, call event.preventDefault() and win.hide(). This keeps the Electron process alive when the user closes the window. The tray icon must remain visible in the system tray while the app is running.",
+      "description": "Create src/main/tray.ts. Export createTray(win:BrowserWindow):Tray and export a mutable isQuitting boolean flag. createTray creates a Tray using the icon at build/tray-icon.png (a 16x16 placeholder PNG \u2014 create a minimal 1x1 white PNG if no icon exists yet). Set a context menu with three items: 'Show Pet' calls win.showInactive(), 'Hide Pet' calls win.hide(), 'Quit' sets isQuitting=true and calls app.quit(). Also set the tray tooltip to 'buddy'. In main.ts, after creating the window, add a win.on('close') handler: if !isQuitting, call event.preventDefault() and win.hide(). This keeps the Electron process alive when the user closes the window. The tray icon must remain visible in the system tray while the app is running.",
       "status": "done",
       "priority": "high",
       "group_id": "FEAT",
@@ -184,7 +184,7 @@
     },
     {
       "id": "FEAT-07",
-      "title": "Wire main process — integrate modules, startup restore, bounds saving",
+      "title": "Wire main process \u2014 integrate modules, startup restore, bounds saving",
       "description": "Update src/main/main.ts to integrate all Phase 1 modules into a complete startup sequence. On app.whenReady(): (1) call loadState() to get persisted state; (2) create the overlay window via createAvatarWindow(state.bounds); (3) call createTray(win); (4) call startSidecar(win); (5) load the renderer (loadURL or loadFile for index.html); (6) wait for the renderer to signal ready via ipcMain.once('renderer-ready') before calling win.showInactive() if state.open is true. Wire bounds saving: on ipcMain.on('drag-end') call saveBounds(win.getBounds()); on screen.on('display-metrics-changed') call saveBounds(win.getBounds()); on win.on('close') (when isQuitting) call saveState({...loadState(), open:win.isVisible(), bounds:win.getBounds()}). On app.on('before-quit') set isQuitting=true, save final state, call stopSidecar. App.svelte must send 'renderer-ready' on mount so main knows the renderer is live before showing the window.",
       "status": "done",
       "priority": "high",
@@ -221,8 +221,8 @@
     },
     {
       "id": "FEAT-08",
-      "title": "Implement hooks install — Claude Code CLI and Codex CLI shell/config hooks",
-      "description": "Create src/main/hooks-install.ts. Export installHooks(options:{claudeCode?:boolean, codexCli?:boolean, shellRcPath?:string}):HookInstallResult where HookInstallResult is {installed:string[], skipped:string[], errors:string[]}. Both targets are CLI tools that can run in WSL or a Windows terminal. The hook event mapping is: UserPromptSubmit->jumping, PreToolUse->running, PostToolUse->idle, PermissionRequest->waiting, Stop->waving.\\n\\nFor Claude Code CLI: write hook entries to ~/.claude/settings.json (hooks section) and/or append shell rc lines to the target rc file (default: ~/.zshrc or ~/.bashrc based on SHELL env). Each hook entry calls petdex-bridge (or buddy state) with the appropriate state name and the sidecar update token. Check for existing entries before writing (idempotency).\\n\\nFor Codex CLI: append shell hook lines to the target rc file. If Codex CLI has a native hook config file, write entries there too using the same five event names (UserPromptSubmit, PreToolUse, PostToolUse, PermissionRequest, Stop). Check for existing lines before appending (idempotency).\\n\\nExport getHooksStatus(options:{claudeCode?:boolean, codexCli?:boolean, shellRcPath?:string}):Record<string,boolean> that checks which hooks are currently installed. This module must be callable from both the tray (add tray menu item Install Hooks that calls installHooks({claudeCode:true, codexCli:true}) and shows a dialog.showMessageBox result summary) and from the CLI layer (buddy hooks install subcommand, implemented in FEAT-09). Do not import Electron APIs at the module'\\''s top level — use dynamic requires so the module is importable from the CLI without loading Electron.",
+      "title": "Implement hooks install \u2014 Claude Code CLI and Codex CLI shell/config hooks",
+      "description": "Create src/main/hooks-install.ts. Export installHooks(options:{claudeCode?:boolean, codexCli?:boolean, shellRcPath?:string}):HookInstallResult where HookInstallResult is {installed:string[], skipped:string[], errors:string[]}. Both targets are CLI tools that can run in WSL or a Windows terminal. The hook event mapping is: UserPromptSubmit->jumping, PreToolUse->running, PostToolUse->idle, PermissionRequest->waiting, Stop->waving.\\n\\nFor Claude Code CLI: write hook entries to ~/.claude/settings.json (hooks section) and/or append shell rc lines to the target rc file (default: ~/.zshrc or ~/.bashrc based on SHELL env). Each hook entry calls petdex-bridge (or buddy state) with the appropriate state name and the sidecar update token. Check for existing entries before writing (idempotency).\\n\\nFor Codex CLI: append shell hook lines to the target rc file. If Codex CLI has a native hook config file, write entries there too using the same five event names (UserPromptSubmit, PreToolUse, PostToolUse, PermissionRequest, Stop). Check for existing lines before appending (idempotency).\\n\\nExport getHooksStatus(options:{claudeCode?:boolean, codexCli?:boolean, shellRcPath?:string}):Record<string,boolean> that checks which hooks are currently installed. This module must be callable from both the tray (add tray menu item Install Hooks that calls installHooks({claudeCode:true, codexCli:true}) and shows a dialog.showMessageBox result summary) and from the CLI layer (buddy hooks install subcommand, implemented in FEAT-09). Do not import Electron APIs at the module'\\''s top level \u2014 use dynamic requires so the module is importable from the CLI without loading Electron.",
       "status": "done",
       "priority": "medium",
       "group_id": "FEAT",
@@ -254,7 +254,7 @@
     {
       "id": "FEAT-09",
       "title": "Implement buddy CLI entry point (start, stop, hooks install, state, doctor)",
-      "description": "Create src/cli/index.ts as the npm bin entry point (registered as \"buddy\" in package.json bin field). Use commander or yargs for subcommand parsing. Implement five subcommands: (1) start — detect environment via /proc/version: on Windows spawn the Electron app process directly; in WSL invoke Windows-side buddy.exe via WSL interop (cmd.exe /c start buddy.exe); if interop is unavailable print a clear actionable error and exit non-zero. (2) stop — find and terminate the running Electron process by name. (3) hooks install — call installHooks() from hooks-install.ts with options derived from the current environment (codex:true on Windows, claudeCode:true in WSL writing to ~/.zshrc or ~/.bashrc); print the HookInstallResult summary. (4) state <name> — read the update token from %USERPROFILE%/.petdex-win/runtime/update-token (Windows) or ~/.petdex-win/runtime/update-token (WSL), then POST {state:<name>} to http://127.0.0.1:${BUDDY_PORT}/state with X-Petdex-Update-Token header; print success or error. (5) doctor — check: Electron process is running, GET /health returns 200, update token file exists, hooks are installed (call getHooksStatus()); print a checklist with pass/fail for each item. Environment detection helper: export function isWSL():boolean that returns true when process.platform is linux and /proc/version contains Microsoft. All subcommands must work from both Windows (node.exe) and WSL (node). Do not import Electron directly in src/cli/ — it is not available in WSL.",
+      "description": "Create src/cli/index.ts as the npm bin entry point (registered as \"buddy\" in package.json bin field). Use commander or yargs for subcommand parsing. Implement five subcommands: (1) start \u2014 detect environment via /proc/version: on Windows spawn the Electron app process directly; in WSL invoke Windows-side buddy.exe via WSL interop (cmd.exe /c start buddy.exe); if interop is unavailable print a clear actionable error and exit non-zero. (2) stop \u2014 find and terminate the running Electron process by name. (3) hooks install \u2014 call installHooks() from hooks-install.ts with options derived from the current environment (codex:true on Windows, claudeCode:true in WSL writing to ~/.zshrc or ~/.bashrc); print the HookInstallResult summary. (4) state <name> \u2014 read the update token from %USERPROFILE%/.petdex-win/runtime/update-token (Windows) or ~/.petdex-win/runtime/update-token (WSL), then POST {state:<name>} to http://127.0.0.1:${BUDDY_PORT}/state with X-Petdex-Update-Token header; print success or error. (5) doctor \u2014 check: Electron process is running, GET /health returns 200, update token file exists, hooks are installed (call getHooksStatus()); print a checklist with pass/fail for each item. Environment detection helper: export function isWSL():boolean that returns true when process.platform is linux and /proc/version contains Microsoft. All subcommands must work from both Windows (node.exe) and WSL (node). Do not import Electron directly in src/cli/ \u2014 it is not available in WSL.",
       "status": "done",
       "priority": "critical",
       "group_id": "FEAT",
@@ -294,11 +294,13 @@
     {
       "id": "ASSET-01",
       "title": "Generate production icon and default spritesheet via pet hatch skill",
-      "description": "Adapt the Codex pet hatch skill for buddy to produce two assets: (1) build/icon.ico — a 256x256 Windows application icon for the buddy pet character, referenced by electron-builder.yml for the installer and executable; (2) pets/default/spritesheet.webp — the production-quality 8-column x 9-row pixel-art spritesheet at 142x154px per frame (1136x1386px total) replacing the current color-grid placeholder. The pet hatch skill is a markdown-driven Codex image generation workflow; it will need to be edited so its output paths and frame dimensions match buddy's expectations. Once real assets exist, remove or replace the placeholder spritesheet and ensure electron-builder.yml icon references resolve correctly so 'npm run build' completes without --config.win.icon=null workarounds. See OPEN-01 in DECISIONS.md for the full decision context.",
+      "description": "Adapt the Codex pet hatch skill for buddy to produce two assets: (1) build/icon.ico \u2014 a 256x256 Windows application icon for the buddy pet character, referenced by electron-builder.yml for the installer and executable; (2) pets/default/spritesheet.webp \u2014 the production-quality 8-column x 9-row pixel-art spritesheet at 142x154px per frame (1136x1386px total) replacing the current color-grid placeholder. The pet hatch skill is a markdown-driven Codex image generation workflow; it will need to be edited so its output paths and frame dimensions match buddy's expectations. Once real assets exist, remove or replace the placeholder spritesheet and ensure electron-builder.yml icon references resolve correctly so 'npm run build' completes without --config.win.icon=null workarounds. See OPEN-01 in DECISIONS.md for the full decision context.",
       "status": "todo",
       "priority": "high",
       "group_id": "ASSET",
-      "depends_on": [],
+      "depends_on": [
+        "ASSET-02"
+      ],
       "blocked_by": [],
       "acceptance_criteria": [
         "build/icon.ico exists and is a valid Windows icon file at 256x256px minimum",
@@ -317,6 +319,31 @@
       ],
       "commands": [
         "npm run build:app"
+      ]
+    },
+    {
+      "id": "ASSET-02",
+      "title": "Implement imagegen-adapter shim for hatch-pet skill",
+      "description": "Create .claude/skills/hatch-pet/imagegen-adapter.md that maps the $imagegen abstraction used in SKILL.md to the Anthropic image generation API. The hatch-pet SKILL.md calls $imagegen for all visual generation; the adapter makes this work from the buddy hatch CLI (claude-sonnet-4-6 with image output or a comparable Anthropic image generation endpoint). The skill itself stays provider-agnostic \u2014 the adapter is the only place with Anthropic-specific logic. Once done, buddy hatch <prompt> can complete image generation steps end-to-end.",
+      "status": "todo",
+      "priority": "high",
+      "group_id": "ASSET",
+      "depends_on": [],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        ".claude/skills/hatch-pet/imagegen-adapter.md exists and documents how $imagegen maps to Anthropic image generation in the buddy CLI context",
+        "buddy hatch \"a small fox\" completes the base generation step without $imagegen-not-found errors",
+        "The adapter is the only file with Anthropic-specific image API logic; SKILL.md is unchanged"
+      ],
+      "docs": [
+        "docs/ARCHITECTURE.md",
+        "docs/DECISIONS.md"
+      ],
+      "files": [
+        ".claude/skills/hatch-pet/imagegen-adapter.md"
+      ],
+      "commands": [
+        "npm run lint"
       ]
     }
   ]

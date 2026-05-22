@@ -8,19 +8,19 @@
  *   buddy hooks install [--rc]   — write Claude Code / Codex CLI hook entries
  *   buddy state <name>           — POST a state change to the running sidecar
  *   buddy doctor                 — print a pass/fail health checklist
+ *   buddy hatch <prompt>         — generate custom pet assets via Anthropic API
  *
  * Environment detection (isWSL) is handled per-command.
  * No Electron imports anywhere in src/cli/ — safe to run in WSL node.
  */
 
-import commander from 'commander'
+import { Command, type Command as CommandType } from 'commander'
 import { runStart } from './commands/start.js'
 import { runStop } from './commands/stop.js'
 import { runHooksInstall } from './commands/hooks.js'
 import { runState } from './commands/state.js'
 import { runDoctor } from './commands/doctor.js'
-
-const { Command } = commander
+import { runHatch } from './commands/hatch.js'
 
 const program = new Command()
 
@@ -59,7 +59,7 @@ hooks
       'in WSL also appends to ~/.zshrc or ~/.bashrc.',
   )
   .option('--rc <path>', 'Path to shell rc file (overrides default ~/.zshrc / ~/.bashrc)')
-  .action(function (this: commander.Command) {
+  .action(function (this: CommandType) {
     const opts = this.opts() as { rc?: string }
     runHooksInstall(opts.rc)
   })
@@ -84,6 +84,26 @@ program
   )
   .action(() => {
     runDoctor().catch((err: unknown) => {
+      console.error(err instanceof Error ? err.message : String(err))
+      process.exit(1)
+    })
+  })
+
+// ── buddy hatch ───────────────────────────────────────────────────────────────
+program
+  .command('hatch <prompt>')
+  .description(
+    'Generate custom pet assets from a text description using the Anthropic API. ' +
+      'Requires ANTHROPIC_API_KEY. ' +
+      'Runs the hatch-pet pipeline: base image, 9 animation rows, spritesheet, icon.',
+  )
+  .option(
+    '--output <dir>',
+    'Output directory for pet assets (pet.json + spritesheet.webp)',
+    'pets/default',
+  )
+  .action(async (prompt: string, options: { output: string }) => {
+    await runHatch(prompt, options.output).catch((err: unknown) => {
       console.error(err instanceof Error ? err.message : String(err))
       process.exit(1)
     })
