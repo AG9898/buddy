@@ -1,7 +1,7 @@
 {
   "$schema": "./workboard.schema.json",
   "schema_version": "1.0.0",
-  "last_updated": "2026-05-22",
+  "last_updated": "2026-05-22T00:00:00Z",
   "tasks": [
     {
       "id": "FEAT-01",
@@ -92,7 +92,7 @@
       "id": "FEAT-04",
       "title": "Build Svelte pet renderer with sprite animation state machine",
       "description": "Implement src/renderer/App.svelte and src/renderer/PetSprite.svelte. App.svelte mounts PetSprite and on mount calls window.petApi.onStateChange to receive state-change events from main, forwarding the new state into PetSprite via a Svelte reactive variable. PetSprite.svelte renders a <div data-avatar-mascot='true'> with inline CSS: background-image pointing to the spritesheet, background-size set to columns*100% by rows*100%, and background-position driven by the current frame. Load frame data from pets/default/pet.json (imported as a static JSON asset). The animation loop uses setInterval per-frame with the ms value from the frame entry; on state transitions, clear the previous interval. Implement once:true + fallback: after the last frame plays once, switch to the fallback state. Pointer handling: on pointermove, check event.target.closest('[data-avatar-mascot]') and call petApi.setPointerInteractive(bool). Drag: pointerdown calls petApi.dragStart(offsetX,offsetY), pointermove calls petApi.dragMove(), pointerup calls petApi.dragEnd(). Declare the petApi type on window in a src/renderer/env.d.ts file.",
-      "status": "todo",
+      "status": "done",
       "priority": "critical",
       "group_id": "FEAT",
       "depends_on": [

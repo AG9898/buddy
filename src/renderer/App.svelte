@@ -1,7 +1,16 @@
 <script lang="ts">
-  // FEAT-04: pet renderer — IPC listener, mounts PetSprite
+  import { onMount } from 'svelte'
+  import PetSprite from './PetSprite.svelte'
+
+  let currentState = $state('idle')
+
+  onMount(() => {
+    window.petApi.onStateChange((payload) => {
+      currentState = payload.state
+    })
+  })
 </script>
 
 <main>
-  <!-- PetSprite component rendered here in FEAT-04 -->
+  <PetSprite state={currentState} />
 </main>

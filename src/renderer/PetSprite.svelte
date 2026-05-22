@@ -1,7 +1,164 @@
 <script lang="ts">
-  // FEAT-04: sprite animation state machine, pointer/drag handling
+  import { onDestroy } from 'svelte'
+  import petData from '../../pets/default/pet.json'
+
+  // --- Types ---
+  interface Frame {
+    row: number
+    col: number
+    ms: number
+  }
+
+  interface StateDefinition {
+    frames: Frame[]
+    once?: boolean
+    fallback?: string
+  }
+
+  interface PetJson {
+    columns: number
+    rows: number
+    frameWidth: number
+    frameHeight: number
+    spritesheet: string
+    states: Record<string, StateDefinition>
+  }
+
+  // --- Props ---
+  interface Props {
+    state: string
+  }
+  let { state: petState }: Props = $props()
+
+  // --- Constants from pet.json ---
+  const pet = petData as PetJson
+  const COLUMNS = pet.columns
+  const ROWS = pet.rows
+  const FRAME_WIDTH = pet.frameWidth
+  const FRAME_HEIGHT = pet.frameHeight
+
+  // Spritesheet co-located with pet.json
+  const SPRITESHEET_URL = new URL('../../pets/default/spritesheet.webp', import.meta.url).href
+
+  // background-size: "800% 900%" for 8 cols × 9 rows
+  const BG_SIZE = `${COLUMNS * 100}% ${ROWS * 100}%`
+
+  // --- Reactive display state ---
+  let bgPosition = $state('0% 0%')
+  let dragging = false
+
+  // Timer handle — null when no animation is running
+  let timerId: ReturnType<typeof setTimeout> | null = null
+  // Version counter: increment to cancel any in-flight animation cycle
+  let animVersion = 0
+
+  function frameToPosition(frame: Frame): string {
+    const xPct = COLUMNS > 1 ? (frame.col / (COLUMNS - 1)) * 100 : 0
+    const yPct = ROWS > 1 ? (frame.row / (ROWS - 1)) * 100 : 0
+    return `${xPct}% ${yPct}%`
+  }
+
+  function clearAnimation(): void {
+    animVersion++
+    if (timerId !== null) {
+      clearTimeout(timerId)
+      timerId = null
+    }
+  }
+
+  function getStateDef(stateName: string): StateDefinition {
+    return pet.states[stateName] ?? pet.states['idle']
+  }
+
+  function startAnimation(stateName: string): void {
+    clearAnimation()
+    const version = animVersion
+
+    const def = getStateDef(stateName)
+    const frames = def.frames
+    if (frames.length === 0) return
+
+    // Show first frame immediately
+    bgPosition = frameToPosition(frames[0])
+
+    let idx = 0
+
+    function scheduleNext(): void {
+      if (animVersion !== version) return // stale — a newer animation started
+      const frame = frames[idx]
+      timerId = setTimeout(() => {
+        if (animVersion !== version) return
+        idx++
+        if (idx >= frames.length) {
+          if (def.once) {
+            // One-shot complete: jump to fallback
+            startAnimation(def.fallback ?? 'idle')
+            return
+          }
+          idx = 0
+        }
+        bgPosition = frameToPosition(frames[idx])
+        scheduleNext()
+      }, frame.ms)
+    }
+
+    scheduleNext()
+  }
+
+  // Re-run animation whenever petState prop changes
+  $effect(() => {
+    startAnimation(petState)
+  })
+
+  onDestroy(() => {
+    clearAnimation()
+  })
+
+  // --- Pointer interactivity (window-level) ---
+  function onWindowPointerMove(event: PointerEvent): void {
+    const target = event.target as Element | null
+    const isOver = target?.closest('[data-avatar-mascot]') !== null
+    window.petApi.setPointerInteractive(isOver)
+  }
+
+  // --- Drag handling (div-level) ---
+  function onPointerDown(event: PointerEvent): void {
+    if (event.button !== 0) return
+    dragging = true
+    ;(event.currentTarget as Element).setPointerCapture(event.pointerId)
+    window.petApi.dragStart(event.offsetX, event.offsetY)
+  }
+
+  function onPointerMoveDiv(): void {
+    if (dragging) {
+      window.petApi.dragMove()
+    }
+  }
+
+  function onPointerUp(event: PointerEvent): void {
+    if (!dragging) return
+    dragging = false
+    ;(event.currentTarget as Element).releasePointerCapture(event.pointerId)
+    window.petApi.dragEnd()
+  }
 </script>
 
-<div data-avatar-mascot="true">
-  <!-- spritesheet background-position animation in FEAT-04 -->
-</div>
+<svelte:window onpointermove={onWindowPointerMove} />
+
+<!-- svelte-ignore a11y_no_static_element_interactions -->
+<div
+  data-avatar-mascot="true"
+  style="
+    width: {FRAME_WIDTH}px;
+    height: {FRAME_HEIGHT}px;
+    background-image: url('{SPRITESHEET_URL}');
+    background-size: {BG_SIZE};
+    background-position: {bgPosition};
+    background-repeat: no-repeat;
+    cursor: grab;
+    user-select: none;
+  "
+  onpointerdown={onPointerDown}
+  onpointermove={onPointerMoveDiv}
+  onpointerup={onPointerUp}
+></div>
