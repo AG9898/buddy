@@ -58,6 +58,25 @@ All components run on a single developer workstation. There is no server, no clo
 - Never read or write Codex's internal state files.
 - Never steal window focus — always use `showInactive()`.
 
+### Preload / contextBridge (`src/preload/preload.ts`)
+
+**Owns:**
+- All IPC channel name string constants (`CH_STATE_SET`, `CH_STATE_CHANGE`, `CH_PTR_INTERACTIVE`, `CH_DRAG_START`, `CH_DRAG_MOVE`, `CH_DRAG_END`). Main process imports these constants from this file; they are never hardcoded elsewhere.
+- The `petApi` object exposed to the renderer via `contextBridge.exposeInMainWorld('petApi', ...)`. This is the sole communication surface between the Svelte renderer and the Electron main process.
+
+**petApi methods:**
+- `setState(state)` — sends `CH_STATE_SET` to main to request a state transition.
+- `onStateChange(cb)` — registers a listener for `CH_STATE_CHANGE` pushed by main.
+- `setPointerInteractive(interactive)` — sends `CH_PTR_INTERACTIVE` to toggle click-through.
+- `dragStart(offsetX, offsetY)` — sends `CH_DRAG_START` with pointer offset within window.
+- `dragMove()` — sends `CH_DRAG_MOVE`; main repositions the window to track the cursor.
+- `dragEnd()` — sends `CH_DRAG_END`; main clears drag state.
+
+**Does NOT:**
+- Never expose Node.js APIs directly — `contextIsolation` is always `true`, `nodeIntegration` is always `false`.
+
+---
+
 ### Svelte Renderer (`src/renderer/`)
 
 **Owns:**

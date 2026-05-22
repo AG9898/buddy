@@ -3,12 +3,7 @@
 
 import { BrowserWindow, ipcMain, screen } from 'electron'
 import path from 'path'
-
-// IPC channel name constants — never use raw strings elsewhere.
-export const IPC_PTR_INTERACTIVE_CHANGED = 'ptr-interactive-changed'
-export const IPC_DRAG_START = 'drag-start'
-export const IPC_DRAG_MOVE = 'drag-move'
-export const IPC_DRAG_END = 'drag-end'
+import { CH_PTR_INTERACTIVE, CH_DRAG_START, CH_DRAG_MOVE, CH_DRAG_END } from '../preload/preload'
 
 export interface WindowBounds {
   x: number
@@ -67,7 +62,7 @@ export function createAvatarWindow(bounds?: Partial<WindowBounds>): BrowserWindo
   win.setIgnoreMouseEvents(true, { forward: true })
 
   // Toggle click-through based on renderer signal.
-  ipcMain.on(IPC_PTR_INTERACTIVE_CHANGED, (_event, interactive: boolean) => {
+  ipcMain.on(CH_PTR_INTERACTIVE, (_event, interactive: boolean) => {
     if (interactive) {
       win.setIgnoreMouseEvents(false)
       // Refresh cursor at current mouse position so the renderer picks up the change.
@@ -90,7 +85,7 @@ export function createAvatarWindow(bounds?: Partial<WindowBounds>): BrowserWindo
   })
 
   // Drag: record initial pointer offset within the window.
-  ipcMain.on(IPC_DRAG_START, (_event, payload: { pointerWindowX: number; pointerWindowY: number }) => {
+  ipcMain.on(CH_DRAG_START, (_event, payload: { pointerWindowX: number; pointerWindowY: number }) => {
     dragState = {
       offsetX: payload.pointerWindowX,
       offsetY: payload.pointerWindowY,
@@ -98,7 +93,7 @@ export function createAvatarWindow(bounds?: Partial<WindowBounds>): BrowserWindo
   })
 
   // Drag: reposition window to follow screen cursor.
-  ipcMain.on(IPC_DRAG_MOVE, () => {
+  ipcMain.on(CH_DRAG_MOVE, () => {
     if (!dragState) return
     const point = screen.getCursorScreenPoint()
     win.setBounds({
@@ -109,7 +104,7 @@ export function createAvatarWindow(bounds?: Partial<WindowBounds>): BrowserWindo
   })
 
   // Drag: clear drag state.
-  ipcMain.on(IPC_DRAG_END, () => {
+  ipcMain.on(CH_DRAG_END, () => {
     dragState = null
   })
 
