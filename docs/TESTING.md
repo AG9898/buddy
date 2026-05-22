@@ -60,6 +60,7 @@ smoke test, Windows-native hook execution.
 
 | File | Domain | What It Covers |
 |---|---|---|
+| `src/main/state-store.test.ts` | State persistence | loadState defaults, saveState directory creation, round-trip fidelity, saveBounds byResolution key |
 
 ---
 

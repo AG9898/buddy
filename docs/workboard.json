@@ -65,7 +65,7 @@
       "id": "FEAT-03",
       "title": "Implement state persistence module (state-store.ts)",
       "description": "Create src/main/state-store.ts. Define and export the AppState interface: { open: boolean, bounds: { x:number, y:number, width:number, height:number }, pet: { id:string, spritesheetPath:string, width:number, height:number, state:string }, byResolution: Record<string,{x:number,y:number,width:number,height:number}> }. Export loadState():AppState (reads %USERPROFILE%/.petdex-win/state.json with fs.readFileSync; returns defaults if missing or invalid), saveState(state:AppState):void, and saveBounds(bounds:Electron.Rectangle):void (updates bounds and byResolution keyed by '${width}x${height}'). Use os.homedir() to build the path. Create the .petdex-win directory with fs.mkdirSync({recursive:true}) if missing. All file I/O is synchronous. Default state: open:true, bounds:{x:1600,y:760,width:356,height:320}, pet:{id:'default',spritesheetPath:'',width:142,height:154,state:'idle'}.",
-      "status": "todo",
+      "status": "done",
       "priority": "high",
       "group_id": "FEAT",
       "depends_on": [],
