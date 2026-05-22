@@ -186,7 +186,7 @@
       "id": "FEAT-07",
       "title": "Wire main process — integrate modules, startup restore, bounds saving",
       "description": "Update src/main/main.ts to integrate all Phase 1 modules into a complete startup sequence. On app.whenReady(): (1) call loadState() to get persisted state; (2) create the overlay window via createAvatarWindow(state.bounds); (3) call createTray(win); (4) call startSidecar(win); (5) load the renderer (loadURL or loadFile for index.html); (6) wait for the renderer to signal ready via ipcMain.once('renderer-ready') before calling win.showInactive() if state.open is true. Wire bounds saving: on ipcMain.on('drag-end') call saveBounds(win.getBounds()); on screen.on('display-metrics-changed') call saveBounds(win.getBounds()); on win.on('close') (when isQuitting) call saveState({...loadState(), open:win.isVisible(), bounds:win.getBounds()}). On app.on('before-quit') set isQuitting=true, save final state, call stopSidecar. App.svelte must send 'renderer-ready' on mount so main knows the renderer is live before showing the window.",
-      "status": "todo",
+      "status": "done",
       "priority": "high",
       "group_id": "FEAT",
       "depends_on": [

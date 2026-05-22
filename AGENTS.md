@@ -250,3 +250,9 @@ Do not reorganize or rewrite existing entries — append only.
 ---
 
 ## Discoveries
+
+### 2026-05-22 — renderer-ready handshake: remove showInactive() from avatar-window.ts
+`createAvatarWindow()` originally called `win.showInactive()` unconditionally at the end, which would flash a blank transparent window before the Svelte renderer mounted. For FEAT-07, the call was moved to main.ts inside an `ipcMain.once(CH_RENDERER_READY)` handler; App.svelte calls `window.petApi.rendererReady()` on mount to trigger it. Always keep window display deferred to main.ts after the renderer-ready signal.
+
+### 2026-05-22 — electron must be in devDependencies for electron-builder
+electron-builder rejects builds if `electron` is listed under `dependencies` instead of `devDependencies`. The original package.json had it under `dependencies`, causing a hard build failure. Move it to `devDependencies` to fix this.

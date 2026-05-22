@@ -7,24 +7,22 @@
     "dev": "electron-vite dev",
     "build": "electron-vite build && electron-builder",
     "build:app": "electron-vite build",
-    "lint": "eslint src --ext .ts,.svelte && svelte-check --tsconfig ./tsconfig.json",
+    "lint": "svelte-check --tsconfig ./tsconfig.json && tsc --noEmit -p tsconfig.node.json",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && svelte-check --tsconfig ./tsconfig.json",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test"
   },
-  "dependencies": {
-    "electron": "^35.0.0"
-  },
+  "dependencies": {},
   "devDependencies": {
+    "electron": "^35.0.0",
     "@sveltejs/vite-plugin-svelte": "^5.0.0",
     "@types/node": "^22.0.0",
     "@playwright/test": "^1.50.0",
     "@vitest/coverage-v8": "^2.0.0",
     "electron-builder": "^25.0.0",
     "electron-vite": "^3.0.0",
-    "eslint": "^9.0.0",
     "svelte": "^5.0.0",
     "svelte-check": "^4.0.0",
     "typescript": "^5.7.0",

@@ -103,13 +103,15 @@ export function createAvatarWindow(bounds?: Partial<WindowBounds>): BrowserWindo
     })
   })
 
-  // Drag: clear drag state.
+  // Drag: clear drag state. (Bounds saving on drag-end is done in main.ts.)
   ipcMain.on(CH_DRAG_END, () => {
     dragState = null
   })
 
-  // Display using showInactive so the pet never steals focus.
-  win.showInactive()
+  // NOTE: The window is created with show:false. The caller (main.ts) is responsible
+  // for calling win.showInactive() after the renderer signals it is ready via
+  // the CH_RENDERER_READY IPC channel. This prevents a brief blank transparent
+  // window from appearing before the Svelte renderer has mounted.
 
   avatarWindow = win
   return win

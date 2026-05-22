@@ -8,6 +8,8 @@ export const CH_PTR_INTERACTIVE = 'ptr-interactive-changed'
 export const CH_DRAG_START = 'drag-start'
 export const CH_DRAG_MOVE = 'drag-move'
 export const CH_DRAG_END = 'drag-end'
+/** Sent by the renderer on mount to signal it is live and ready to display. */
+export const CH_RENDERER_READY = 'renderer-ready'
 
 contextBridge.exposeInMainWorld('petApi', {
   /**
@@ -55,5 +57,13 @@ contextBridge.exposeInMainWorld('petApi', {
    */
   dragEnd(): void {
     ipcRenderer.send(CH_DRAG_END)
+  },
+
+  /**
+   * Notify main that the renderer is mounted and ready to be shown.
+   * Call once from the root component's onMount lifecycle hook.
+   */
+  rendererReady(): void {
+    ipcRenderer.send(CH_RENDERER_READY)
   },
 })

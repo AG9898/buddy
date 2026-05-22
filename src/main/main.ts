@@ -1,23 +1,38 @@
-// Electron main process entry point.
-// FEAT-01: BrowserWindow creation via avatar-window.ts.
-// FEAT-05: system tray (Show/Hide/Quit) and close-to-hide behaviour.
+// Electron main process entry point — FEAT-07: full startup wiring.
+// Integrates all Phase 1 modules: state restore, avatar window, tray, sidecar,
+// renderer-ready handshake, bounds saving, and graceful shutdown.
 
-import { app } from 'electron'
+import { app, ipcMain, screen } from 'electron'
+import http from 'http'
 import path from 'path'
 import { createAvatarWindow } from './avatar-window'
-import { createTray, isQuitting } from './tray'
+import { createTray } from './tray'
+import { startSidecar, stopSidecar } from './sidecar'
+import { loadState, saveState, saveBounds } from './state-store'
+import { CH_DRAG_END, CH_RENDERER_READY } from '../preload/preload'
 
-// Default window bounds (356×320 px) — overridden by persisted state in FEAT-07.
-const DEFAULT_WIDTH = 356
-const DEFAULT_HEIGHT = 320
+// Track whether app.quit() was triggered via the tray Quit item so the
+// 'close' handler knows to allow the window to close.
+let isQuitting = false
+
+// Reference to the sidecar server so we can stop it on quit.
+let sidecarServer: http.Server | null = null
 
 app.whenReady().then(() => {
-  const win = createAvatarWindow({
-    width: DEFAULT_WIDTH,
-    height: DEFAULT_HEIGHT,
-  })
+  // 1. Load persisted state — provides bounds and open/hidden flag.
+  const state = loadState()
 
-  // Load the Svelte renderer.
+  // 2. Create the overlay window at the last-saved bounds (show:false — renderer
+  //    must signal ready before we call showInactive).
+  const win = createAvatarWindow(state.bounds)
+
+  // 3. Create the system tray (keeps the process alive when the window is hidden).
+  createTray(win)
+
+  // 4. Start the local HTTP sidecar (validates token, forwards events to renderer).
+  sidecarServer = startSidecar(win)
+
+  // 5. Load the Svelte renderer.
   if (process.env['ELECTRON_RENDERER_URL']) {
     // Dev: electron-vite injects this env var pointing at the Vite dev server.
     void win.loadURL(process.env['ELECTRON_RENDERER_URL'])
@@ -26,21 +41,59 @@ app.whenReady().then(() => {
     void win.loadFile(path.join(__dirname, '../renderer/index.html'))
   }
 
-  // Create the system tray icon; it keeps the process alive when the window is hidden.
-  createTray(win)
+  // 6. Wait for the renderer to signal it is mounted before showing the window.
+  //    This prevents a brief blank transparent window from appearing.
+  ipcMain.once(CH_RENDERER_READY, () => {
+    if (state.open) {
+      win.moveTop()
+      win.showInactive()
+    }
+  })
 
-  // Intercept the system close button: hide instead of quit unless isQuitting is set.
+  // 7. Save bounds on drag-end.
+  ipcMain.on(CH_DRAG_END, () => {
+    const b = win.getBounds()
+    const display = screen.getDisplayNearestPoint({ x: b.x, y: b.y })
+    const res = `${display.bounds.width}x${display.bounds.height}`
+    saveBounds(b, res)
+  })
+
+  // 8. Save bounds when the display configuration changes (resolution, scale, etc.).
+  screen.on('display-metrics-changed', () => {
+    const b = win.getBounds()
+    const display = screen.getDisplayNearestPoint({ x: b.x, y: b.y })
+    const res = `${display.bounds.width}x${display.bounds.height}`
+    saveBounds(b, res)
+  })
+
+  // 9. Intercept the window close button: hide (sleep) instead of quit unless
+  //    isQuitting is set by the tray Quit item.
   win.on('close', (event) => {
     if (!isQuitting) {
+      // Prevent close — sleep the pet.
       event.preventDefault()
+      const currentState = loadState()
+      saveState({ ...currentState, open: false })
       win.hide()
+    } else {
+      // Quitting: persist final state including current bounds and visibility.
+      const b = win.getBounds()
+      const currentState = loadState()
+      saveState({ ...currentState, open: win.isVisible(), bounds: b })
     }
   })
 })
 
-// Keep the process alive when all windows are closed — the tray provides the quit path.
+// 10. Before the app quits: set isQuitting flag, save final state, stop sidecar.
+app.on('before-quit', () => {
+  isQuitting = true
+  if (sidecarServer) {
+    stopSidecar(sidecarServer)
+    sidecarServer = null
+  }
+})
+
+// Keep the process alive when all windows are closed — the tray is the only exit path.
 app.on('window-all-closed', () => {
   // Do not quit here; the Quit tray item is the only exit path.
-  // On macOS the convention is to keep the app running even without windows,
-  // so no special-case is needed.
 })
