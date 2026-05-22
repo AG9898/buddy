@@ -1,8 +1,10 @@
 // FEAT-05: system tray icon with Show/Hide/Quit context menu
+// FEAT-08: added "Install Hooks" tray menu item
 
 import { app, BrowserWindow, Menu, Tray, nativeImage } from 'electron'
 import path from 'path'
 import fs from 'fs'
+import { installHooksWithDialog } from './hooks-install'
 
 /**
  * Flag set to true by the Quit menu item so the 'close' handler in main.ts
@@ -51,6 +53,15 @@ export function createTray(win: BrowserWindow): Tray {
       label: 'Hide Pet',
       click: () => {
         win.hide()
+      },
+    },
+    { type: 'separator' },
+    {
+      label: 'Install Hooks',
+      click: () => {
+        installHooksWithDialog().catch((err: unknown) => {
+          console.error('Install Hooks failed:', err)
+        })
       },
     },
     { type: 'separator' },

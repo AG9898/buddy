@@ -51,6 +51,7 @@ All components run on a single developer workstation. There is no server, no clo
 - Local HTTP sidecar on `127.0.0.1:7777` (configurable via `BUDDY_PORT`): receives hook events, validates the `X-Petdex-Update-Token` header, and forwards events to the renderer via Electron IPC.
 - State persistence: reads and writes `%USERPROFILE%\.petdex-win\state.json` (window open/hidden, bounds, pet id, current animation state).
 - System tray (Show / Hide / Quit) to keep the process alive when the window is hidden.
+- Hook installation: `hooks-install.ts` exports `installHooks(options)` and `getHooksStatus(options)`. For Claude Code CLI it writes hook entries to `~/.claude/settings.json` (hooks section); for Codex CLI it appends shell environment-variable blocks to the target rc file. Both operations are idempotent. The module contains no top-level Electron import and is safe to call from the CLI layer (FEAT-09) without an Electron environment. The `installHooksWithDialog()` helper is intended for tray use only and dynamically requires Electron's `dialog` API at call time.
 - Files: `main.ts`, `avatar-window.ts`, `state-store.ts`, `sidecar.ts`, `tray.ts`, `hooks-install.ts`.
 
 **Does NOT:**
