@@ -7,7 +7,9 @@
 
 ## Overview
 
-buddy is a standalone Windows desktop application that renders a floating, always-on-top, transparent pet character directly on the Windows desktop. It is built on a three-component architecture: an Electron main process managing the window and HTTP sidecar, a Svelte renderer driving pet animation, and a Rust CLI binary (petdex-bridge) that runs in WSL and bridges shell hook events from WSL agents into the Windows-side Electron process. The system is entirely local — there are no cloud services, no accounts, and no network traffic leaving the machine.
+buddy is an npm-distributed developer tool that renders a floating, always-on-top, transparent pet character directly on the Windows desktop. It is built on a four-component architecture: a CLI entry point (`buddy`) that handles install-time setup and runtime commands, an Electron main process managing the window and HTTP sidecar, a Svelte renderer driving pet animation, and a Rust CLI binary (petdex-bridge) that runs in WSL and bridges shell hook events from WSL agents into the Windows-side Electron process. The system is entirely local — there are no cloud services, no accounts, and no network traffic leaving the machine.
+
+buddy is installed via `npm install -g buddy` from either a Windows terminal or a WSL terminal. When installed in WSL the CLI uses the WSL interop layer to launch the Windows Electron process; when installed on Windows it launches directly.
 
 ---
 
@@ -15,13 +17,30 @@ buddy is a standalone Windows desktop application that renders a floating, alway
 
 All components run on a single developer workstation. There is no server, no cloud service, and no external network dependency.
 
+- **buddy CLI** (`src/cli/`): npm `bin` entry point. Handles `start`, `stop`, `hooks install`, `state <name>`, and `doctor` subcommands. Detects whether it is running in WSL or on Windows and adjusts behavior accordingly — in WSL it launches the Windows Electron app via WSL interop (`buddy.exe`).
 - **Electron main process** (Windows, `src/main/`): Manages the transparent frameless BrowserWindow, runs the local HTTP sidecar on `127.0.0.1:7777`, persists state to disk, and owns the system tray.
 - **Svelte renderer** (Windows, Electron webview, `src/renderer/`): Renders the pet character, drives the sprite animation state machine, and handles pointer interactivity and dragging.
-- **petdex-bridge** (WSL, Rust CLI binary, `petdex-bridge/`): A tiny cross-compiled Linux binary invoked by WSL shell hooks. It reads the shared update token and POSTs agent lifecycle events to the Electron HTTP sidecar via WSL localhost passthrough.
+- **petdex-bridge** (WSL, Rust CLI binary, `petdex-bridge/`): A tiny cross-compiled Linux binary distributed as the companion npm package `buddy-bridge`. Invoked by WSL shell hooks; reads the shared update token and POSTs agent lifecycle events to the Electron HTTP sidecar via WSL localhost passthrough.
 
 ---
 
 ## Component Responsibilities
+
+### buddy CLI (`src/cli/`)
+
+**Owns:**
+- The npm `bin` entry point — the `buddy` command developers run in their terminal.
+- Environment detection: reads `/proc/version` to determine if running in WSL or natively on Windows.
+- On Windows: `buddy start` spawns the Electron app process; `buddy stop` terminates it.
+- In WSL: `buddy start` invokes the Windows-side `buddy.exe` via WSL interop; prints a clear actionable error if interop is unavailable.
+- `buddy hooks install`: writes shell hook entries for Claude Code CLI and Codex CLI (both operate via shell hooks / rc files — no desktop app config is written).
+- `buddy state <name>`: sends an HTTP POST to the running sidecar (works from both Windows and WSL via localhost passthrough).
+- `buddy doctor`: checks that the Electron process is running, the sidecar responds, the update token exists, and hooks are installed.
+- Files: `src/cli/index.ts`, `src/cli/commands/`.
+
+**Does NOT:**
+- Never manages window state directly — all window operations go through the Electron main process.
+- Never starts a long-running server process itself — it starts the Electron app which owns the sidecar.
 
 ### Electron Main Process (`src/main/`)
 
@@ -89,11 +108,11 @@ All components run on a single developer workstation. There is no server, no clo
 | `PermissionRequest` | `waiting` |
 | `Stop` | `waving` |
 
-### (b) Windows-only hook (e.g., Codex `hooks.json`)
+### (b) Windows terminal hook (e.g., Codex CLI or Claude Code running natively on Windows)
 
-1. Codex fires a `PreToolUse` hook on Windows.
-2. The hook calls `petdex-win state running` (Windows CLI or PowerShell invocation).
-3. petdex-win POSTs directly to the Electron HTTP sidecar on `127.0.0.1:7777`.
+1. A CLI tool (Codex CLI or Claude Code) fires a `PreToolUse` hook in a Windows terminal.
+2. The hook calls `buddy state running` (the buddy CLI, which POSTs to the local sidecar).
+3. buddy POSTs `{"state":"running","source":"codex-cli"}` to `http://127.0.0.1:7777/state`.
 4. From step 5 onward, the path is identical to flow (a) above.
 
 ---
@@ -114,8 +133,9 @@ buddy has no user-facing authentication. Access to the HTTP sidecar is secured b
 | Dependency | Purpose | Required / Optional |
 |---|---|---|
 | Electron | BrowserWindow, IPC, system tray, app packaging shell | Required |
-| electron-builder | Windows installer (.exe / NSIS) packaging | Required (production build) |
+| electron-forge | npm package publishing and production build tooling (replaces electron-builder) | Required (production build) |
 | Svelte + Vite | Renderer framework and dev/build tooling | Required |
+| commander (or yargs) | CLI entry point (`buddy` command) argument parsing | Required |
 | Rust toolchain (`x86_64-unknown-linux-gnu` cross-compile target) | Build petdex-bridge for WSL | Required (for WSL hook support) |
 
 There are no cloud services, no managed databases, no auth providers, and no external APIs.
@@ -127,7 +147,8 @@ There are no cloud services, no managed databases, no auth providers, and no ext
 | Environment | Electron app | petdex-bridge | State file |
 |---|---|---|---|
 | Local dev | `npm run dev` — Electron + Vite dev server on localhost | `cargo build --release --target x86_64-unknown-linux-gnu`, binary copied to WSL `$PATH` | `%USERPROFILE%\.petdex-win\state.json` (created on first run) |
-| Production (packaged) | `electron-builder` output — Windows `.exe` / NSIS installer, installed to `%LOCALAPPDATA%\buddy` | Pre-built Linux binary distributed alongside installer, placed in WSL home by install script | Same path — persisted across updates |
+| Production | `npm install -g buddy` — electron-forge packages the app; the npm package ships the Electron binary and exposes the `buddy` CLI via the `bin` field | `npm install -g buddy-bridge` inside WSL — ships the pre-built `x86_64-unknown-linux-gnu` binary | Same path — persisted across updates |
+| WSL-only install | `npm install -g buddy` in WSL — CLI detects WSL, installs shell hooks, and invokes the Windows-side `buddy.exe` via WSL interop to launch the GUI | Same as above | Same path |
 
 See [`ENV_VARS.md`](ENV_VARS.md) for the canonical variable and secret matrix per environment.
 
@@ -137,9 +158,11 @@ See [`ENV_VARS.md`](ENV_VARS.md) for the canonical variable and secret matrix pe
 
 - **Windows-only.** The Electron app and renderer target `win32` exclusively. No macOS, no Linux native GUI.
 - **HTTP sidecar must bind `127.0.0.1` only.** Never change `BUDDY_HOST` to `0.0.0.0` or any non-loopback address.
-- **Never read or write Codex internal state files.** buddy may read pet assets from `%USERPROFILE%\.codex\pets` (read-only), but must never touch Codex's own session or config files.
+- **Never read or write any AI assistant CLI's internal config or state files.** buddy must never touch `.codex/`, `.claude/`, or equivalent internal directories of any CLI tool it integrates with.
 - **Window must be non-focusable by default.** Always use `showInactive()` to display the window; never call `focus()` or `show()` in a way that steals focus from the user's active application.
 - **Bounds must be saved on close, drag-end, and display-change events.** State must not be lost on crash — write `state.json` defensively at each of these points, not only on graceful exit.
 - **DPI awareness is required.** The window bounds calculation must account for Windows display scaling. Test at 100%, 125%, and mixed-DPI multi-monitor configurations.
-- **WSL agents cannot launch Windows GUI processes.** All UI integration testing must be performed natively on Windows. Do not attempt `electron .` or GUI invocations from within a WSL shell.
+- **WSL agents cannot launch Windows GUI processes directly.** The supported path is WSL interop: invoking `buddy.exe` from a WSL shell hands execution off to the Windows host. Do not attempt `electron .` or direct GUI invocations from within a WSL shell.
+- **WSL interop is optional infrastructure, not a hard requirement.** The CLI must detect when `/proc/version` does not contain `Microsoft` or when `cmd.exe` is not reachable, and print a clear fallback message rather than crashing.
 - **petdex-bridge must be cross-compiled for `x86_64-unknown-linux-gnu`.** Do not use the host Rust target for this binary — it must run inside WSL, not on the Windows host.
+- **electron-forge is the only supported packaging tool.** electron-builder must not be introduced; it is incompatible with the npm distribution model.

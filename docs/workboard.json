@@ -1,7 +1,7 @@
 {
   "$schema": "./workboard.schema.json",
   "schema_version": "1.0.0",
-  "last_updated": "2026-05-21",
+  "last_updated": "2026-05-22",
   "tasks": [
     {
       "id": "FEAT-01",
@@ -204,7 +204,7 @@
         "Changing display resolution saves the new bounds to state.json under byResolution",
         "Quitting via tray persists the window open/closed state; restart respects it",
         "npm run lint passes",
-        "npm run build completes without error"
+        "npm run build completes without error (electron-forge packages the app as an npm-distributable binary)"
       ],
       "docs": [
         "docs/ARCHITECTURE.md",
@@ -221,8 +221,8 @@
     },
     {
       "id": "FEAT-08",
-      "title": "Implement Codex hooks install command",
-      "description": "Create src/main/hooks-install.ts. Export installHooks(options:{codex?:boolean}):HookInstallResult where HookInstallResult is {installed:string[], skipped:string[], errors:string[]}. For Codex: read %USERPROFILE%/.codex/hooks.json (create as [] if missing). The hook mapping is: UserPromptSubmit->jumping, PreToolUse->running, PostToolUse->idle, PermissionRequest->waiting, Stop->waving. Each hook entry should have type:'command' and command: the curl one-liner that POSTs to the sidecar with the update token. Before appending, check if an entry for that event+command already exists to ensure idempotency. Write the updated array back. Export a second function getHooksStatus():Record<string,boolean> that returns which hooks are currently installed. Add a tray menu item 'Install Hooks' (in tray.ts) that calls installHooks({codex:true}) and shows a dialog.showMessageBox with the result summary.",
+      "title": "Implement hooks install — Claude Code CLI and Codex CLI shell/config hooks",
+      "description": "Create src/main/hooks-install.ts. Export installHooks(options:{claudeCode?:boolean, codexCli?:boolean, shellRcPath?:string}):HookInstallResult where HookInstallResult is {installed:string[], skipped:string[], errors:string[]}. Both targets are CLI tools that can run in WSL or a Windows terminal. The hook event mapping is: UserPromptSubmit->jumping, PreToolUse->running, PostToolUse->idle, PermissionRequest->waiting, Stop->waving.\\n\\nFor Claude Code CLI: write hook entries to ~/.claude/settings.json (hooks section) and/or append shell rc lines to the target rc file (default: ~/.zshrc or ~/.bashrc based on SHELL env). Each hook entry calls petdex-bridge (or buddy state) with the appropriate state name and the sidecar update token. Check for existing entries before writing (idempotency).\\n\\nFor Codex CLI: append shell hook lines to the target rc file. If Codex CLI has a native hook config file, write entries there too using the same five event names (UserPromptSubmit, PreToolUse, PostToolUse, PermissionRequest, Stop). Check for existing lines before appending (idempotency).\\n\\nExport getHooksStatus(options:{claudeCode?:boolean, codexCli?:boolean, shellRcPath?:string}):Record<string,boolean> that checks which hooks are currently installed. This module must be callable from both the tray (add tray menu item Install Hooks that calls installHooks({claudeCode:true, codexCli:true}) and shows a dialog.showMessageBox result summary) and from the CLI layer (buddy hooks install subcommand, implemented in FEAT-09). Do not import Electron APIs at the module'\\''s top level — use dynamic requires so the module is importable from the CLI without loading Electron.",
       "status": "todo",
       "priority": "medium",
       "group_id": "FEAT",
@@ -231,10 +231,12 @@
       ],
       "blocked_by": [],
       "acceptance_criteria": [
-        "installHooks({codex:true}) writes valid JSON entries to ~/.codex/hooks.json",
-        "Re-running installHooks is idempotent (duplicate entries are not created)",
-        "getHooksStatus() accurately reflects which hooks are present in hooks.json",
-        "The tray Install Hooks item shows a success/failure dialog after running",
+        "installHooks({claudeCode:true, shellRcPath}) writes hook entries to ~/.claude/settings.json (hooks section) covering all five hook events (UserPromptSubmit, PreToolUse, PostToolUse, PermissionRequest, Stop)",
+        "installHooks({codexCli:true, shellRcPath}) appends shell hook lines for Codex CLI to the specified rc file covering all five hook events",
+        "Re-running installHooks with either option is idempotent (no duplicate entries created in settings.json or rc files)",
+        "getHooksStatus() accurately reflects which Claude Code CLI and Codex CLI hooks are currently installed",
+        "The tray Install Hooks item calls installHooks({claudeCode:true, codexCli:true}) and shows a success/failure dialog",
+        "The module can be imported from the CLI (FEAT-09) without loading Electron (no top-level Electron import)",
         "npm run lint passes"
       ],
       "docs": [
@@ -244,6 +246,46 @@
       "files": [
         "src/main/hooks-install.ts",
         "src/main/tray.ts"
+      ],
+      "commands": [
+        "npm run lint"
+      ]
+    },
+    {
+      "id": "FEAT-09",
+      "title": "Implement buddy CLI entry point (start, stop, hooks install, state, doctor)",
+      "description": "Create src/cli/index.ts as the npm bin entry point (registered as \"buddy\" in package.json bin field). Use commander or yargs for subcommand parsing. Implement five subcommands: (1) start — detect environment via /proc/version: on Windows spawn the Electron app process directly; in WSL invoke Windows-side buddy.exe via WSL interop (cmd.exe /c start buddy.exe); if interop is unavailable print a clear actionable error and exit non-zero. (2) stop — find and terminate the running Electron process by name. (3) hooks install — call installHooks() from hooks-install.ts with options derived from the current environment (codex:true on Windows, claudeCode:true in WSL writing to ~/.zshrc or ~/.bashrc); print the HookInstallResult summary. (4) state <name> — read the update token from %USERPROFILE%/.petdex-win/runtime/update-token (Windows) or ~/.petdex-win/runtime/update-token (WSL), then POST {state:<name>} to http://127.0.0.1:${BUDDY_PORT}/state with X-Petdex-Update-Token header; print success or error. (5) doctor — check: Electron process is running, GET /health returns 200, update token file exists, hooks are installed (call getHooksStatus()); print a checklist with pass/fail for each item. Environment detection helper: export function isWSL():boolean that returns true when process.platform is linux and /proc/version contains Microsoft. All subcommands must work from both Windows (node.exe) and WSL (node). Do not import Electron directly in src/cli/ — it is not available in WSL.",
+      "status": "todo",
+      "priority": "critical",
+      "group_id": "FEAT",
+      "depends_on": [
+        "FEAT-07",
+        "FEAT-08"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "buddy start on Windows spawns the Electron process and the pet window appears",
+        "buddy start in WSL invokes buddy.exe via WSL interop and the pet window appears on the Windows desktop",
+        "buddy start in WSL without interop available prints a clear actionable error and exits non-zero",
+        "buddy hooks install on Windows writes Codex hook entries to %USERPROFILE%/.codex/hooks.json",
+        "buddy hooks install in WSL appends Claude Code shell hook lines to ~/.zshrc or ~/.bashrc",
+        "buddy state running POSTs to the sidecar and the pet switches to the running animation",
+        "buddy doctor prints a pass/fail checklist covering process, sidecar, token, and hooks",
+        "isWSL() returns true in a WSL shell and false in a Windows cmd/PowerShell environment",
+        "src/cli/ imports no Electron modules (safe to run in WSL node)",
+        "npm run lint passes"
+      ],
+      "docs": [
+        "docs/ARCHITECTURE.md",
+        "docs/PRD.md"
+      ],
+      "files": [
+        "src/cli/index.ts",
+        "src/cli/commands/start.ts",
+        "src/cli/commands/stop.ts",
+        "src/cli/commands/hooks.ts",
+        "src/cli/commands/state.ts",
+        "src/cli/commands/doctor.ts"
       ],
       "commands": [
         "npm run lint"
