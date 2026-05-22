@@ -1,10 +1,11 @@
 // Electron main process entry point.
 // FEAT-01: BrowserWindow creation via avatar-window.ts.
-// FEAT-07: state-store, sidecar, tray, and startup restore flow (out of scope here).
+// FEAT-05: system tray (Show/Hide/Quit) and close-to-hide behaviour.
 
 import { app } from 'electron'
 import path from 'path'
 import { createAvatarWindow } from './avatar-window'
+import { createTray, isQuitting } from './tray'
 
 // Default window bounds (356×320 px) — overridden by persisted state in FEAT-07.
 const DEFAULT_WIDTH = 356
@@ -24,13 +25,22 @@ app.whenReady().then(() => {
     // Production: load the built renderer index.html.
     void win.loadFile(path.join(__dirname, '../renderer/index.html'))
   }
+
+  // Create the system tray icon; it keeps the process alive when the window is hidden.
+  createTray(win)
+
+  // Intercept the system close button: hide instead of quit unless isQuitting is set.
+  win.on('close', (event) => {
+    if (!isQuitting) {
+      event.preventDefault()
+      win.hide()
+    }
+  })
 })
 
-// Prevent the process from quitting when all windows are closed on Windows/Linux.
-// A tray icon (FEAT-07) will provide the only quit mechanism.
+// Keep the process alive when all windows are closed — the tray provides the quit path.
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
-    // Keep alive until FEAT-07 tray is implemented; quit for now in dev.
-    app.quit()
-  }
+  // Do not quit here; the Quit tray item is the only exit path.
+  // On macOS the convention is to keep the app running even without windows,
+  // so no special-case is needed.
 })
