@@ -407,6 +407,25 @@ After model visual QA accepts the contact sheet, remove intermediate run artifac
 
 Keep `pet_request.json`, `final/spritesheet.webp`, `final/validation.json`, `qa/contact-sheet.png`, `qa/previews/`, `qa/review.json`, and `qa/run-summary.json`. Remove generated prompt files, layout guides, decoded row strips, extracted frames, `final/spritesheet.png`, and the imagegen job manifest. Skip cleanup when the user wants debug artifacts or the run still needs repair.
 
+Use the bundled cleanup helper instead of ad hoc recursive shell deletes. It validates that the kept QA/final artifacts exist, resolves every target under the run directory, and removes only the known disposable paths:
+
+```bash
+python "$SKILL_DIR/scripts/cleanup_run.py" --run-dir "$RUN_DIR"
+```
+
+On Windows, do not use `Remove-Item -Recurse` for hatch cleanup. If you need to preview the cleanup, run:
+
+```bash
+python "$SKILL_DIR/scripts/cleanup_run.py" --run-dir "$RUN_DIR" --dry-run
+```
+
+For buddy verification on Windows, prefer `npm.cmd` so PowerShell execution policy does not block `npm.ps1`:
+
+```powershell
+npm.cmd test
+npm.cmd run lint
+```
+
 ## Lightweight Visual Workers
 
 Use lightweight subagents for image-heavy work by default. This bounds each `$imagegen` rollout to one selected image, keeps contact-sheet vision payloads out of the parent thread, and reduces cost while preserving the full 9-state app contract.

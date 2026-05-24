@@ -4,6 +4,7 @@ dist/
 .env
 coverage/
 *.tsbuildinfo
+tmp/
 
 # petdex-bridge Rust build artifacts
 petdex-bridge/target/

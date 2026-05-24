@@ -34,6 +34,9 @@ npm run lint
 cd petdex-bridge && cargo build --release --target x86_64-unknown-linux-gnu
 ```
 
+On PowerShell, prefer `npm.cmd ...` for npm commands. Some Windows machines block
+`npm.ps1` through execution policy even though the npm `.cmd` shim works.
+
 ---
 
 ## Build & Verification Commands
@@ -283,3 +286,6 @@ The hatch-pet workflow should be runnable from `buddy hatch`, but buddy should n
 
 ### 2026-05-24 - hatch-pet manifests must stay UTF-8 without BOM
 PowerShell `Set-Content -Encoding UTF8` can write a UTF-8 BOM that makes hatch-pet Python scripts fail with `JSONDecodeError: Unexpected UTF-8 BOM`. When updating `imagegen-jobs.json` or run summaries from PowerShell, use `[System.Text.UTF8Encoding]::new($false)` with `[System.IO.File]::WriteAllText(...)`.
+
+### 2026-05-24 - hatch-pet cleanup and npm on Windows
+Use `npm.cmd test` and `npm.cmd run lint` from PowerShell so execution policy does not block `npm.ps1`. For hatch-pet cleanup, use `.codex/skills/hatch-pet/scripts/cleanup_run.py` instead of ad hoc recursive shell deletion; it keeps QA/final artifacts and removes only known disposable run paths.

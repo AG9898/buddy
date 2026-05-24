@@ -28,6 +28,15 @@ cd petdex-bridge && cargo test
 npm run test:e2e
 ```
 
+PowerShell on locked-down Windows machines may block `npm.ps1` through execution
+policy. In PowerShell, use the `.cmd` shim for npm commands:
+
+```powershell
+npm.cmd test
+npm.cmd run lint
+npm.cmd run build:app
+```
+
 ---
 
 ## Test Stacks
@@ -58,10 +67,10 @@ Full local smoke-test sequence for a locked-down machine:
 
 ```powershell
 npm install
-npm test
-npm run lint
-npm run build:app
-npm run build:win:local
+npm.cmd test
+npm.cmd run lint
+npm.cmd run build:app
+npm.cmd run build:win:local
 ```
 
 `npm run build:app` must emit `out/cli/index.js` as well as the Electron main,
