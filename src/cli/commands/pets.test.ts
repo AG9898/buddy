@@ -177,6 +177,32 @@ describe('runPetsList()', () => {
     expect(out).toContain('codex-compatible')
   })
 
+  it('shows packaged default pets when user pet directories are empty', async () => {
+    mockReaddirSync.mockImplementation((dirPath: unknown) => {
+      const p = dirPath as string
+      if (p.endsWith(`${path.sep}pets`) && !p.includes('.petdex-win') && !p.includes('.codex')) {
+        return [{ name: 'default', isDirectory: () => true }]
+      }
+      return []
+    })
+    mockReadFileSync.mockImplementation((filePath: unknown) => {
+      const p = filePath as string
+      if (p.endsWith('state.json')) return makeStateJson('default')
+      return JSON.stringify({ ...VALID_PET_JSON, id: 'default', name: 'Default' })
+    })
+    mockExistsSync.mockReturnValue(true)
+
+    const { runPetsList } = await import('./pets.js')
+    const cap = captureOutput()
+    runPetsList()
+    cap.restore()
+
+    const out = cap.stdout.join('')
+    expect(out).toContain('default')
+    expect(out).toContain('packaged')
+    expect(out).not.toContain('No pet folders found')
+  })
+
   it('marks the currently active pet with an asterisk', async () => {
     mockReaddirSync.mockImplementation((dirPath: unknown) => {
       const p = dirPath as string

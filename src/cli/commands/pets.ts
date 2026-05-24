@@ -2,7 +2,7 @@
  * buddy pets — enumerate and select pets from the buddy CLI.
  *
  * Subcommands:
- *   pets list        List valid buddy-managed and Codex-compatible pets.
+ *   pets list        List valid buddy-managed, packaged, and Codex-compatible pets.
  *   pets show        Print the currently selected pet and its source path.
  *   pets use <id>    Validate and persist a pet selection.
  *
@@ -104,8 +104,10 @@ function saveActivePet(entry: PetEntry): void {
 // ── Output helpers ─────────────────────────────────────────────────────────────
 
 /** Source label text for a pet entry. */
-function sourceLabel(source: 'buddy' | 'codex'): string {
-  return source === 'buddy' ? 'buddy-managed' : 'codex-compatible'
+function sourceLabel(source: PetEntry['source']): string {
+  if (source === 'buddy') return 'buddy-managed'
+  if (source === 'packaged') return 'packaged'
+  return 'codex-compatible'
 }
 
 /** Render a single pet entry row. */
@@ -122,7 +124,7 @@ function printPetRow(entry: PetEntry, activePetId: string | null): void {
 /**
  * buddy pets list
  *
- * Enumerate all valid pets from buddy-managed and Codex-compatible directories.
+ * Enumerate all valid pets from buddy-managed, packaged, and Codex-compatible directories.
  * Marks the currently active pet with an asterisk.
  */
 export function runPetsList(): void {
@@ -135,7 +137,7 @@ export function runPetsList(): void {
     warn('No pet folders found.')
     process.stdout.write(
       dim(
-        '  Add pets to %USERPROFILE%\\.petdex-win\\pets or %USERPROFILE%\\.codex\\pets\n',
+        '  Add pets to %USERPROFILE%\\.petdex-win\\pets, this package\\pets, or %USERPROFILE%\\.codex\\pets\n',
       ),
     )
     closeSeparator()
@@ -269,7 +271,7 @@ export function runPetsUse(id: string): void {
  * Called when `buddy pets --help` or `buddy pets` (no subcommand) is used.
  */
 export function runPetsHelp(): void {
-  bullet('buddy pets list        — list valid buddy-managed and Codex-compatible pets')
+  bullet('buddy pets list        — list valid buddy-managed, packaged, and Codex-compatible pets')
   bullet('buddy pets show        — print the currently selected pet and its source path')
   bullet('buddy pets use <id>    — validate and persist a pet selection')
 }

@@ -13,11 +13,17 @@ body {
 #app {
   width: 100vw;
   height: 100vh;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
 }
 
 .pet-container {
   position: relative;
-  display: inline-block;
+  width: min(100vw, calc(100vh * var(--frame-aspect)));
+  height: min(100vh, calc(100vw / var(--frame-aspect)));
+  min-width: 1px;
+  min-height: 1px;
 }
 
 /* Resize handle: 12×12px triangle in the bottom-right corner of the pet sprite.

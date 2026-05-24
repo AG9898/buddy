@@ -18,7 +18,7 @@ usable from Windows PowerShell, Command Prompt, WSL shells, non-TTY scripts, and
 | `buddy hooks install [--rc <path>]` | Install Claude Code and Codex CLI hook entries. |
 | `buddy doctor` | Print a health checklist for process, sidecar, token, and hooks. |
 | `buddy hatch <prompt> [--output <dir>] [--verbose]` | Generate pet assets by delegating image work to Codex CLI, then package buddy assets. |
-| `buddy pets list` | List valid buddy-managed and Codex-compatible pets. |
+| `buddy pets list` | List valid buddy-managed, packaged, and Codex-compatible pets. |
 | `buddy pets show` | Print the currently selected pet and its source path. |
 | `buddy pets use <id>` | Validate and persist the active pet selection. |
 
@@ -121,11 +121,12 @@ is included in the failure message when no subprocess output was captured.
 
 ## Pet Discovery and Selection
 
-buddy supports two pet sources:
+buddy supports three pet sources:
 
 | Source | Default path | Notes |
 |---|---|---|
 | buddy-managed pets | `%USERPROFILE%\.petdex-win\pets` | Primary location for pets created by `buddy hatch`. |
+| packaged pets | `<buddy package>\pets` | Built-in read-only pets shipped with buddy, including `default`. |
 | Codex-compatible pets | `%USERPROFILE%\.codex\pets` | Read as asset folders only. buddy must not read or write Codex internal state. |
 
 A valid pet folder contains:
@@ -149,7 +150,8 @@ the sidecar or future IPC-backed command surfaces, but they must not directly mu
 window files or bypass the Electron process.
 
 Visual resize is the primary resize interaction. The renderer should expose a resize
-handle, main should resize the BrowserWindow, and the app should persist bounds at resize
+handle, main should resize the BrowserWindow, and the sprite should scale to fit inside
+the current transparent window without clipping. The app should persist bounds at resize
 end. CLI resize is secondary and should follow the same ownership rule.
 
 Resize behavior must preserve transparent-window constraints, click-through behavior, and
@@ -191,6 +193,6 @@ CLI changes should include focused tests or smoke checks for:
 - Styled output behavior when styling is supported.
 - Expected error output and exit codes.
 - `buddy hatch` progress output without raw subprocess dumps in normal mode.
-- Pet discovery from buddy-managed and Codex-compatible directories.
+- Pet discovery from buddy-managed, packaged, and Codex-compatible directories.
 - Invalid pet folder handling.
 - Built CLI smoke tests through `node out/cli/index.js --help` after packaging changes.

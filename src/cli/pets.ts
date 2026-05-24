@@ -1,8 +1,9 @@
 /**
  * Pet discovery and validation module for the buddy CLI.
  *
- * Enumerates valid pet folders from two sources:
+ * Enumerates valid pet folders from three sources:
  *   - buddy-managed pets: %USERPROFILE%/.petdex-win/pets   (read/write)
+ *   - packaged pets:       <buddy package>/pets             (read-only built-ins)
  *   - Codex-compatible pets: %USERPROFILE%/.codex/pets     (read-only asset source)
  *
  * A valid pet folder contains:
@@ -15,6 +16,7 @@
 import fs from 'fs'
 import os from 'os'
 import path from 'path'
+import { fileURLToPath } from 'url'
 
 // ── Pet data types ────────────────────────────────────────────────────────────
 
@@ -44,8 +46,11 @@ export interface PetJson {
   states: Record<string, PetAnimState>
 }
 
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
+
 /** Source of a discovered pet folder. */
-export type PetSource = 'buddy' | 'codex'
+export type PetSource = 'buddy' | 'packaged' | 'codex'
 
 /** A successfully validated pet entry. */
 export interface PetEntry {
@@ -90,6 +95,15 @@ export function buddyPetsDir(): string {
 export function codexPetsDir(): string {
   const base = process.env['USERPROFILE'] ?? os.homedir()
   return path.join(base, '.codex', 'pets')
+}
+
+/**
+ * Absolute path to the pets directory bundled with this buddy installation.
+ * In source this resolves from src/cli -> repo root; in built output it
+ * resolves from out/cli -> package root.
+ */
+export function packagedPetsDir(): string {
+  return path.resolve(__dirname, '../../pets')
 }
 
 // ── Validation ────────────────────────────────────────────────────────────────
@@ -223,18 +237,19 @@ function scanDirectory(dirPath: string, source: PetSource): DiscoveryResult {
 }
 
 /**
- * Discover all valid pet entries from both the buddy-managed and Codex-compatible
- * pet directories. Codex folders are treated as read-only asset sources.
+ * Discover all valid pet entries from the buddy-managed, packaged, and
+ * Codex-compatible pet directories. Codex folders are treated as read-only asset sources.
  *
- * Returns all valid entries (sorted buddy-first, then codex) and all invalid entries.
+ * Returns all valid entries (sorted buddy, packaged, then codex) and all invalid entries.
  * Never reads or writes Codex internal state files.
  */
 export function discoverPets(): DiscoveryResult {
   const buddyResult = scanDirectory(buddyPetsDir(), 'buddy')
+  const packagedResult = scanDirectory(packagedPetsDir(), 'packaged')
   const codexResult = scanDirectory(codexPetsDir(), 'codex')
 
   return {
-    valid: [...buddyResult.valid, ...codexResult.valid],
-    invalid: [...buddyResult.invalid, ...codexResult.invalid],
+    valid: [...buddyResult.valid, ...packagedResult.valid, ...codexResult.valid],
+    invalid: [...buddyResult.invalid, ...packagedResult.invalid, ...codexResult.invalid],
   }
 }

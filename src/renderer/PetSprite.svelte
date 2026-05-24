@@ -173,7 +173,10 @@
 <svelte:window onpointermove={onWindowPointerMove} />
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<div class="pet-container" style="width: {FRAME_WIDTH}px; height: {FRAME_HEIGHT}px; position: relative;">
+<div
+  class="pet-container"
+  style="--frame-aspect: {FRAME_WIDTH / FRAME_HEIGHT};"
+>
   <div
     data-avatar-mascot="true"
     style="

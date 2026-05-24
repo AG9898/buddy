@@ -291,3 +291,6 @@ PowerShell `Set-Content -Encoding UTF8` can write a UTF-8 BOM that makes hatch-p
 
 ### 2026-05-24 - hatch-pet cleanup and npm on Windows
 Use `npm.cmd test` and `npm.cmd run lint` from PowerShell so execution policy does not block `npm.ps1`. For hatch-pet cleanup, use `.codex/skills/hatch-pet/scripts/cleanup_run.py` instead of ad hoc recursive shell deletion; it keeps QA/final artifacts and removes only known disposable run paths.
+
+### 2026-05-24 - packaged pets must be discoverable and default id must resolve
+`buddy pets list` scans `%USERPROFILE%\.petdex-win\pets`, the package `pets/` directory, and `%USERPROFILE%\.codex\pets`. Keep `pets/default/pet.json` id set to `default`; otherwise the default state store selection reports as unresolved even though the bundled sprite files exist.

@@ -81,7 +81,8 @@ These apply across every stack in this project.
   Show summarized progress by default and reserve subprocess detail for verbose/debug
   behavior or logs.
 - Pet discovery must validate `pet.json` and the referenced spritesheet before listing or
-  selecting a folder.
+  selecting a folder. Discovery scans buddy-managed pets, packaged built-ins, and
+  Codex-compatible pet folders.
 
 ---
 
@@ -125,9 +126,10 @@ These apply across every stack in this project.
   `pointermove` on the window calls `petApi.resizeMove(screenX, screenY)` (forwarded only
   when `resizing` is true); `pointerup` calls `petApi.resizeEnd()`. Main computes new
   dimensions from cursor screen coordinates relative to the fixed window origin. Final bounds
-  are saved to the state store on `CH_RESIZE_END`. Click-through (`setIgnoreMouseEvents`) is
-  disabled while the cursor is over `.resize-handle` using the same `setPointerInteractive`
-  mechanism as dragging.
+  are saved to the state store on `CH_RESIZE_END`. The sprite container must scale to fit
+  inside the current BrowserWindow viewport without clipping. Click-through
+  (`setIgnoreMouseEvents`) is disabled while the cursor is over `.resize-handle` using the
+  same `setPointerInteractive` mechanism as dragging.
 
 ---
 

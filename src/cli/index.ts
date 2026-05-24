@@ -14,7 +14,7 @@
  * No Electron imports anywhere in src/cli/ — safe to run in WSL node.
  */
 
-import { Command, type Command as CommandType } from 'commander'
+import { Command, type Command as CommandType, type HelpContext } from 'commander'
 import { runStart } from './commands/start.js'
 import { runStop } from './commands/stop.js'
 import { runHooksInstall } from './commands/hooks.js'
@@ -38,10 +38,18 @@ program.on('--help', () => {
 
 // Override outputHelp to prepend the banner.
 const originalOutputHelp = program.outputHelp.bind(program)
-program.outputHelp = (cb?: (str: string) => string): void => {
+
+function outputHelpWithBanner(context?: HelpContext): void
+function outputHelpWithBanner(cb?: (str: string) => string): void
+function outputHelpWithBanner(arg?: HelpContext | ((str: string) => string)): void {
   printBanner()
-  originalOutputHelp(cb)
+  if (typeof arg === 'function') {
+    originalOutputHelp(arg)
+  } else {
+    originalOutputHelp(arg)
+  }
 }
+program.outputHelp = outputHelpWithBanner
 
 // ── buddy start ───────────────────────────────────────────────────────────────
 program
@@ -134,8 +142,8 @@ const pets = program
   .command('pets')
   .description(
     'Enumerate and select pets. ' +
-      'Pets can be buddy-managed (%USERPROFILE%\\.petdex-win\\pets) ' +
-      'or Codex-compatible (%USERPROFILE%\\.codex\\pets).',
+      'Pets can be buddy-managed (%USERPROFILE%\\.petdex-win\\pets), ' +
+      'packaged with buddy, or Codex-compatible (%USERPROFILE%\\.codex\\pets).',
   )
   .action(() => {
     // Show help when `buddy pets` is run with no subcommand.
@@ -144,7 +152,7 @@ const pets = program
 
 pets
   .command('list')
-  .description('List valid buddy-managed and Codex-compatible pets.')
+  .description('List valid buddy-managed, packaged, and Codex-compatible pets.')
   .action(() => {
     runPetsList()
   })

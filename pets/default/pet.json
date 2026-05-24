@@ -1,5 +1,5 @@
 {
-  "id": "ragdoll",
+  "id": "default",
   "name": "Ragdoll",
   "spritesheet": "spritesheet.webp",
   "frameWidth": 192,

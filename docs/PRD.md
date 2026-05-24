@@ -36,7 +36,7 @@ buddy is an npm-distributed developer tool that renders a floating, always-on-to
 - Render one sprite sheet with CSS background-position animation (buddy-defined pet.json sprite format)
 - Pet state machine: idle, running, waiting, jumping, waving, failed, review
 - Persist open state and window bounds across app restarts (`%USERPROFILE%\.petdex-win\state.json`)
-- Visual mouse resize for the pet window, with resized bounds persisted across restarts
+- Visual mouse resize for the pet window, with the sprite scaling inside the window and resized bounds persisted across restarts
 - System tray icon with Show / Hide / Quit menu items
 - Local HTTP endpoint `POST /state` listening on `127.0.0.1:7777` (configurable via `BUDDY_PORT`)
 - CLI hook event → pet state mapping: UserPromptSubmit → jumping, PreToolUse → running, PostToolUse → idle, PermissionRequest → waiting, Stop → waving (applies to both Codex CLI and Claude Code)
@@ -48,7 +48,7 @@ buddy is an npm-distributed developer tool that renders a floating, always-on-to
 - Claude Code hook detection and shell hook installation
 - Sprite creation tooling supporting buddy's pet.json sprite sheet format
 - Multi-monitor and per-resolution DPI support (separate bounds per display config)
-- Custom pet loading and selection from `%USERPROFILE%\.petdex-win\pets` and common Codex-compatible pet folders such as `%USERPROFILE%\.codex\pets`
+- Custom pet loading and selection from `%USERPROFILE%\.petdex-win\pets`, packaged buddy pets, and common Codex-compatible pet folders such as `%USERPROFILE%\.codex\pets`
 
 ### Out of Scope
 
@@ -82,8 +82,8 @@ buddy is an npm-distributed developer tool that renders a floating, always-on-to
 - `petdex-bridge` binary builds cleanly with `cargo build --target x86_64-unknown-linux-gnu` and runs in WSL without additional runtime dependencies.
 - Claude Code shell hooks installed via `buddy-bridge hooks install --shell zsh` (or bash) trigger visible pet state changes on the Windows display.
 - Per-resolution window bounds are stored and restored correctly when switching between monitor configurations.
-- Users can visually resize the pet window and the resized bounds persist across restart.
-- Users can list and select valid buddy-managed and Codex-compatible pets without buddy modifying Codex internal state.
+- Users can visually resize the pet window, the sprite scales without clipping, and the resized bounds persist across restart.
+- Users can list and select valid buddy-managed, packaged, and Codex-compatible pets without buddy modifying Codex internal state.
 
 ---
 

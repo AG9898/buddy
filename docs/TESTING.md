@@ -134,8 +134,8 @@ Electron E2E).
 - CLI output changes should assert both human-readable content and expected exit codes.
 - Hatch workflow tests should verify normal output is summarized and verbose/debug output
   is opt-in.
-- Pet discovery tests should cover buddy-managed pets, Codex-compatible pets, invalid
-  folders, and selected pet persistence.
+- Pet discovery tests should cover buddy-managed pets, packaged pets, Codex-compatible pets,
+  invalid folders, and selected pet persistence.
 - New public functions in `sidecar.ts` or `state-store.ts` require a Vitest unit test
   before the task is marked done.
 

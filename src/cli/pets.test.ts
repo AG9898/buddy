@@ -40,6 +40,7 @@ import {
   discoverPets,
   buddyPetsDir,
   codexPetsDir,
+  packagedPetsDir,
 } from './pets.js'
 
 /* ── Test fixtures ─────────────────────────────────────────────────────────── */
@@ -237,6 +238,23 @@ describe('discoverPets()', () => {
     expect(sources).toContain('codex')
   })
 
+  it('returns packaged pets from the buddy package pets directory', () => {
+    mockReaddirSync.mockImplementation((dirPath: unknown) => {
+      const p = dirPath as string
+      if (p.endsWith(`${path.sep}pets`) && !p.includes('.petdex-win') && !p.includes('.codex')) {
+        return [{ name: 'default', isDirectory: () => true }]
+      }
+      return []
+    })
+    mockReadFileSync.mockReturnValue(JSON.stringify({ ...VALID_PET_JSON, id: 'default' }))
+    mockExistsSync.mockReturnValue(true)
+
+    const result = discoverPets()
+    expect(result.valid.length).toBe(1)
+    expect(result.valid[0]?.id).toBe('default')
+    expect(result.valid[0]?.source).toBe('packaged')
+  })
+
   it('collects invalid entries with reasons', () => {
     mockReaddirSync.mockImplementation((dirPath: unknown) => {
       const p = dirPath as string
@@ -283,6 +301,13 @@ describe('discoverPets()', () => {
     const result = discoverPets()
     expect(result.valid[0]?.source).toBe('buddy')
     expect(result.valid[1]?.source).toBe('codex')
+  })
+})
+
+describe('packagedPetsDir()', () => {
+  it('returns the package-level pets directory', () => {
+    const dir = packagedPetsDir()
+    expect(path.basename(dir)).toBe('pets')
   })
 })
 
