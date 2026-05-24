@@ -17,7 +17,7 @@ buddy is installed via `npm install -g buddy` from either a Windows terminal or 
 
 All components run on a single developer workstation. There is no server, no cloud service, and no external network dependency.
 
-- **buddy CLI** (`src/cli/`): npm `bin` entry point. Handles `start`, `stop`, `hooks install`, `state <name>`, and `doctor` subcommands. Detects whether it is running in WSL or on Windows and adjusts behavior accordingly — in WSL it launches the Windows Electron app via WSL interop (`buddy.exe`).
+- **buddy CLI** (`src/cli/`): npm `bin` entry point. Handles `start`, `stop`, `hooks install`, `state <name>`, `doctor`, and `hatch <prompt>` subcommands. Detects whether it is running in WSL or on Windows and adjusts behavior accordingly — in WSL it launches the Windows Electron app via WSL interop (`buddy.exe`). For asset generation, `buddy hatch` delegates visual generation to a Codex run that can use `$imagegen`, then packages the deterministic hatch-pet outputs for buddy.
 - **Electron main process** (Windows, `src/main/`): Manages the transparent frameless BrowserWindow, runs the local HTTP sidecar on `127.0.0.1:7777`, persists state to disk, and owns the system tray.
 - **Svelte renderer** (Windows, Electron webview, `src/renderer/`): Renders the pet character, drives the sprite animation state machine, and handles pointer interactivity and dragging.
 - **petdex-bridge** (WSL, Rust CLI binary, `petdex-bridge/`): A tiny cross-compiled Linux binary distributed as the companion npm package `buddy-bridge`. Invoked by WSL shell hooks; reads the shared update token and POSTs agent lifecycle events to the Electron HTTP sidecar via WSL localhost passthrough.
@@ -36,11 +36,13 @@ All components run on a single developer workstation. There is no server, no clo
 - `buddy hooks install`: writes shell hook entries for Claude Code CLI and Codex CLI (both operate via shell hooks / rc files — no desktop app config is written).
 - `buddy state <name>`: sends an HTTP POST to the running sidecar (works from both Windows and WSL via localhost passthrough).
 - `buddy doctor`: checks that the Electron process is running, the sidecar responds, the update token exists, and hooks are installed.
+- `buddy hatch <prompt>`: prepares a hatch-pet run and invokes Codex CLI as the image-generation worker so `$imagegen` is provided by Codex rather than by a buddy-owned image API adapter. The command packages the completed run into buddy's `pets/<id>/pet.json`, `spritesheet.webp`, and `build/icon.ico` formats.
 - Files: `src/cli/index.ts`, `src/cli/commands/`.
 
 **Does NOT:**
 - Never manages window state directly — all window operations go through the Electron main process.
 - Never starts a long-running server process itself — it starts the Electron app which owns the sidecar.
+- Never owns image-provider credentials for hatch generation. If a user starts hatching from Claude Code or any other shell, buddy still delegates the visual generation phase to Codex CLI so `$imagegen` routing remains centralized.
 
 ### Electron Main Process (`src/main/`)
 
@@ -156,9 +158,10 @@ buddy has no user-facing authentication. Access to the HTTP sidecar is secured b
 | electron-builder | npm package publishing and production build tooling | Required (production build) |
 | Svelte + Vite | Renderer framework and dev/build tooling | Required |
 | commander (or yargs) | CLI entry point (`buddy` command) argument parsing | Required |
+| Codex CLI | Executes `hatch-pet` visual generation jobs with `$imagegen` for `buddy hatch` | Required for asset generation only |
 | Rust toolchain (`x86_64-unknown-linux-gnu` cross-compile target) | Build petdex-bridge for WSL | Required (for WSL hook support) |
 
-There are no cloud services, no managed databases, no auth providers, and no external APIs.
+There are no buddy-owned cloud services, managed databases, auth providers, or image API integrations. Codex CLI may use its own configured model/image-generation backend when `buddy hatch` delegates `$imagegen` work to it, but buddy does not read or store those credentials.
 
 ---
 

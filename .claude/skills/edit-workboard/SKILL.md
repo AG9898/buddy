@@ -44,6 +44,27 @@ Do not use this skill for selecting the next task, executing tasks, or transitio
 
 ## Shared Write Protocol
 
+### Shell portability
+
+Most examples below use WSL/Linux shell syntax with `/tmp/wb.json` and `mv`. When
+running from Windows PowerShell, prefer a repo-local temporary file and PowerShell
+move semantics:
+
+```powershell
+$tmp = Join-Path (Get-Location) ".workboard.tmp.json"
+jq '...targeted filter...' docs/workboard.json > $tmp
+Move-Item -Force $tmp docs/workboard.json
+```
+
+For WSL/Ubuntu, keep using:
+
+```bash
+jq '...targeted filter...' docs/workboard.json > /tmp/wb.json && mv /tmp/wb.json docs/workboard.json
+```
+
+In either shell, the jq expression must target only the intended task object(s) and
+must update `last_updated` in the same expression.
+
 Run after every command that writes to the board:
 
 1. Apply the targeted patch using the template for that command; never rewrite the full file.

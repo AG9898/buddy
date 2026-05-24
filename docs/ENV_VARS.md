@@ -22,6 +22,7 @@ All variables are optional. The app ships with safe defaults for every variable.
 | `BUDDY_HOST` | No | `127.0.0.1` | Bind address for the HTTP sidecar. **Never set to `0.0.0.0`** — loopback only to prevent exposure to other machines on the network. | `.env` (dev) only |
 | `BUDDY_SPRITES_DIR` | No | `%USERPROFILE%\.petdex-win\pets` | Override directory for sprite/pet asset files. buddy also checks `%USERPROFILE%\.codex\pets` as a fallback. | `.env` (dev) or app settings UI |
 | `BUDDY_LOG_LEVEL` | No | `info` | Log verbosity for the Electron main process. Accepted values: `debug`, `info`, `warn`, `error`. | `.env` (dev) or Electron app config |
+| `BUDDY_CODEX_COMMAND` | No | `codex` | Command used by `buddy hatch` to invoke Codex CLI for hatch-pet `$imagegen` work. Override only when Codex is installed under a non-standard command name or path. | `.env` (dev) or shell |
 
 ---
 
@@ -53,3 +54,6 @@ No `.env.example` is required or maintained. The variable matrix above is the ca
 | `BUDDY_HOST` | Optional — defaults to `127.0.0.1` | Optional — defaults to `127.0.0.1` (do not override) |
 | `BUDDY_SPRITES_DIR` | Optional — defaults to `%USERPROFILE%\.petdex-win\pets` | Optional — defaults to `%USERPROFILE%\.petdex-win\pets` |
 | `BUDDY_LOG_LEVEL` | Optional — recommend `debug` during dev | Optional — defaults to `info` |
+| `BUDDY_CODEX_COMMAND` | Optional — defaults to `codex` | Optional — defaults to `codex` |
+
+`buddy hatch` must not require `ANTHROPIC_API_KEY` or any other buddy-owned image provider secret. Image generation is delegated to Codex CLI, which uses its own configured authentication and `$imagegen` route.

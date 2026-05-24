@@ -64,11 +64,11 @@ What existing code or docs does this affect?>
 
 **Resolved:** 2026-05-22
 
-**Decision:** Adopt the upstream `openai/skills` `hatch-pet` skill, adapted for buddy. The skill lives in `.claude/skills/hatch-pet/`. Two buddy-specific scripts are added (`make_icon.py`, `package_for_buddy.py`). The `SKILL_DIR` path is resolved from the git root. A `buddy hatch <prompt>` CLI command drives the pipeline via the Anthropic SDK. The `$imagegen` abstraction is preserved; a provider adapter (`ASSET-02`) will wire it to Anthropic's image generation API.
+**Decision:** Adopt the upstream `openai/skills` `hatch-pet` skill, adapted for buddy. The skill source is maintained in the repo and synced into both `.claude/skills/hatch-pet/` and `.codex/skills/hatch-pet/` as needed. Two buddy-specific scripts are added (`make_icon.py`, `package_for_buddy.py`). The `SKILL_DIR` path is resolved from the git root. A `buddy hatch <prompt>` CLI command orchestrates the workflow by invoking a Codex run that owns the `$imagegen` steps, then uses the deterministic scripts to package `build/icon.ico` and `pets/default/spritesheet.webp`.
 
-**Why:** Repeatable generation workflow; consistent with the Codex/petdex ecosystem; users can retheme by re-running `buddy hatch`; bespoke static assets would have no regeneration path.
+**Why:** Repeatable generation workflow; consistent with the Codex/petdex ecosystem; users can retheme by re-running `buddy hatch`; bespoke static assets would have no regeneration path. Delegating image generation to Codex keeps buddy out of provider-specific image API credentials and lets the same `$imagegen` path work even when a Claude model or Claude Code session initiated the hatch request.
 
-**Alternatives rejected:** Bespoke static binary blobs — no repeatable generation, harder to retheme.
+**Alternatives rejected:** Bespoke static binary blobs — no repeatable generation, harder to retheme. A buddy-owned Anthropic image adapter was also rejected because it would duplicate image-generation routing already available through Codex and would make buddy responsible for image provider secrets.
 
 **Affects:** [ARCHITECTURE.md](ARCHITECTURE.md), [CONVENTIONS.md](CONVENTIONS.md), [workboard.json](workboard.json)
 

@@ -58,6 +58,9 @@ buddy/
   tsconfig.json         — TypeScript config (strict mode)
   electron-builder.yml  — Windows installer/packager config
   src/
+    cli/
+      index.ts         — npm bin entry: start/stop/hooks/state/doctor/hatch
+      commands/        — CLI command implementations; hatch delegates imagegen work to Codex CLI
     main/
       main.ts           — Electron entry: app lifecycle, tray, startup restore
       avatar-window.ts  — BrowserWindow: transparent overlay creation, click-through, drag IPC
@@ -124,6 +127,7 @@ Full topology: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
 - Never write to `%USERPROFILE%\.codex\.codex-global-state.json` — Codex internals are off-limits.
 - Never set `nodeIntegration: true` — use contextBridge only.
 - Never bind the HTTP sidecar to `0.0.0.0`.
+- Never make buddy own image-provider secrets for pet hatching; `buddy hatch` delegates `$imagegen` work to Codex CLI.
 
 ### Always
 
@@ -273,3 +277,6 @@ The committed `pets/default/spritesheet.webp` is a generated color-grid placehol
 
 ### 2026-05-23 — stale persisted bounds can hide a correctly rendered pet
 `%USERPROFILE%\.petdex-win\state.json` can contain coordinates outside the current display work area, especially after resolution or monitor changes. Startup clamps restored bounds before creating the BrowserWindow and persists the corrected bounds, so a rendered window is not shown off-screen.
+
+### 2026-05-24 — buddy hatch should delegate imagegen to Codex CLI
+The hatch-pet workflow should be runnable from `buddy hatch`, but buddy should not implement an Anthropic image adapter or hold image-provider API keys. Keep `$imagegen` centralized in Codex by having the CLI invoke a Codex run for visual generation, then use the deterministic hatch-pet scripts to package buddy assets.

@@ -24,6 +24,27 @@ npx --yes ajv-cli validate -s docs/workboard.schema.json -d docs/workboard.json
 If `ajv-cli` is unavailable, install a validator and validate against
 `docs/workboard.schema.json` before changing task structure.
 
+### Portable Edit Commands
+
+Most workboard skill examples are written for WSL/Linux shells and use `/tmp/wb.json`
+plus `mv`. When editing from Windows PowerShell, use a repo-local temporary file and
+`Move-Item` instead:
+
+```powershell
+$tmp = Join-Path (Get-Location) ".workboard.tmp.json"
+jq '...targeted filter...' docs/workboard.json > $tmp
+Move-Item -Force $tmp docs/workboard.json
+```
+
+When editing from WSL/Ubuntu, the standard form remains:
+
+```bash
+jq '...targeted filter...' docs/workboard.json > /tmp/wb.json && mv /tmp/wb.json docs/workboard.json
+```
+
+In both shells, keep edits targeted to the affected task objects and update
+`last_updated` in the same jq expression.
+
 ---
 
 ## Top-Level Shape

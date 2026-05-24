@@ -1,7 +1,7 @@
 {
   "$schema": "./workboard.schema.json",
   "schema_version": "1.0.0",
-  "last_updated": "2026-05-22T12:00:00Z",
+  "last_updated": "2026-05-24",
   "tasks": [
     {
       "id": "FEAT-01",
@@ -294,12 +294,13 @@
     {
       "id": "ASSET-01",
       "title": "Generate production icon and default spritesheet via pet hatch skill",
-      "description": "Adapt the Codex pet hatch skill for buddy to produce two assets: (1) build/icon.ico \u2014 a 256x256 Windows application icon for the buddy pet character, referenced by electron-builder.yml for the installer and executable; (2) pets/default/spritesheet.webp \u2014 the production-quality 8-column x 9-row pixel-art spritesheet at 142x154px per frame (1136x1386px total) replacing the current color-grid placeholder. The pet hatch skill is a markdown-driven Codex image generation workflow; it will need to be edited so its output paths and frame dimensions match buddy's expectations. Once real assets exist, remove or replace the placeholder spritesheet and ensure electron-builder.yml icon references resolve correctly so 'npm run build' completes without --config.win.icon=null workarounds. See OPEN-01 in DECISIONS.md for the full decision context.",
+      "description": "Use the Codex-delegated pet hatch workflow for buddy to produce two assets: (1) build/icon.ico - a 256x256 Windows application icon for the buddy pet character, referenced by electron-builder.yml for the installer and executable; (2) pets/default/spritesheet.webp - the production-quality 8-column x 9-row pixel-art spritesheet replacing the current color-grid placeholder. The renderer reads frame dimensions from pets/default/pet.json, so the generated spritesheet dimensions must match the packaged pet.json produced by package_for_buddy.py. Once real assets exist, remove or replace the placeholder spritesheet and ensure electron-builder.yml icon references resolve correctly so npm run build completes without icon workarounds.",
       "status": "todo",
       "priority": "high",
       "group_id": "ASSET",
       "depends_on": [
-        "ASSET-02"
+        "ASSET-02",
+        "ASSET-03"
       ],
       "blocked_by": [],
       "acceptance_criteria": [
@@ -307,7 +308,7 @@
         "pets/default/spritesheet.webp contains real pixel-art frames (not the color-grid placeholder)",
         "npm run build completes without --config.win.icon=null or --config.win.signAndEditExecutable=false workarounds on a machine with symlink privileges",
         "The pet character is visually recognizable and consistent between the installer icon and the in-app sprite",
-        "pet.json frame dimensions (142x154) match the new spritesheet exactly"
+        "pets/default/pet.json frame dimensions match the new spritesheet exactly"
       ],
       "docs": [
         "docs/DECISIONS.md",
@@ -318,32 +319,84 @@
         "pets/default/spritesheet.webp"
       ],
       "commands": [
+        "buddy hatch \"a small developer pet\" --output pets/default",
         "npm run build:app"
       ]
     },
     {
       "id": "ASSET-02",
-      "title": "Implement imagegen-adapter shim for hatch-pet skill",
-      "description": "Create .claude/skills/hatch-pet/imagegen-adapter.md that maps the $imagegen abstraction used in SKILL.md to the Anthropic image generation API. The hatch-pet SKILL.md calls $imagegen for all visual generation; the adapter makes this work from the buddy hatch CLI (claude-sonnet-4-6 with image output or a comparable Anthropic image generation endpoint). The skill itself stays provider-agnostic \u2014 the adapter is the only place with Anthropic-specific logic. Once done, buddy hatch <prompt> can complete image generation steps end-to-end.",
+      "title": "Delegate buddy hatch image generation to Codex",
+      "description": "Replace the planned Anthropic imagegen-adapter approach with a Codex-delegated hatch runner. The buddy CLI should invoke Codex CLI for hatch-pet visual generation so Codex owns the $imagegen route even when the user started from Claude Code or selected a Claude model elsewhere. Sync or install hatch-pet into .codex/skills/hatch-pet, pass the prompt/output constraints to Codex, stream useful progress back to the terminal, and keep deterministic packaging in buddy's local scripts. buddy must not require ANTHROPIC_API_KEY or store image-provider credentials for hatching.",
       "status": "todo",
       "priority": "high",
       "group_id": "ASSET",
-      "depends_on": [],
+      "depends_on": [
+        "ASSET-03"
+      ],
       "blocked_by": [],
       "acceptance_criteria": [
-        ".claude/skills/hatch-pet/imagegen-adapter.md exists and documents how $imagegen maps to Anthropic image generation in the buddy CLI context",
-        "buddy hatch \"a small fox\" completes the base generation step without $imagegen-not-found errors",
-        "The adapter is the only file with Anthropic-specific image API logic; SKILL.md is unchanged"
+        ".codex/skills/hatch-pet/SKILL.md exists or is generated from the canonical hatch-pet skill source",
+        "buddy hatch verifies Codex CLI is installed/authenticated and prints an actionable error if it is unavailable",
+        "buddy hatch invokes Codex CLI for $imagegen-backed visual jobs instead of calling the Anthropic SDK directly",
+        "buddy hatch does not require ANTHROPIC_API_KEY or any buddy-owned image provider secret",
+        "The command documents and honors BUDDY_CODEX_COMMAND for non-standard Codex executable paths",
+        "npm run lint passes"
       ],
       "docs": [
         "docs/ARCHITECTURE.md",
-        "docs/DECISIONS.md"
+        "docs/DECISIONS.md",
+        "docs/ENV_VARS.md"
       ],
       "files": [
-        ".claude/skills/hatch-pet/imagegen-adapter.md"
+        "src/cli/commands/hatch.ts",
+        ".codex/skills/hatch-pet/",
+        ".claude/skills/hatch-pet/",
+        "docs/ARCHITECTURE.md",
+        "docs/DECISIONS.md",
+        "docs/ENV_VARS.md"
       ],
       "commands": [
+        "npm run typecheck",
         "npm run lint"
+      ]
+    },
+    {
+      "id": "ASSET-03",
+      "title": "Package buddy CLI hatch command in the build output",
+      "description": "Make the npm bin entry point real in built artifacts. The repository currently has src/cli/index.ts and src/cli/commands/hatch.ts, but electron-vite only builds Electron main, preload, and renderer bundles. Add a CLI build path that emits out/cli/index.js with executable-compatible imports, preserves the package.json bin contract, and includes the hatch command in --help. This task should not implement image generation semantics; ASSET-02 owns Codex delegation.",
+      "status": "todo",
+      "priority": "high",
+      "group_id": "ASSET",
+      "depends_on": [
+        "FEAT-09"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "npm run build:app emits out/cli/index.js or an equivalent package bin target",
+        "node out/cli/index.js --help lists start, stop, hooks, state, doctor, and hatch",
+        "node out/cli/index.js hatch --help documents the prompt, output directory, and Codex delegation behavior",
+        "package.json bin.buddy points at a file produced by the build process",
+        "The CLI build path works on Windows PowerShell and WSL/Ubuntu",
+        "npm run lint and npm test pass"
+      ],
+      "docs": [
+        "docs/ARCHITECTURE.md",
+        "docs/CONVENTIONS.md",
+        "docs/TESTING.md"
+      ],
+      "files": [
+        "package.json",
+        "electron.vite.config.ts",
+        "tsconfig.node.json",
+        "src/cli/index.ts",
+        "src/cli/commands/hatch.ts"
+      ],
+      "commands": [
+        "npm run build:app",
+        "node out/cli/index.js --help",
+        "node out/cli/index.js hatch --help",
+        "npm run lint",
+        "npm test"
       ]
     }
   ]

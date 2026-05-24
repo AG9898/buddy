@@ -38,6 +38,9 @@ These apply across every stack in this project.
 
 - `src/main/` — one file per concern: `avatar-window.ts`, `state-store.ts`, `sidecar.ts`,
   `tray.ts`, `hooks-install.ts`.
+- `src/cli/` — command implementations must be safe to run outside Electron and must not
+  import Electron APIs. `buddy hatch` delegates `$imagegen` work to Codex CLI rather than
+  calling an image provider API directly.
 - `src/preload/preload.ts` — single preload file; exposes only `petApi` via
   `contextBridge.exposeInMainWorld`.
 - State read/write is isolated to `state-store.ts` — no other file writes to `state.json`.
