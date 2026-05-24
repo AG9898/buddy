@@ -3,7 +3,7 @@
 
 import { BrowserWindow, ipcMain, screen } from 'electron'
 import path from 'path'
-import { CH_PTR_INTERACTIVE, CH_DRAG_START, CH_DRAG_MOVE, CH_DRAG_END } from '../preload/preload'
+import { CH_PTR_INTERACTIVE, CH_DRAG_START, CH_DRAG_MOVE, CH_DRAG_END } from '../shared/ipc-channels'
 
 export interface WindowBounds {
   x: number

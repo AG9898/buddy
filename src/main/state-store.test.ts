@@ -8,6 +8,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest'
+import path from 'path'
 
 // ---------------------------------------------------------------------------
 // Declare mock functions before vi.mock calls.
@@ -111,10 +112,7 @@ describe('saveState', () => {
       byResolution: {},
     })
 
-    expect(mockMkdirSync).toHaveBeenCalledWith(
-      `${MOCK_HOME}/.petdex-win`,
-      { recursive: true },
-    )
+    expect(mockMkdirSync).toHaveBeenCalledWith(path.join(MOCK_HOME, '.petdex-win'), { recursive: true })
   })
 
   it('writes to the correct state.json path', () => {
@@ -126,7 +124,7 @@ describe('saveState', () => {
     })
 
     expect(mockWriteFileSync).toHaveBeenCalledWith(
-      `${MOCK_HOME}/.petdex-win/state.json`,
+      path.join(MOCK_HOME, '.petdex-win', 'state.json'),
       expect.any(String),
       'utf8',
     )

@@ -67,8 +67,11 @@ buddy/
       hooks-install.ts  — writes Codex/Claude Code hooks.json entries
     preload/
       preload.ts        — contextBridge: exposes petApi to renderer (setState, onStateChange, drag events, setPointerInteractive)
+    shared/
+      ipc-channels.ts   — side-effect-free IPC channel constants imported by main/preload/tests
     renderer/
       index.html        — Electron renderer entry
+      main.ts           — Svelte bootstrap: mounts App into #app and imports global styles
       App.svelte        — root Svelte component, IPC event listener
       PetSprite.svelte  — sprite animation state machine, pointer/drag handling
       styles.css
@@ -127,6 +130,7 @@ Full topology: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
 - Always run the fast verification suite before marking a task done.
 - Always update relevant `docs/` files when behavior changes.
 - Always use `showInactive()` to display the pet — never `show()`.
+- Always clamp restored window bounds into the current display work area before showing the pet.
 - Always save window bounds on close, drag-end, and display-change events.
 - Always validate `X-Petdex-Update-Token` before acting on sidecar requests.
 
@@ -263,3 +267,9 @@ electron-builder rejects builds if `electron` is listed under `dependencies` ins
 
 ### 2026-05-22 — pets/default/spritesheet.webp is a placeholder; real art TBD via pet hatch skill
 The committed `pets/default/spritesheet.webp` is a generated color-grid placeholder (1136×1386px, 142×154 per frame, 8×9 grid) so the app renders without a missing-asset crash. Real artwork will be generated via the codex pet hatch skill — see OPEN-01 in DECISIONS.md and the ASSET-01 workboard task.
+
+### 2026-05-23 — never import preload.ts from main-process modules
+`preload.ts` calls `contextBridge.exposeInMainWorld()` at module top level, so importing it from `main.ts`, `avatar-window.ts`, or `sidecar.ts` pulls preload-only code into the main bundle and can prevent Electron startup. IPC channel constants live in `src/shared/ipc-channels.ts`; import that side-effect-free module from main/preload/tests instead.
+
+### 2026-05-23 — stale persisted bounds can hide a correctly rendered pet
+`%USERPROFILE%\.petdex-win\state.json` can contain coordinates outside the current display work area, especially after resolution or monitor changes. Startup clamps restored bounds before creating the BrowserWindow and persists the corrected bounds, so a rendered window is not shown off-screen.
