@@ -1,16 +1,11 @@
 /**
- * buddy hatch — generate custom pet assets from a text description.
+ * buddy hatch - generate custom pet assets from a text description.
  *
- * Calls the Anthropic API with the hatch-pet SKILL.md as system context,
- * running a tool-use agentic loop that can execute bash commands and
- * read/write files to drive the deterministic Python pipeline.
- *
- * Requires ANTHROPIC_API_KEY in the environment.
- * Image generation steps require the imagegen-adapter shim (ASSET-02).
+ * Delegates visual generation to Codex CLI so Codex owns the $imagegen route.
+ * buddy keeps only the local deterministic hatch-pet packaging workflow.
  */
 
-import Anthropic from '@anthropic-ai/sdk'
-import { execSync } from 'child_process'
+import { spawn, spawnSync } from 'child_process'
 import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
@@ -18,200 +13,155 @@ import { fileURLToPath } from 'url'
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
-const MODEL = 'claude-sonnet-4-6'
-const MAX_TOKENS = 8192
+const DEFAULT_CODEX_COMMAND = 'codex'
+const CODEX_COMMAND_ENV = 'BUDDY_CODEX_COMMAND'
 
-const TOOLS: Anthropic.Tool[] = [
-  {
-    name: 'bash',
-    description: 'Execute a shell command and return stdout + stderr. Timeout: 120s.',
-    input_schema: {
-      type: 'object' as const,
-      properties: {
-        command: { type: 'string', description: 'Shell command to run' },
-      },
-      required: ['command'],
-    },
-  },
-  {
-    name: 'read_file',
-    description: 'Read a file from the filesystem and return its contents.',
-    input_schema: {
-      type: 'object' as const,
-      properties: {
-        path: { type: 'string', description: 'Absolute or relative path to the file' },
-      },
-      required: ['path'],
-    },
-  },
-  {
-    name: 'write_file',
-    description: 'Write content to a file, creating parent directories as needed.',
-    input_schema: {
-      type: 'object' as const,
-      properties: {
-        path: { type: 'string', description: 'Absolute or relative path to the file' },
-        content: { type: 'string', description: 'Content to write' },
-      },
-      required: ['path', 'content'],
-    },
-  },
-]
-
-function toolBash(command: string): string {
+function repoRoot(): string {
   try {
-    return execSync(command, { encoding: 'utf8', timeout: 120_000 })
-  } catch (e: unknown) {
-    const err = e as { stdout?: string; stderr?: string; message?: string }
-    return [
-      err.stderr ? `STDERR:\n${err.stderr}` : '',
-      err.stdout ? `STDOUT:\n${err.stdout}` : '',
-      `ERROR: ${err.message ?? 'command failed'}`,
-    ]
-      .filter(Boolean)
-      .join('\n')
-  }
-}
-
-function toolReadFile(filePath: string): string {
-  try {
-    return fs.readFileSync(filePath, 'utf8')
-  } catch (e: unknown) {
-    return `Error reading file: ${(e as Error).message}`
-  }
-}
-
-function toolWriteFile(filePath: string, content: string): string {
-  try {
-    fs.mkdirSync(path.dirname(filePath), { recursive: true })
-    fs.writeFileSync(filePath, content, 'utf8')
-    return `Written: ${filePath}`
-  } catch (e: unknown) {
-    return `Error writing file: ${(e as Error).message}`
-  }
-}
-
-function resolveSkillDir(): string {
-  if (process.env.BUDDY_SKILL_DIR) return process.env.BUDDY_SKILL_DIR
-  // When running from built output (out/cli/), skill dir is ../../.claude/skills/hatch-pet
-  const fromBuild = path.resolve(__dirname, '../../.claude/skills/hatch-pet')
-  if (fs.existsSync(fromBuild)) return fromBuild
-  // Fallback: resolve from git root
-  try {
-    const root = execSync('git rev-parse --show-toplevel', { encoding: 'utf8' }).trim()
-    return path.join(root, '.claude/skills/hatch-pet')
+    const result = spawnSync('git', ['rev-parse', '--show-toplevel'], {
+      cwd: process.cwd(),
+      encoding: 'utf8',
+      shell: process.platform === 'win32',
+    })
+    if (result.status === 0 && result.stdout.trim()) return result.stdout.trim()
   } catch {
-    return path.resolve('.claude/skills/hatch-pet')
+    // Fall through to process cwd.
   }
+  return process.cwd()
 }
 
-function buildSystemPrompt(skillDir: string, outputDir: string): string {
-  const skillMdPath = path.join(skillDir, 'SKILL.md')
-  if (!fs.existsSync(skillMdPath)) {
-    throw new Error(`SKILL.md not found at ${skillMdPath}`)
-  }
-  const skillMd = fs.readFileSync(skillMdPath, 'utf8')
+function resolveSkillDir(root: string): string {
+  if (process.env.BUDDY_SKILL_DIR) return process.env.BUDDY_SKILL_DIR
 
-  const repoRoot = (() => {
-    try {
-      return execSync('git rev-parse --show-toplevel', { encoding: 'utf8' }).trim()
-    } catch {
-      return process.cwd()
-    }
-  })()
+  const fromRoot = path.join(root, '.codex/skills/hatch-pet')
+  if (fs.existsSync(path.join(fromRoot, 'SKILL.md'))) return fromRoot
 
-  return `${skillMd}
+  const fromBuild = path.resolve(__dirname, '../../.codex/skills/hatch-pet')
+  if (fs.existsSync(path.join(fromBuild, 'SKILL.md'))) return fromBuild
 
-## Buddy Runtime Context
+  return fromRoot
+}
 
-- SKILL_DIR: ${skillDir}
-- REPO_ROOT: ${repoRoot}
-- Output spritesheet: ${path.resolve(repoRoot, outputDir, 'spritesheet.webp')}
-- Output pet.json: ${path.resolve(repoRoot, outputDir, 'pet.json')}
-- Output icon: ${path.resolve(repoRoot, 'build/icon.ico')}
-- Working directory: ${process.cwd()}
+function codexCommand(): string {
+  return process.env[CODEX_COMMAND_ENV]?.trim() || DEFAULT_CODEX_COMMAND
+}
 
-Use package_for_buddy.py (not the shell+jq Codex block) when packaging.
-Use make_icon.py to produce build/icon.ico from the canonical base image.
-$imagegen is not available in this runtime — the imagegen-adapter shim must be installed (ASSET-02) for image generation steps to work.`
+function runCodexCheck(command: string, args: string[], failureMessage: string): void {
+  const result = spawnSync(command, args, {
+    cwd: process.cwd(),
+    encoding: 'utf8',
+    shell: process.platform === 'win32',
+  })
+
+  if (result.status === 0) return
+
+  const detail = [result.stderr, result.stdout, result.error?.message].filter(Boolean).join('\n')
+  throw new Error(
+    `${failureMessage}\n\n` +
+      `Checked command: ${command} ${args.join(' ')}\n` +
+      `Set ${CODEX_COMMAND_ENV} to the full Codex executable path if it is installed under a non-standard name.\n` +
+      `Run "codex login" or "codex doctor" to repair Codex authentication if needed.` +
+      (detail ? `\n\nCodex output:\n${detail.trim()}` : ''),
+  )
+}
+
+function buildCodexPrompt(prompt: string, root: string, skillDir: string, outputDir: string): string {
+  const absoluteOutputDir = path.resolve(root, outputDir)
+  const spritesheetPath = path.join(absoluteOutputDir, 'spritesheet.webp')
+  const petJsonPath = path.join(absoluteOutputDir, 'pet.json')
+  const iconPath = path.join(root, 'build/icon.ico')
+
+  return `Use the hatch-pet skill to generate buddy pet assets.
+
+User pet concept:
+${prompt}
+
+Runtime constraints:
+- Work in repository root: ${root}
+- Use skill directory: ${skillDir}
+- Generate visuals through Codex $imagegen. Do not call Anthropic SDKs or ask buddy for image-provider secrets.
+- Keep deterministic packaging in the hatch-pet scripts.
+- Use ${path.join(skillDir, 'scripts/package_for_buddy.py')} for buddy packaging.
+- Use ${path.join(skillDir, 'scripts/make_icon.py')} to create the Windows icon from the canonical base image.
+- Write pet assets to: ${absoluteOutputDir}
+- Required final files:
+  - ${spritesheetPath}
+  - ${petJsonPath}
+  - ${iconPath}
+- Stream concise progress and stop with a clear error if any required output cannot be produced.
+`
 }
 
 export async function runHatch(prompt: string, outputDir: string): Promise<void> {
-  const apiKey = process.env.ANTHROPIC_API_KEY
-  if (!apiKey) {
-    console.error('Error: ANTHROPIC_API_KEY environment variable is not set.')
-    process.exit(1)
+  const command = codexCommand()
+  const root = repoRoot()
+  const skillDir = resolveSkillDir(root)
+  const skillMdPath = path.join(skillDir, 'SKILL.md')
+
+  if (!fs.existsSync(skillMdPath)) {
+    throw new Error(
+      `hatch-pet skill not found at ${skillMdPath}.\n` +
+        'Install or sync the canonical hatch-pet skill into .codex/skills/hatch-pet before running buddy hatch.',
+    )
   }
 
-  const client = new Anthropic({ apiKey })
-  const skillDir = resolveSkillDir()
+  runCodexCheck(
+    command,
+    ['--version'],
+    'Codex CLI is not available for buddy hatch.',
+  )
+  runCodexCheck(
+    command,
+    ['doctor', '--summary', '--ascii'],
+    'Codex CLI is installed but not ready for buddy hatch.',
+  )
 
-  let systemPrompt: string
-  try {
-    systemPrompt = buildSystemPrompt(skillDir, outputDir)
-  } catch (e: unknown) {
-    console.error((e as Error).message)
-    process.exit(1)
-  }
-
-  const messages: Anthropic.MessageParam[] = [{ role: 'user', content: prompt }]
+  const codexPrompt = buildCodexPrompt(prompt, root, skillDir, outputDir)
+  const args = [
+    'exec',
+    '--cd',
+    root,
+    '--sandbox',
+    'workspace-write',
+    '--ask-for-approval',
+    'never',
+    '-',
+  ]
 
   console.log(`Hatching pet from prompt: "${prompt}"`)
-  console.log(`Skill dir: ${skillDir}\n`)
+  console.log(`Codex command: ${command}`)
+  console.log(`Skill dir: ${skillDir}`)
+  console.log(`Output dir: ${path.resolve(root, outputDir)}\n`)
 
-  // Agentic tool-use loop
-  for (;;) {
-    const response = await client.messages.create({
-      model: MODEL,
-      max_tokens: MAX_TOKENS,
-      system: systemPrompt,
-      tools: TOOLS,
-      messages,
+  await new Promise<void>((resolve, reject) => {
+    const child = spawn(command, args, {
+      cwd: root,
+      stdio: ['pipe', 'inherit', 'inherit'],
+      shell: process.platform === 'win32',
     })
 
-    for (const block of response.content) {
-      if (block.type === 'text' && block.text) {
-        process.stdout.write(block.text)
+    child.on('error', (error) => {
+      reject(
+        new Error(
+          `Failed to start Codex CLI: ${error.message}\n` +
+            `Set ${CODEX_COMMAND_ENV} to the full Codex executable path if needed.`,
+        ),
+      )
+    })
+    child.on('exit', (code, signal) => {
+      if (code === 0) {
+        resolve()
+        return
       }
-    }
+      reject(
+        new Error(
+          `Codex hatch run failed${signal ? ` with signal ${signal}` : ` with exit code ${code}`}.`,
+        ),
+      )
+    })
 
-    if (response.stop_reason === 'end_turn') break
-    if (response.stop_reason !== 'tool_use') break
+    child.stdin.end(codexPrompt)
+  })
 
-    const toolUseBlocks = response.content.filter(
-      (b: Anthropic.ContentBlock): b is Anthropic.ToolUseBlock => b.type === 'tool_use',
-    )
-    if (toolUseBlocks.length === 0) break
-
-    messages.push({ role: 'assistant', content: response.content })
-
-    const toolResults: Anthropic.ToolResultBlockParam[] = []
-    for (const block of toolUseBlocks) {
-      const input = block.input as Record<string, string>
-      let result: string
-
-      switch (block.name) {
-        case 'bash':
-          console.log(`\n$ ${input.command}`)
-          result = toolBash(input.command)
-          if (result) console.log(result.slice(0, 500))
-          break
-        case 'read_file':
-          result = toolReadFile(input.path)
-          break
-        case 'write_file':
-          result = toolWriteFile(input.path, input.content)
-          console.log(`\n${result}`)
-          break
-        default:
-          result = `Unknown tool: ${block.name}`
-      }
-
-      toolResults.push({ type: 'tool_result', tool_use_id: block.id, content: result })
-    }
-
-    messages.push({ role: 'user', content: toolResults })
-  }
-
-  console.log('\n\nDone.')
+  console.log('\nDone.')
 }

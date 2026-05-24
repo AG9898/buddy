@@ -327,7 +327,7 @@
       "id": "ASSET-02",
       "title": "Delegate buddy hatch image generation to Codex",
       "description": "Replace the planned Anthropic imagegen-adapter approach with a Codex-delegated hatch runner. The buddy CLI should invoke Codex CLI for hatch-pet visual generation so Codex owns the $imagegen route even when the user started from Claude Code or selected a Claude model elsewhere. Sync or install hatch-pet into .codex/skills/hatch-pet, pass the prompt/output constraints to Codex, stream useful progress back to the terminal, and keep deterministic packaging in buddy's local scripts. buddy must not require ANTHROPIC_API_KEY or store image-provider credentials for hatching.",
-      "status": "todo",
+      "status": "done",
       "priority": "high",
       "group_id": "ASSET",
       "depends_on": [

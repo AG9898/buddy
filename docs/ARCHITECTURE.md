@@ -36,7 +36,7 @@ All components run on a single developer workstation. There is no server, no clo
 - `buddy hooks install`: writes shell hook entries for Claude Code CLI and Codex CLI (both operate via shell hooks / rc files — no desktop app config is written).
 - `buddy state <name>`: sends an HTTP POST to the running sidecar (works from both Windows and WSL via localhost passthrough).
 - `buddy doctor`: checks that the Electron process is running, the sidecar responds, the update token exists, and hooks are installed.
-- `buddy hatch <prompt>`: prepares a hatch-pet run and invokes Codex CLI as the image-generation worker so `$imagegen` is provided by Codex rather than by a buddy-owned image API adapter. The command packages the completed run into buddy's `pets/<id>/pet.json`, `spritesheet.webp`, and `build/icon.ico` formats.
+- `buddy hatch <prompt>`: prepares a hatch-pet run, verifies Codex CLI is installed and ready with `codex doctor`, then invokes `codex exec` as the image-generation worker so `$imagegen` is provided by Codex rather than by a buddy-owned image API adapter. The command packages the completed run into buddy's `pets/<id>/pet.json`, `spritesheet.webp`, and `build/icon.ico` formats.
 - Files: `src/cli/index.ts`, `src/cli/commands/`.
 - Build output: `npm run build:app` runs `electron-vite build` for Electron bundles and a Vite CLI build that emits `out/cli/index.js`, the package `bin.buddy` target.
 
@@ -159,7 +159,7 @@ buddy has no user-facing authentication. Access to the HTTP sidecar is secured b
 | electron-builder | npm package publishing and production build tooling | Required (production build) |
 | Svelte + Vite | Renderer framework and dev/build tooling | Required |
 | commander (or yargs) | CLI entry point (`buddy` command) argument parsing | Required |
-| Codex CLI | Executes `hatch-pet` visual generation jobs with `$imagegen` for `buddy hatch` | Required for asset generation only |
+| Codex CLI | Executes `hatch-pet` visual generation jobs with `$imagegen` for `buddy hatch`; command can be overridden with `BUDDY_CODEX_COMMAND` | Required for asset generation only |
 | Rust toolchain (`x86_64-unknown-linux-gnu` cross-compile target) | Build petdex-bridge for WSL | Required (for WSL hook support) |
 
 There are no buddy-owned cloud services, managed databases, auth providers, or image API integrations. Codex CLI may use its own configured model/image-generation backend when `buddy hatch` delegates `$imagegen` work to it, but buddy does not read or store those credentials.
