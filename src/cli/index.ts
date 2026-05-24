@@ -8,7 +8,7 @@
  *   buddy hooks install [--rc]   — write Claude Code / Codex CLI hook entries
  *   buddy state <name>           — POST a state change to the running sidecar
  *   buddy doctor                 — print a pass/fail health checklist
- *   buddy hatch <prompt>         — generate custom pet assets via Anthropic API
+ *   buddy hatch <prompt>         — delegate custom pet asset generation to Codex
  *
  * Environment detection (isWSL) is handled per-command.
  * No Electron imports anywhere in src/cli/ — safe to run in WSL node.
@@ -93,9 +93,8 @@ program
 program
   .command('hatch <prompt>')
   .description(
-    'Generate custom pet assets from a text description using the Anthropic API. ' +
-      'Requires ANTHROPIC_API_KEY. ' +
-      'Runs the hatch-pet pipeline: base image, 9 animation rows, spritesheet, icon.',
+    'Generate custom pet assets from a text description by delegating to Codex CLI. ' +
+      'Codex provides $imagegen; buddy packages the hatch-pet outputs into spritesheet assets.',
   )
   .option(
     '--output <dir>',

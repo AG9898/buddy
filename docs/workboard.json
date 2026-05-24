@@ -364,7 +364,7 @@
       "id": "ASSET-03",
       "title": "Package buddy CLI hatch command in the build output",
       "description": "Make the npm bin entry point real in built artifacts. The repository currently has src/cli/index.ts and src/cli/commands/hatch.ts, but electron-vite only builds Electron main, preload, and renderer bundles. Add a CLI build path that emits out/cli/index.js with executable-compatible imports, preserves the package.json bin contract, and includes the hatch command in --help. This task should not implement image generation semantics; ASSET-02 owns Codex delegation.",
-      "status": "todo",
+      "status": "done",
       "priority": "high",
       "group_id": "ASSET",
       "depends_on": [

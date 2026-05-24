@@ -38,6 +38,7 @@ All components run on a single developer workstation. There is no server, no clo
 - `buddy doctor`: checks that the Electron process is running, the sidecar responds, the update token exists, and hooks are installed.
 - `buddy hatch <prompt>`: prepares a hatch-pet run and invokes Codex CLI as the image-generation worker so `$imagegen` is provided by Codex rather than by a buddy-owned image API adapter. The command packages the completed run into buddy's `pets/<id>/pet.json`, `spritesheet.webp`, and `build/icon.ico` formats.
 - Files: `src/cli/index.ts`, `src/cli/commands/`.
+- Build output: `npm run build:app` runs `electron-vite build` for Electron bundles and a Vite CLI build that emits `out/cli/index.js`, the package `bin.buddy` target.
 
 **Does NOT:**
 - Never manages window state directly — all window operations go through the Electron main process.

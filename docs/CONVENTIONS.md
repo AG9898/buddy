@@ -41,6 +41,9 @@ These apply across every stack in this project.
 - `src/cli/` — command implementations must be safe to run outside Electron and must not
   import Electron APIs. `buddy hatch` delegates `$imagegen` work to Codex CLI rather than
   calling an image provider API directly.
+- `vite.cli.config.ts` owns the package CLI bundle. Keep `package.json` `bin.buddy`
+  pointed at the emitted `out/cli/index.js`, and keep `npm run build:app` producing that
+  file on both Windows PowerShell and WSL.
 - `src/preload/preload.ts` — single preload file; exposes only `petApi` via
   `contextBridge.exposeInMainWorld`.
 - State read/write is isolated to `state-store.ts` — no other file writes to `state.json`.

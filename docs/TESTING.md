@@ -12,6 +12,9 @@
 # Run all Svelte/TS unit tests
 npm test
 
+# Build Electron bundles and the package CLI target
+npm run build:app
+
 # Run a single test file
 npm test -- src/renderer/PetSprite.test.ts
 
@@ -60,6 +63,11 @@ npm run lint
 npm run build:app
 npm run build:win:local
 ```
+
+`npm run build:app` must emit `out/cli/index.js` as well as the Electron main,
+preload, and renderer bundles. For CLI packaging changes, smoke-test the generated
+entry point with `node out/cli/index.js --help` and command-specific help such as
+`node out/cli/index.js hatch --help`.
 
 ---
 
