@@ -13,6 +13,7 @@ moving any file under `docs/`, update this file in the same commit.
 |---|---|
 | [`docs/INDEX.md`](INDEX.md) | This file — documentation navigation map |
 | [`docs/PRD.md`](PRD.md) | Product requirements, scope, users, and success criteria |
+| [`docs/CLI.md`](CLI.md) | CLI command contract, terminal UX, hatch output, pet selection, and window command behavior |
 | [`docs/ARCHITECTURE.md`](ARCHITECTURE.md) | System topology, runtime boundaries, and component responsibilities |
 | [`docs/CONVENTIONS.md`](CONVENTIONS.md) | Coding standards, naming rules, and idiomatic patterns |
 | [`docs/DECISIONS.md`](DECISIONS.md) | Architectural decision log (open and resolved) |

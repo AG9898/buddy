@@ -28,12 +28,15 @@ buddy is an npm-distributed developer tool that renders a floating, always-on-to
 
 - Distributed as an npm package (`npm install -g buddy`); primary install path is from either a Windows terminal or a WSL terminal
 - CLI entry point (`buddy`) with subcommands: `start`, `stop`, `hooks install`, `state <name>`, `doctor`
+- CLI behavior is terminal-first: concise styled output when supported, plain fallback in non-TTY contexts, actionable errors, and command details documented in [`CLI.md`](CLI.md)
 - When installed in WSL: `buddy hooks install` sets up `.zshrc`/`.bashrc` shell hooks and uses WSL interop to launch the Windows-side Electron app; falls back with a clear message if WSL interop is unavailable
-- When installed on Windows: `buddy start` launches the Electron app directly
+- When installed on Windows: `buddy start` launches the Electron app directly, detached, and returns control to the terminal
+- `buddy stop` terminates the running Electron app
 - Electron transparent always-on-top frameless window on Windows desktop (packaged via electron-forge for npm distribution)
 - Render one sprite sheet with CSS background-position animation (buddy-defined pet.json sprite format)
 - Pet state machine: idle, running, waiting, jumping, waving, failed, review
 - Persist open state and window bounds across app restarts (`%USERPROFILE%\.petdex-win\state.json`)
+- Visual mouse resize for the pet window, with resized bounds persisted across restarts
 - System tray icon with Show / Hide / Quit menu items
 - Local HTTP endpoint `POST /state` listening on `127.0.0.1:7777` (configurable via `BUDDY_PORT`)
 - CLI hook event → pet state mapping: UserPromptSubmit → jumping, PreToolUse → running, PostToolUse → idle, PermissionRequest → waiting, Stop → waving (applies to both Codex CLI and Claude Code)
@@ -45,7 +48,7 @@ buddy is an npm-distributed developer tool that renders a floating, always-on-to
 - Claude Code hook detection and shell hook installation
 - Sprite creation tooling supporting buddy's pet.json sprite sheet format
 - Multi-monitor and per-resolution DPI support (separate bounds per display config)
-- Custom pet loading from `%USERPROFILE%\.petdex-win\pets`
+- Custom pet loading and selection from `%USERPROFILE%\.petdex-win\pets` and common Codex-compatible pet folders such as `%USERPROFILE%\.codex\pets`
 
 ### Out of Scope
 
@@ -66,6 +69,8 @@ buddy is an npm-distributed developer tool that renders a floating, always-on-to
 
 - `npm install -g buddy` succeeds from both a Windows terminal and a WSL terminal.
 - `buddy start` from a Windows terminal launches the pet window on the Windows desktop.
+- `buddy start` exits after launching the detached app, and `buddy stop` terminates it cleanly.
+- CLI output is readable in normal terminals, degrades cleanly in plain/non-TTY contexts, and avoids raw stack traces for expected user errors.
 - `buddy hooks install` from a WSL terminal writes valid Claude Code CLI and Codex CLI hook entries and the pet reacts to tool events.
 - When run from WSL, `buddy start` uses WSL interop to launch the Windows Electron app; if interop is unavailable a clear actionable error is printed.
 - Pet animates through idle, running, and waiting states in response to CLI hook events (Claude Code and Codex CLI).
@@ -77,6 +82,8 @@ buddy is an npm-distributed developer tool that renders a floating, always-on-to
 - `petdex-bridge` binary builds cleanly with `cargo build --target x86_64-unknown-linux-gnu` and runs in WSL without additional runtime dependencies.
 - Claude Code shell hooks installed via `buddy-bridge hooks install --shell zsh` (or bash) trigger visible pet state changes on the Windows display.
 - Per-resolution window bounds are stored and restored correctly when switching between monitor configurations.
+- Users can visually resize the pet window and the resized bounds persist across restart.
+- Users can list and select valid buddy-managed and Codex-compatible pets without buddy modifying Codex internal state.
 
 ---
 
@@ -90,6 +97,7 @@ buddy is an npm-distributed developer tool that renders a floating, always-on-to
 - WSL agents cannot launch or inspect Windows GUI processes directly — all UI integration testing must be explicit and manual or use the CLI/HTTP interface.
 - WSL interop (`buddy.exe` invoked from WSL shell) is the supported path for WSL-only installs. The CLI must detect when interop is unavailable and print a clear fallback message rather than silently failing.
 - Custom pet directories use buddy's own format: a named directory containing `pet.json` and `spritesheet.webp`.
+- Codex-compatible pet directories may be read as asset folders only. buddy must not read or write Codex internal state or selection files.
 - No hardcoded credentials, tokens, or paths — all configuration via environment variables or well-known state file locations.
 - electron-forge is the packaging and publishing tool; electron-builder must not be introduced.
 

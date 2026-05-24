@@ -92,6 +92,7 @@ buddy/
   docs/
     INDEX.md            — navigation map (this file's pair)
     PRD.md              — product requirements
+    CLI.md              — CLI command contract, terminal UX, hatch output, pet selection, and window command behavior
     ARCHITECTURE.md     — system topology and component responsibilities
     CONVENTIONS.md      — coding standards (TS, Svelte, Rust, sprite format)
     DECISIONS.md        — architectural decision log
@@ -154,6 +155,7 @@ the code change — never defer a doc update to a follow-up task.
 
 | What changed | Doc to update |
 |---|---|
+| CLI commands, terminal output, hatch progress, pet selection commands, or CLI lifecycle behavior | [`docs/CLI.md`](docs/CLI.md) |
 | System topology, services, auth, data flow, deployment | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) |
 | Coding pattern, naming rule, or never/always constraint | [`docs/CONVENTIONS.md`](docs/CONVENTIONS.md) |
 | Env var added, removed, renamed, or changed | [`docs/ENV_VARS.md`](docs/ENV_VARS.md) |

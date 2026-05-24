@@ -41,6 +41,9 @@ These apply across every stack in this project.
 - `src/cli/` — command implementations must be safe to run outside Electron and must not
   import Electron APIs. `buddy hatch` delegates `$imagegen` work to Codex CLI rather than
   calling an image provider API directly.
+- CLI command behavior and terminal UX are documented in [`CLI.md`](CLI.md). Keep command
+  descriptions, output behavior, lifecycle semantics, hatch progress, and pet-selection
+  behavior consistent with that doc.
 - `vite.cli.config.ts` owns the package CLI bundle. Keep `package.json` `bin.buddy`
   pointed at the emitted `out/cli/index.js`, and keep `npm run build:app` producing that
   file on both Windows PowerShell and WSL.
@@ -66,6 +69,19 @@ These apply across every stack in this project.
   handles `setIgnoreMouseEvents` accordingly.
 - **State persistence:** always read state at startup via `state-store.ts`; always write
   state on `close`, `drag-end`, `display-change`, and `app-quit` events.
+
+### CLI Output
+
+- Default CLI output should be concise and human-readable.
+- Use styled/color output only when supported, and keep plain ASCII output clean for
+  non-TTY contexts and CI.
+- Expected user errors should be actionable messages with non-zero exit codes, not raw
+  stack traces.
+- `buddy hatch` must not dump raw Codex/imagegen subprocess output during normal runs.
+  Show summarized progress by default and reserve subprocess detail for verbose/debug
+  behavior or logs.
+- Pet discovery must validate `pet.json` and the referenced spritesheet before listing or
+  selecting a folder.
 
 ---
 
@@ -104,6 +120,9 @@ These apply across every stack in this project.
   interactive region.
 - **Dragging:** `pointerdown` starts drag, `pointermove` sends `drag-move` via `petApi`,
   `pointerup` ends the drag and sends `drag-end`.
+- **Resizing:** visual resize must preserve transparent-window click-through behavior,
+  route size changes through preload IPC to the Electron main process, and persist final
+  bounds on resize end.
 
 ---
 

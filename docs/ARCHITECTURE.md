@@ -28,15 +28,20 @@ All components run on a single developer workstation. There is no server, no clo
 
 ### buddy CLI (`src/cli/`)
 
+Detailed command behavior, terminal output rules, hatch progress expectations, pet
+selection UX, and CLI lifecycle semantics live in [`CLI.md`](CLI.md).
+
 **Owns:**
 - The npm `bin` entry point — the `buddy` command developers run in their terminal.
 - Environment detection: reads `/proc/version` to determine if running in WSL or natively on Windows.
-- On Windows: `buddy start` spawns the Electron app process; `buddy stop` terminates it.
+- On Windows: `buddy start` spawns the Electron app process detached and returns control to the terminal; `buddy stop` terminates it.
 - In WSL: `buddy start` invokes the Windows-side `buddy.exe` via WSL interop; prints a clear actionable error if interop is unavailable.
 - `buddy hooks install`: writes shell hook entries for Claude Code CLI and Codex CLI (both operate via shell hooks / rc files — no desktop app config is written).
 - `buddy state <name>`: sends an HTTP POST to the running sidecar (works from both Windows and WSL via localhost passthrough).
 - `buddy doctor`: checks that the Electron process is running, the sidecar responds, the update token exists, and hooks are installed.
 - `buddy hatch <prompt>`: prepares a hatch-pet run, verifies Codex CLI is installed and ready with `codex doctor`, then invokes `codex exec` as the image-generation worker so `$imagegen` is provided by Codex rather than by a buddy-owned image API adapter. The command packages the completed run into buddy's `pets/<id>/pet.json`, `spritesheet.webp`, and `build/icon.ico` formats.
+- Pet-management commands enumerate and select valid buddy-managed pets and Codex-compatible pet asset folders. Selection is persisted in buddy-owned state only.
+- CLI output is concise by default, styled when supported, plain in non-TTY contexts, and avoids dumping raw child-process output unless verbose/debug behavior is explicitly requested.
 - Files: `src/cli/index.ts`, `src/cli/commands/`.
 - Build output: `npm run build:app` runs `electron-vite build` for Electron bundles and a Vite CLI build that emits `out/cli/index.js`, the package `bin.buddy` target.
 
@@ -44,6 +49,7 @@ All components run on a single developer workstation. There is no server, no clo
 - Never manages window state directly — all window operations go through the Electron main process.
 - Never starts a long-running server process itself — it starts the Electron app which owns the sidecar.
 - Never owns image-provider credentials for hatch generation. If a user starts hatching from Claude Code or any other shell, buddy still delegates the visual generation phase to Codex CLI so `$imagegen` routing remains centralized.
+- Never reads or writes Codex internal state while discovering Codex-compatible pet folders.
 
 ### Electron Main Process (`src/main/`)
 
@@ -53,6 +59,8 @@ All components run on a single developer workstation. There is no server, no clo
 - Click-through toggle via `setIgnoreMouseEvents(true, { forward: true })` — disabled when renderer signals pointer is over an interactive region.
 - Local HTTP sidecar on `127.0.0.1:7777` (configurable via `BUDDY_PORT`): receives hook events, validates the `X-Petdex-Update-Token` header, and forwards events to the renderer via Electron IPC.
 - State persistence: reads and writes `%USERPROFILE%\.petdex-win\state.json` (window open/hidden, bounds, pet id, current animation state). Restored bounds are clamped into the nearest display work area before the window is created so stale or off-screen coordinates cannot hide the pet.
+- Window resize: receives resize interactions from the renderer, updates BrowserWindow bounds, preserves click-through behavior, and persists final bounds on resize end.
+- Pet selection: owns active pet state and asset loading. The CLI may request or persist selection through buddy-owned surfaces, but Electron main remains responsible for loading assets into the renderer.
 - System tray (Show / Hide / Quit) to keep the process alive when the window is hidden.
 - Hook installation: `hooks-install.ts` exports `installHooks(options)` and `getHooksStatus(options)`. For Claude Code CLI it writes hook entries to `~/.claude/settings.json` (hooks section); for Codex CLI it appends shell environment-variable blocks to the target rc file. Both operations are idempotent. The module contains no top-level Electron import and is safe to call from the CLI layer (FEAT-09) without an Electron environment. The `installHooksWithDialog()` helper is intended for tray use only and dynamically requires Electron's `dialog` API at call time.
 - Files: `main.ts`, `avatar-window.ts`, `state-store.ts`, `sidecar.ts`, `tray.ts`, `hooks-install.ts`.
@@ -89,6 +97,7 @@ All components run on a single developer workstation. There is no server, no clo
 - Handles drag events and sends `drag-start` / `drag-move` / `drag-end` IPC messages to the main process.
 - Detects pointer entry/exit on interactive regions (`[data-avatar-mascot]`, `.resize-handle`) and signals the main process to toggle click-through.
 - Responds to `pet:state-change` IPC events to switch the active animation state.
+- Provides a visual resize handle for the pet window and sends resize lifecycle events through preload IPC.
 - Files: `index.html`, `main.ts`, `App.svelte`, `PetSprite.svelte`, `styles.css`.
 
 **Does NOT:**

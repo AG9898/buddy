@@ -398,6 +398,283 @@
         "npm run lint",
         "npm test"
       ]
+    },
+    {
+      "id": "FEAT-10",
+      "title": "Add shared CLI terminal output layer",
+      "description": "Create a small shared CLI output layer for consistent terminal UX across buddy commands. It should support concise status/success/error output, a default warm orange accent theme that fits buddy, a styled Buddy ASCII logo banner using the canonical text from docs/CLI.md, polished terminal line and text styling, styled/color output when supported, plain ASCII fallback for non-TTY/CI contexts, and a common verbose flag shape for future detailed diagnostics. Focus on an aesthetic command-line base with tasteful separators, symbols, emphasis, and readable formatting while keeping output practical. Keep the implementation safe for Windows PowerShell, Command Prompt, and WSL, and do not import Electron APIs from src/cli.",
+      "status": "todo",
+      "priority": "high",
+      "group_id": "FEAT",
+      "depends_on": [
+        "FEAT-09",
+        "ASSET-03"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "CLI commands can use a shared formatter for status, success, warning, and error output",
+        "The formatter defines a default warm orange accent theme appropriate for buddy",
+        "Primary CLI entry/help surfaces can render a styled Buddy banner using the canonical ASCII text logo from docs/CLI.md",
+        "Terminal output uses polished lines, symbols, emphasis, and spacing without becoming noisy",
+        "Output uses color/styling only when supported and remains readable without color",
+        "Expected user errors print actionable messages without raw stack traces",
+        "At least start, stop, state, and doctor use the shared output layer",
+        "CLI behavior remains safe to run from Windows and WSL without Electron imports",
+        "npm run lint and npm test pass"
+      ],
+      "docs": [
+        "docs/CLI.md",
+        "docs/CONVENTIONS.md",
+        "docs/TESTING.md"
+      ],
+      "files": [
+        "src/cli/index.ts",
+        "src/cli/output.ts",
+        "src/cli/commands/start.ts",
+        "src/cli/commands/stop.ts",
+        "src/cli/commands/state.ts",
+        "src/cli/commands/doctor.ts"
+      ],
+      "commands": [
+        "npm run lint",
+        "npm test",
+        "npm run build:app",
+        "node out/cli/index.js --help"
+      ]
+    },
+    {
+      "id": "FEAT-11",
+      "title": "Streamline buddy hatch terminal progress",
+      "description": "Update buddy hatch so normal user output is a concise progress flow instead of a raw Codex/imagegen transcript. The command should show readiness checks, destination, visual generation progress, packaging/validation progress, and final asset location using the shared polished CLI output layer. Raw child-process output should be hidden during normal runs and available only through verbose/debug behavior or a log path.",
+      "status": "todo",
+      "priority": "high",
+      "group_id": "FEAT",
+      "depends_on": [
+        "FEAT-10",
+        "ASSET-02",
+        "ASSET-03"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "buddy hatch normal output does not dump raw Codex/imagegen subprocess logs",
+        "buddy hatch shows clear progress for Codex readiness, generation, packaging, and validation",
+        "buddy hatch uses the shared warm-accent CLI output layer for user-facing progress",
+        "Codex CLI failures produce concise actionable errors",
+        "Verbose/debug mode exposes enough subprocess detail for troubleshooting",
+        "Generated output path and next pet-selection command are printed when successful",
+        "npm run lint and npm test pass"
+      ],
+      "docs": [
+        "docs/CLI.md",
+        "docs/ARCHITECTURE.md",
+        "docs/TESTING.md"
+      ],
+      "files": [
+        "src/cli/commands/hatch.ts",
+        "src/cli/output.ts",
+        "src/cli/index.ts"
+      ],
+      "commands": [
+        "npm run lint",
+        "npm test",
+        "npm run build:app",
+        "node out/cli/index.js hatch --help"
+      ]
+    },
+    {
+      "id": "FEAT-12",
+      "title": "Add visual resize for the pet window",
+      "description": "Implement mouse-driven visual resizing for the transparent Electron pet window. The renderer should expose a resize handle, preload should expose resize lifecycle IPC methods, and the main process should update BrowserWindow bounds while preserving click-through behavior. Final resized bounds must persist through the existing state store and be clamped/restored like other saved bounds.",
+      "status": "todo",
+      "priority": "high",
+      "group_id": "FEAT",
+      "depends_on": [
+        "FEAT-07"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "The pet window can be resized with the mouse from a visible resize handle",
+        "Resize interactions do not break drag behavior or click-through behavior",
+        "Final resized bounds are saved on resize end",
+        "Restart restores the resized window bounds and clamps stale bounds into the display work area",
+        "Renderer-ready showInactive lifecycle remains intact",
+        "npm run lint and npm test pass"
+      ],
+      "docs": [
+        "docs/CLI.md",
+        "docs/ARCHITECTURE.md",
+        "docs/CONVENTIONS.md",
+        "docs/TESTING.md"
+      ],
+      "files": [
+        "src/shared/ipc-channels.ts",
+        "src/preload/preload.ts",
+        "src/main/avatar-window.ts",
+        "src/main/main.ts",
+        "src/main/state-store.ts",
+        "src/renderer/PetSprite.svelte",
+        "src/renderer/styles.css"
+      ],
+      "commands": [
+        "npm run lint",
+        "npm test",
+        "npm run build:app"
+      ]
+    },
+    {
+      "id": "FEAT-13",
+      "title": "Implement pet discovery and validation",
+      "description": "Add a pet discovery module that enumerates valid buddy-managed pets from %USERPROFILE%/.petdex-win/pets and valid Codex-compatible pet asset folders from %USERPROFILE%/.codex/pets. Discovery must treat Codex folders as read-only asset sources, validate pet.json and the referenced spritesheet before returning candidates, and provide concise invalid-folder reasons for CLI use.",
+      "status": "todo",
+      "priority": "high",
+      "group_id": "FEAT",
+      "depends_on": [
+        "FEAT-09"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "Discovery lists valid pets from the buddy-managed pets directory",
+        "Discovery lists valid Codex-compatible pets from the common Codex pets directory",
+        "Invalid folders are skipped or reported with concise validation reasons",
+        "Discovery does not read or write Codex internal state or selection files",
+        "Pet validation checks pet.json, referenced spritesheet, and required state-machine fields",
+        "npm run lint and npm test pass"
+      ],
+      "docs": [
+        "docs/CLI.md",
+        "docs/ARCHITECTURE.md",
+        "docs/CONVENTIONS.md",
+        "docs/ENV_VARS.md",
+        "docs/TESTING.md"
+      ],
+      "files": [
+        "src/cli/commands/pets.ts",
+        "src/cli/pets.ts",
+        "src/main/state-store.ts",
+        "pets/default/pet.json"
+      ],
+      "commands": [
+        "npm run lint",
+        "npm test",
+        "npm run build:app"
+      ]
+    },
+    {
+      "id": "FEAT-14",
+      "title": "Add CLI pet list and selection commands",
+      "description": "Add buddy pets list, buddy pets show, and buddy pets use <id> commands backed by the pet discovery module. The commands should use the shared CLI output layer for styled/plain terminal output, clearly identify buddy-managed versus Codex-compatible pets, validate selections before persisting them, and store the active pet in buddy-owned state only.",
+      "status": "todo",
+      "priority": "high",
+      "group_id": "FEAT",
+      "depends_on": [
+        "FEAT-10",
+        "FEAT-13"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "buddy pets list shows valid buddy-managed and Codex-compatible pets with their source",
+        "buddy pets show prints the currently selected pet and source path",
+        "buddy pets use <id> validates the requested pet before persisting selection",
+        "Pet selection is stored in buddy-owned state and never writes Codex config/state",
+        "Invalid pet ids produce actionable non-zero errors",
+        "node out/cli/index.js pets --help documents list, show, and use commands"
+      ],
+      "docs": [
+        "docs/CLI.md",
+        "docs/PRD.md",
+        "docs/ARCHITECTURE.md",
+        "docs/TESTING.md"
+      ],
+      "files": [
+        "src/cli/index.ts",
+        "src/cli/commands/pets.ts",
+        "src/cli/output.ts",
+        "src/cli/pets.ts",
+        "src/main/state-store.ts"
+      ],
+      "commands": [
+        "npm run lint",
+        "npm test",
+        "npm run build:app",
+        "node out/cli/index.js pets --help"
+      ]
+    },
+    {
+      "id": "FEAT-15",
+      "title": "Load selected pet assets in Electron",
+      "description": "Wire the persisted active pet selection into Electron startup and renderer asset loading. The main process should resolve the selected pet through validated buddy-owned pet metadata, fall back safely to the default pet if the selection is missing or invalid, and provide the renderer the selected pet manifest and spritesheet path without exposing arbitrary file access.",
+      "status": "todo",
+      "priority": "high",
+      "group_id": "FEAT",
+      "depends_on": [
+        "FEAT-13",
+        "FEAT-14"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "Electron startup loads the selected valid pet when one is persisted",
+        "Missing or invalid selected pets fall back to pets/default with a clear diagnostic",
+        "Renderer receives only the active pet manifest and asset path needed to render",
+        "Switching pets through the CLI affects the next app startup or reload path as documented",
+        "Default pet behavior remains unchanged when no pet is selected",
+        "npm run lint and npm test pass"
+      ],
+      "docs": [
+        "docs/CLI.md",
+        "docs/ARCHITECTURE.md",
+        "docs/TESTING.md"
+      ],
+      "files": [
+        "src/main/main.ts",
+        "src/main/state-store.ts",
+        "src/main/avatar-window.ts",
+        "src/preload/preload.ts",
+        "src/renderer/App.svelte",
+        "src/renderer/PetSprite.svelte"
+      ],
+      "commands": [
+        "npm run lint",
+        "npm test",
+        "npm run build:app"
+      ]
+    },
+    {
+      "id": "FEAT-16",
+      "title": "Add optional CLI resize command",
+      "description": "Add a secondary terminal resize command after visual resize exists. The command should allow users to set a scale or explicit dimensions from the CLI, validate bounds, persist through the same state ownership model as visual resize, and avoid direct unsafe window-file mutation. This task is lower priority than visual resize and should follow the behavior defined in docs/CLI.md.",
+      "status": "todo",
+      "priority": "medium",
+      "group_id": "FEAT",
+      "depends_on": [
+        "FEAT-10",
+        "FEAT-12"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "buddy size supports a documented scale or dimension input format",
+        "Invalid sizes produce actionable non-zero errors",
+        "CLI resize uses the same bounds validation and persistence model as visual resize",
+        "Resize changes apply without breaking restored bounds or display clamping",
+        "node out/cli/index.js size --help documents usage",
+        "npm run lint and npm test pass"
+      ],
+      "docs": [
+        "docs/CLI.md",
+        "docs/ARCHITECTURE.md",
+        "docs/TESTING.md"
+      ],
+      "files": [
+        "src/cli/index.ts",
+        "src/cli/commands/size.ts",
+        "src/main/state-store.ts",
+        "src/main/main.ts"
+      ],
+      "commands": [
+        "npm run lint",
+        "npm test",
+        "npm run build:app",
+        "node out/cli/index.js size --help"
+      ]
     }
   ]
 }

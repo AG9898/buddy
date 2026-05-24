@@ -3,6 +3,7 @@
 > Canonical source for how to run tests, what is covered, and how to write new tests.
 > Read before adding any new test file or modifying an existing one.
 > Code conventions that affect test structure live in [`CONVENTIONS.md`](CONVENTIONS.md).
+> CLI behavior and terminal UX expectations live in [`CLI.md`](CLI.md).
 
 ---
 
@@ -92,6 +93,10 @@ reading, exit codes on connection failure.
 **Electron E2E:** Window appears at startup, pet state changes via HTTP POST animate
 correctly, state persists across restart, tray Show/Hide/Quit work.
 
+**CLI tests:** Command help and changed command behavior, non-TTY/plain output, styled
+output when supported, expected error messages and exit codes, hatch progress output that
+does not dump raw subprocess logs, and pet discovery/selection behavior.
+
 **Not covered (yet):** Visual regression, multi-monitor DPI scaling, packaged installer
 smoke test, Windows-native hook execution.
 
@@ -118,6 +123,11 @@ smoke test, Windows-native hook execution.
   `if (process.platform !== 'win32') test.skip(...)` at the top of every E2E file.
 - Any change to an IPC channel name must include an updated assertion in the E2E test for
   that channel.
+- CLI output changes should assert both human-readable content and expected exit codes.
+- Hatch workflow tests should verify normal output is summarized and verbose/debug output
+  is opt-in.
+- Pet discovery tests should cover buddy-managed pets, Codex-compatible pets, invalid
+  folders, and selected pet persistence.
 - New public functions in `sidecar.ts` or `state-store.ts` require a Vitest unit test
   before the task is marked done.
 
