@@ -18,6 +18,7 @@ import path from 'path'
 import { getHooksStatus } from '../../main/hooks-install.js'
 import { sidecarBaseUrl } from '../env.js'
 import { isWSL } from '../env.js'
+import { heading, check, subCheck, closeSeparator, success, error } from '../output.js'
 
 function resolveTokenPath(): string {
   const base = process.env['USERPROFILE'] ?? os.homedir()
@@ -82,26 +83,33 @@ function checkHooks(): Record<string, boolean> {
   })
 }
 
-function icon(ok: boolean): string {
-  return ok ? 'PASS' : 'FAIL'
-}
-
 export async function runDoctor(): Promise<void> {
-  console.log('buddy doctor')
-  console.log('─'.repeat(40))
+  heading('buddy doctor')
 
   // 1. Process check
   const processRunning = checkProcessRunning()
-  console.log(`[${icon(processRunning)}] Electron process running`)
+  check(
+    'Electron process running',
+    processRunning,
+    processRunning ? undefined : 'Run: buddy start',
+  )
 
   // 2. Sidecar check
   const sidecarOk = await checkSidecar()
-  console.log(`[${icon(sidecarOk)}] Sidecar /health → HTTP 200 (${sidecarBaseUrl()})`)
+  check(
+    `Sidecar /health → HTTP 200  ${sidecarBaseUrl()}`,
+    sidecarOk,
+    sidecarOk ? undefined : 'Ensure the buddy app is running: buddy start',
+  )
 
   // 3. Token file
   const tokenOk = checkTokenFile()
   const tokenFile = resolveTokenPath()
-  console.log(`[${icon(tokenOk)}] Update token file exists (${tokenFile})`)
+  check(
+    'Update token file exists',
+    tokenOk,
+    tokenOk ? tokenFile : `Expected: ${tokenFile}  —  run buddy start once to generate it`,
+  )
 
   // 4. Hooks
   const hooksStatus = checkHooks()
@@ -109,18 +117,20 @@ export async function runDoctor(): Promise<void> {
   const allHooksOk = hookEntries.every(([, v]) => v)
   const hooksInstalledCount = hookEntries.filter(([, v]) => v).length
 
-  console.log(
-    `[${icon(allHooksOk)}] Hooks installed (${hooksInstalledCount}/${hookEntries.length})`,
+  check(
+    `Hooks installed (${hooksInstalledCount}/${hookEntries.length})`,
+    allHooksOk,
+    allHooksOk ? undefined : 'Run: buddy hooks install',
   )
   for (const [key, ok] of hookEntries) {
-    console.log(`        [${icon(ok)}] ${key}`)
+    subCheck(key, ok)
   }
 
-  console.log('─'.repeat(40))
+  closeSeparator()
 
   const allOk = processRunning && sidecarOk && tokenOk && allHooksOk
   if (allOk) {
-    console.log('All checks passed.')
+    success('All checks passed.')
   } else {
     const failing = [
       !processRunning && 'process not running (run: buddy start)',
@@ -128,9 +138,9 @@ export async function runDoctor(): Promise<void> {
       !tokenOk && 'token missing (start buddy once to generate it)',
       !allHooksOk && 'some hooks not installed (run: buddy hooks install)',
     ].filter(Boolean)
-    console.error('Some checks failed:')
+    error('Some checks failed:')
     for (const msg of failing) {
-      console.error(`  - ${msg}`)
+      process.stderr.write(`  - ${msg}\n`)
     }
     process.exit(1)
   }

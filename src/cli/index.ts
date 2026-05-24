@@ -21,6 +21,7 @@ import { runHooksInstall } from './commands/hooks.js'
 import { runState } from './commands/state.js'
 import { runDoctor } from './commands/doctor.js'
 import { runHatch } from './commands/hatch.js'
+import { printBanner } from './output.js'
 
 const program = new Command()
 
@@ -28,6 +29,18 @@ program
   .name('buddy')
   .description('Windows floating desktop pet CLI')
   .version('0.1.0')
+
+// Print the banner before the help text on `buddy --help`
+program.on('--help', () => {
+  // Banner already printed before this callback fires; nothing extra needed.
+})
+
+// Override outputHelp to prepend the banner.
+const originalOutputHelp = program.outputHelp.bind(program)
+program.outputHelp = (cb?: (str: string) => string): void => {
+  printBanner()
+  originalOutputHelp(cb)
+}
 
 // ── buddy start ───────────────────────────────────────────────────────────────
 program
@@ -84,7 +97,8 @@ program
   )
   .action(() => {
     runDoctor().catch((err: unknown) => {
-      console.error(err instanceof Error ? err.message : String(err))
+      const { error } = require('./output.js') as typeof import('./output.js')
+      error(err instanceof Error ? err.message : String(err))
       process.exit(1)
     })
   })
@@ -103,7 +117,8 @@ program
   )
   .action(async (prompt: string, options: { output: string }) => {
     await runHatch(prompt, options.output).catch((err: unknown) => {
-      console.error(err instanceof Error ? err.message : String(err))
+      const { error } = require('./output.js') as typeof import('./output.js')
+      error(err instanceof Error ? err.message : String(err))
       process.exit(1)
     })
   })

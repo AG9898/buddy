@@ -10,6 +10,7 @@
 
 import { spawn } from 'child_process'
 import { isWSL } from '../env.js'
+import { success, error } from '../output.js'
 
 export function runStart(): void {
   if (isWSL()) {
@@ -26,9 +27,9 @@ function startOnWindows(): void {
   // main script resolved from the same package root.
   const electronBin = resolveElectronBin()
   if (!electronBin) {
-    console.error(
-      'Error: Could not locate the Electron binary.\n' +
-        'Ensure buddy is installed correctly and try: npm install -g buddy',
+    error(
+      'Could not locate the Electron binary.',
+      'Ensure buddy is installed correctly and try: npm install -g buddy',
     )
     process.exit(1)
   }
@@ -39,7 +40,7 @@ function startOnWindows(): void {
     cwd: resolvePackageRoot(),
   })
   child.unref()
-  console.log('buddy started.')
+  success('buddy started.')
 }
 
 function startFromWSL(): void {
@@ -58,8 +59,8 @@ function startFromWSL(): void {
     if (err.code === 'ENOENT') {
       printWSLInteropError()
     } else {
-      console.error(`Error launching buddy.exe via WSL interop: ${err.message}`)
-      console.error(
+      error(
+        `Failed to launch buddy.exe via WSL interop: ${err.message}`,
         'Ensure WSL interop is enabled and buddy is installed on the Windows side.',
       )
     }
@@ -68,29 +69,29 @@ function startFromWSL(): void {
 
   child.on('close', (code: number | null) => {
     if (code !== 0 && code !== null) {
-      console.error(`cmd.exe exited with code ${code}.`)
       if (stderr) {
-        console.error(stderr.trim())
+        process.stderr.write(stderr.trim() + '\n')
       }
       printWSLInteropError()
       process.exit(1)
     } else {
-      console.log('buddy started via WSL interop.')
+      success('buddy started via WSL interop.')
     }
   })
 }
 
 function printWSLInteropError(): void {
-  console.error(
-    'Error: WSL interop is not available or cmd.exe is not reachable.\n\n' +
-      'To fix this:\n' +
-      '  1. Ensure WSL interop is enabled:\n' +
-      '       echo 0 > /proc/sys/fs/binfmt_misc/WSLInterop  # disable\n' +
-      '       echo 1 > /proc/sys/fs/binfmt_misc/WSLInterop  # re-enable\n' +
-      '     Or set [interop] enabled=true in /etc/wsl.conf and restart WSL.\n' +
-      '  2. Ensure buddy is installed on the Windows side:\n' +
-      '       npm install -g buddy   (in a Windows terminal, not WSL)\n' +
+  error(
+    'WSL interop is not available or cmd.exe is not reachable.',
+    [
+      'To fix this:',
+      '  1. Ensure WSL interop is enabled:',
+      '       echo 1 > /proc/sys/fs/binfmt_misc/WSLInterop',
+      '     Or set [interop] enabled=true in /etc/wsl.conf and restart WSL.',
+      '  2. Ensure buddy is installed on the Windows side:',
+      '       npm install -g buddy   (in a Windows terminal, not WSL)',
       '  3. Then retry:  buddy start',
+    ].join('\n'),
   )
 }
 

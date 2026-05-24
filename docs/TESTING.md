@@ -109,6 +109,9 @@ smoke test, Windows-native hook execution.
 | File | Domain | What It Covers |
 |---|---|---|
 | `src/main/state-store.test.ts` | State persistence | loadState defaults, saveState directory creation, round-trip fidelity, saveBounds byResolution key |
+| `src/cli/env.test.ts` | CLI environment | isWSL() detection, buddyPort() defaults and overrides, sidecarBaseUrl() |
+| `src/main/hooks-install.test.ts` | Hook installation | installHooks idempotency, getHooksStatus, Claude Code and Codex CLI targets |
+| `src/cli/output.test.ts` | CLI output layer | status/success/warn/error helpers, NO_COLOR plain mode, check/subCheck/bullet/label, banner text, separator |
 
 ---
 

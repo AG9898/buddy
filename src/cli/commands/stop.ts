@@ -10,6 +10,7 @@
 
 import { execSync } from 'child_process'
 import { isWSL } from '../env.js'
+import { success, warn, error } from '../output.js'
 
 export function runStop(): void {
   try {
@@ -18,13 +19,13 @@ export function runStop(): void {
     } else {
       stopOnWindows()
     }
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err)
+  } catch (err_) {
+    const message = err_ instanceof Error ? err_.message : String(err_)
     // taskkill exits non-zero when no matching process is found
     if (message.includes('not found') || message.includes('No tasks')) {
-      console.log('buddy is not running.')
+      warn('buddy is not running.')
     } else {
-      console.error(`Error stopping buddy: ${message}`)
+      error(`Failed to stop buddy: ${message}`)
       process.exit(1)
     }
   }
@@ -35,23 +36,23 @@ function stopOnWindows(): void {
   // be the Electron executable. Use /F (force) and /IM (image name).
   try {
     execSync('taskkill /F /IM buddy.exe', { stdio: 'pipe' })
-    console.log('buddy stopped.')
+    success('buddy stopped.')
     return
   } catch {
     // Fallback: try the electron image name used in dev mode.
   }
   execSync('taskkill /F /IM electron.exe', { stdio: 'pipe' })
-  console.log('buddy stopped.')
+  success('buddy stopped.')
 }
 
 function stopFromWSL(): void {
   try {
     execSync('cmd.exe /c taskkill /F /IM buddy.exe', { stdio: 'pipe' })
-    console.log('buddy stopped.')
+    success('buddy stopped.')
     return
   } catch {
     // Fallback: dev mode electron process
   }
   execSync('cmd.exe /c taskkill /F /IM electron.exe', { stdio: 'pipe' })
-  console.log('buddy stopped.')
+  success('buddy stopped.')
 }

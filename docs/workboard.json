@@ -403,7 +403,7 @@
       "id": "FEAT-10",
       "title": "Add shared CLI terminal output layer",
       "description": "Create a small shared CLI output layer for consistent terminal UX across buddy commands. It should support concise status/success/error output, a default warm orange accent theme that fits buddy, a styled Buddy ASCII logo banner using the canonical text from docs/CLI.md, polished terminal line and text styling, styled/color output when supported, plain ASCII fallback for non-TTY/CI contexts, and a common verbose flag shape for future detailed diagnostics. Focus on an aesthetic command-line base with tasteful separators, symbols, emphasis, and readable formatting while keeping output practical. Keep the implementation safe for Windows PowerShell, Command Prompt, and WSL, and do not import Electron APIs from src/cli.",
-      "status": "todo",
+      "status": "done",
       "priority": "high",
       "group_id": "FEAT",
       "depends_on": [

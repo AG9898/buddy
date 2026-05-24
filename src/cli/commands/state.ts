@@ -13,6 +13,7 @@ import http from 'http'
 import os from 'os'
 import path from 'path'
 import { sidecarBaseUrl } from '../env.js'
+import { success, error, label } from '../output.js'
 
 /** Absolute path to the shared update token file. */
 function resolveTokenPath(): string {
@@ -34,9 +35,9 @@ export function runState(stateName: string): void {
   const token = readToken()
   if (!token) {
     const tokenFile = resolveTokenPath()
-    console.error(
-      `Error: update token not found at ${tokenFile}\n` +
-        'Ensure the buddy Electron app has been started at least once to generate the token.',
+    error(
+      'Update token not found.',
+      `Start the buddy app first to generate the token: buddy start\n  Token path: ${tokenFile}`,
     )
     process.exit(1)
   }
@@ -61,10 +62,12 @@ export function runState(stateName: string): void {
       })
       res.on('end', () => {
         if (res.statusCode === 200) {
-          console.log(`State set to: ${stateName}`)
+          success('State updated.')
+          label('State', stateName)
         } else {
-          console.error(
-            `Error: sidecar returned HTTP ${res.statusCode ?? 'unknown'}: ${data.trim()}`,
+          error(
+            `Sidecar returned HTTP ${res.statusCode ?? 'unknown'}.`,
+            data.trim() || 'Check that the buddy app is running.',
           )
           process.exit(1)
         }
@@ -74,12 +77,12 @@ export function runState(stateName: string): void {
 
   req.on('error', (err: NodeJS.ErrnoException) => {
     if (err.code === 'ECONNREFUSED') {
-      console.error(
-        'Error: Could not connect to the buddy sidecar.\n' +
-          'Ensure the buddy app is running: buddy start',
+      error(
+        'Could not connect to the buddy sidecar.',
+        'Ensure the buddy app is running: buddy start',
       )
     } else {
-      console.error(`Error: ${err.message}`)
+      error(`Connection error: ${err.message}`)
     }
     process.exit(1)
   })
