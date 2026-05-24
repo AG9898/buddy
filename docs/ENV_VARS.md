@@ -23,6 +23,7 @@ All variables are optional. The app ships with safe defaults for every variable.
 | `BUDDY_SPRITES_DIR` | No | `%USERPROFILE%\.petdex-win\pets` | Override directory for sprite/pet asset files. buddy also checks `%USERPROFILE%\.codex\pets` as a fallback. | `.env` (dev) or app settings UI |
 | `BUDDY_LOG_LEVEL` | No | `info` | Log verbosity for the Electron main process. Accepted values: `debug`, `info`, `warn`, `error`. | `.env` (dev) or Electron app config |
 | `BUDDY_CODEX_COMMAND` | No | `codex` | Command used by `buddy hatch` to invoke Codex CLI for hatch-pet `$imagegen` work. Override only when Codex is installed under a non-standard command name or path. Paths with spaces should be quoted by the shell. | `.env` (dev) or shell |
+| `BUDDY_VERBOSE` | No | _(unset)_ | Set to `1` to enable verbose/debug subprocess output in `buddy hatch` (equivalent to `--verbose` flag or `BUDDY_LOG_LEVEL=debug`). | `.env` (dev) or shell |
 
 ---
 
@@ -55,5 +56,6 @@ No `.env.example` is required or maintained. The variable matrix above is the ca
 | `BUDDY_SPRITES_DIR` | Optional — defaults to `%USERPROFILE%\.petdex-win\pets` | Optional — defaults to `%USERPROFILE%\.petdex-win\pets` |
 | `BUDDY_LOG_LEVEL` | Optional — recommend `debug` during dev | Optional — defaults to `info` |
 | `BUDDY_CODEX_COMMAND` | Optional — defaults to `codex` | Optional — defaults to `codex` |
+| `BUDDY_VERBOSE` | Optional — set to `1` to enable verbose subprocess output in `buddy hatch` | Optional — defaults to unset |
 
 `buddy hatch` must not require `ANTHROPIC_API_KEY` or any other buddy-owned image provider secret. Image generation is delegated to Codex CLI, which uses its own configured authentication and `$imagegen` route. Before starting a hatch run, buddy checks the configured Codex command with `--version` and `doctor --summary --ascii`; failures should be fixed with `codex login`, `codex doctor`, or by setting `BUDDY_CODEX_COMMAND`.

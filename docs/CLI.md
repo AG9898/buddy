@@ -17,7 +17,7 @@ usable from Windows PowerShell, Command Prompt, WSL shells, non-TTY scripts, and
 | `buddy state <name>` | Send a pet state change to the local sidecar. |
 | `buddy hooks install [--rc <path>]` | Install Claude Code and Codex CLI hook entries. |
 | `buddy doctor` | Print a health checklist for process, sidecar, token, and hooks. |
-| `buddy hatch <prompt> [--output <dir>]` | Generate pet assets by delegating image work to Codex CLI, then package buddy assets. |
+| `buddy hatch <prompt> [--output <dir>] [--verbose]` | Generate pet assets by delegating image work to Codex CLI, then package buddy assets. |
 
 Planned pet-management commands:
 
@@ -109,8 +109,18 @@ the user's terminal should see a streamlined progress flow:
 5. Print the generated pet id/path and the command to select it when selection commands
    exist.
 
-Raw Codex/imagegen output should not be printed during normal runs. Preserve enough detail
-for troubleshooting through verbose mode or a log file, but keep default output readable.
+Raw Codex/imagegen output is hidden during normal runs. Pass `--verbose` (or set
+`BUDDY_LOG_LEVEL=debug` / `BUDDY_VERBOSE=1`) to expose raw subprocess output for
+troubleshooting.
+
+```
+buddy hatch "a small orange cat"
+buddy hatch "a small orange cat" --verbose
+buddy hatch "a small orange cat" --output pets/my-cat
+```
+
+Codex CLI failures produce a concise actionable error in normal mode. The `--verbose` hint
+is included in the failure message when no subprocess output was captured.
 
 ---
 

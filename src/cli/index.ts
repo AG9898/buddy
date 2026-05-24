@@ -115,8 +115,13 @@ program
     'Output directory for pet assets (pet.json + spritesheet.webp)',
     'pets/default',
   )
-  .action(async (prompt: string, options: { output: string }) => {
-    await runHatch(prompt, options.output).catch((err: unknown) => {
+  .option(
+    '--verbose',
+    'Show raw Codex subprocess output for troubleshooting (also enabled by BUDDY_LOG_LEVEL=debug)',
+    false,
+  )
+  .action(async (prompt: string, options: { output: string; verbose: boolean }) => {
+    await runHatch(prompt, options.output, options.verbose).catch((err: unknown) => {
       const { error } = require('./output.js') as typeof import('./output.js')
       error(err instanceof Error ? err.message : String(err))
       process.exit(1)

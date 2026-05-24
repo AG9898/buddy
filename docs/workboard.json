@@ -446,7 +446,7 @@
       "id": "FEAT-11",
       "title": "Streamline buddy hatch terminal progress",
       "description": "Update buddy hatch so normal user output is a concise progress flow instead of a raw Codex/imagegen transcript. The command should show readiness checks, destination, visual generation progress, packaging/validation progress, and final asset location using the shared polished CLI output layer. Raw child-process output should be hidden during normal runs and available only through verbose/debug behavior or a log path.",
-      "status": "todo",
+      "status": "done",
       "priority": "high",
       "group_id": "FEAT",
       "depends_on": [
