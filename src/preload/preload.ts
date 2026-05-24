@@ -5,6 +5,9 @@ import {
   CH_DRAG_START,
   CH_PTR_INTERACTIVE,
   CH_RENDERER_READY,
+  CH_RESIZE_END,
+  CH_RESIZE_MOVE,
+  CH_RESIZE_START,
   CH_STATE_CHANGE,
   CH_STATE_SET,
 } from '../shared/ipc-channels'
@@ -63,5 +66,29 @@ contextBridge.exposeInMainWorld('petApi', {
    */
   rendererReady(): void {
     ipcRenderer.send(CH_RENDERER_READY)
+  },
+
+  /**
+   * Notify main that a resize operation has started.
+   * initialWidth/initialHeight are the window dimensions at the moment the handle is grabbed.
+   */
+  resizeStart(initialWidth: number, initialHeight: number): void {
+    ipcRenderer.send(CH_RESIZE_START, { initialWidth, initialHeight })
+  },
+
+  /**
+   * Notify main to update the window size based on current pointer position.
+   * screenX/screenY are the current cursor position in screen coordinates.
+   */
+  resizeMove(screenX: number, screenY: number): void {
+    ipcRenderer.send(CH_RESIZE_MOVE, { screenX, screenY })
+  },
+
+  /**
+   * Notify main that the resize operation has ended.
+   * Main saves the final bounds to the state store.
+   */
+  resizeEnd(): void {
+    ipcRenderer.send(CH_RESIZE_END)
   },
 })

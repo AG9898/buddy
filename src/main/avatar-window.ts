@@ -3,7 +3,15 @@
 
 import { BrowserWindow, ipcMain, screen } from 'electron'
 import path from 'path'
-import { CH_PTR_INTERACTIVE, CH_DRAG_START, CH_DRAG_MOVE, CH_DRAG_END } from '../shared/ipc-channels'
+import {
+  CH_DRAG_END,
+  CH_DRAG_MOVE,
+  CH_DRAG_START,
+  CH_PTR_INTERACTIVE,
+  CH_RESIZE_END,
+  CH_RESIZE_MOVE,
+  CH_RESIZE_START,
+} from '../shared/ipc-channels'
 
 export interface WindowBounds {
   x: number
@@ -17,8 +25,18 @@ interface DragState {
   offsetY: number
 }
 
+interface ResizeState {
+  /** Window top-left position at the moment the resize started. */
+  originX: number
+  originY: number
+  /** Window dimensions at the moment the resize started. */
+  initialWidth: number
+  initialHeight: number
+}
+
 let avatarWindow: BrowserWindow | null = null
 let dragState: DragState | null = null
+let resizeState: ResizeState | null = null
 
 /**
  * Create the transparent, frameless, always-on-top avatar overlay BrowserWindow.
@@ -106,6 +124,37 @@ export function createAvatarWindow(bounds?: Partial<WindowBounds>): BrowserWindo
   // Drag: clear drag state. (Bounds saving on drag-end is done in main.ts.)
   ipcMain.on(CH_DRAG_END, () => {
     dragState = null
+  })
+
+  // Resize: record initial window origin and dimensions when the handle is grabbed.
+  ipcMain.on(CH_RESIZE_START, (_event, payload: { initialWidth: number; initialHeight: number }) => {
+    const b = win.getBounds()
+    resizeState = {
+      originX: b.x,
+      originY: b.y,
+      initialWidth: payload.initialWidth,
+      initialHeight: payload.initialHeight,
+    }
+  })
+
+  // Resize: update window size by computing delta from cursor position.
+  // The window origin (top-left) is kept fixed; only width and height change.
+  ipcMain.on(CH_RESIZE_MOVE, (_event, payload: { screenX: number; screenY: number }) => {
+    if (!resizeState) return
+    const minSize = 80
+    const newWidth = Math.max(minSize, payload.screenX - resizeState.originX)
+    const newHeight = Math.max(minSize, payload.screenY - resizeState.originY)
+    win.setBounds({
+      x: resizeState.originX,
+      y: resizeState.originY,
+      width: newWidth,
+      height: newHeight,
+    })
+  })
+
+  // Resize: clear resize state. (Bounds saving on resize-end is done in main.ts.)
+  ipcMain.on(CH_RESIZE_END, () => {
+    resizeState = null
   })
 
   // NOTE: The window is created with show:false. The caller (main.ts) is responsible

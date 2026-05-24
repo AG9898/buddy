@@ -84,8 +84,9 @@ entry point with `node out/cli/index.js --help` and command-specific help such a
 ## What Is Covered
 
 **Svelte unit tests:** PetSprite animation state machine (frame sequencing, state
-transitions, `once` + `fallback` logic), pointer interactivity detection logic, App
-component IPC event handling.
+transitions, `once` + `fallback` logic), pointer interactivity detection logic (including
+`.resize-handle` region), resize lifecycle IPC calls (`resizeStart`/`resizeMove`/`resizeEnd`),
+App component IPC event handling.
 
 **Rust unit tests:** petdex-bridge CLI arg parsing, HTTP payload construction, token file
 reading, exit codes on connection failure.
@@ -98,7 +99,8 @@ output when supported, expected error messages and exit codes, hatch progress ou
 does not dump raw subprocess logs, and pet discovery/selection behavior.
 
 **Not covered (yet):** Visual regression, multi-monitor DPI scaling, packaged installer
-smoke test, Windows-native hook execution.
+smoke test, Windows-native hook execution, resize pointer-event integration (requires
+Electron E2E).
 
 ---
 

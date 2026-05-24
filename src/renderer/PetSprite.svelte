@@ -114,11 +114,22 @@
     clearAnimation()
   })
 
+  // --- Resize state ---
+  let resizing = false
+
   // --- Pointer interactivity (window-level) ---
+  // Both the pet sprite and the resize handle are interactive regions.
   function onWindowPointerMove(event: PointerEvent): void {
     const target = event.target as Element | null
-    const isOver = target?.closest('[data-avatar-mascot]') !== null
+    const isOver =
+      target?.closest('[data-avatar-mascot]') !== null ||
+      target?.closest('.resize-handle') !== null
     window.petApi.setPointerInteractive(isOver)
+
+    // Forward move events during an active resize.
+    if (resizing) {
+      window.petApi.resizeMove(event.screenX, event.screenY)
+    }
   }
 
   // --- Drag handling (div-level) ---
@@ -141,24 +152,49 @@
     ;(event.currentTarget as Element).releasePointerCapture(event.pointerId)
     window.petApi.dragEnd()
   }
+
+  // --- Resize handle handling ---
+  function onResizePointerDown(event: PointerEvent): void {
+    if (event.button !== 0) return
+    event.stopPropagation() // do not trigger drag
+    resizing = true
+    ;(event.currentTarget as Element).setPointerCapture(event.pointerId)
+    window.petApi.resizeStart(FRAME_WIDTH, FRAME_HEIGHT)
+  }
+
+  function onResizePointerUp(event: PointerEvent): void {
+    if (!resizing) return
+    resizing = false
+    ;(event.currentTarget as Element).releasePointerCapture(event.pointerId)
+    window.petApi.resizeEnd()
+  }
 </script>
 
 <svelte:window onpointermove={onWindowPointerMove} />
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<div
-  data-avatar-mascot="true"
-  style="
-    width: {FRAME_WIDTH}px;
-    height: {FRAME_HEIGHT}px;
-    background-image: url('{SPRITESHEET_URL}');
-    background-size: {BG_SIZE};
-    background-position: {bgPosition};
-    background-repeat: no-repeat;
-    cursor: grab;
-    user-select: none;
-  "
-  onpointerdown={onPointerDown}
-  onpointermove={onPointerMoveDiv}
-  onpointerup={onPointerUp}
-></div>
+<div class="pet-container" style="width: {FRAME_WIDTH}px; height: {FRAME_HEIGHT}px; position: relative;">
+  <div
+    data-avatar-mascot="true"
+    style="
+      width: 100%;
+      height: 100%;
+      background-image: url('{SPRITESHEET_URL}');
+      background-size: {BG_SIZE};
+      background-position: {bgPosition};
+      background-repeat: no-repeat;
+      cursor: grab;
+      user-select: none;
+    "
+    onpointerdown={onPointerDown}
+    onpointermove={onPointerMoveDiv}
+    onpointerup={onPointerUp}
+  ></div>
+  <!-- Resize handle: bottom-right corner, visible on hover -->
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div
+    class="resize-handle"
+    onpointerdown={onResizePointerDown}
+    onpointerup={onResizePointerUp}
+  ></div>
+</div>

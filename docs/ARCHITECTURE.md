@@ -73,7 +73,7 @@ selection UX, and CLI lifecycle semantics live in [`CLI.md`](CLI.md).
 ### Shared IPC channels (`src/shared/ipc-channels.ts`) and Preload / contextBridge (`src/preload/preload.ts`)
 
 **Owns:**
-- `src/shared/ipc-channels.ts` owns all IPC channel name string constants (`CH_STATE_SET`, `CH_STATE_CHANGE`, `CH_PTR_INTERACTIVE`, `CH_DRAG_START`, `CH_DRAG_MOVE`, `CH_DRAG_END`, `CH_RENDERER_READY`). Main, preload, and tests import constants from this side-effect-free shared module; channel strings are never hardcoded elsewhere.
+- `src/shared/ipc-channels.ts` owns all IPC channel name string constants (`CH_STATE_SET`, `CH_STATE_CHANGE`, `CH_PTR_INTERACTIVE`, `CH_DRAG_START`, `CH_DRAG_MOVE`, `CH_DRAG_END`, `CH_RENDERER_READY`, `CH_RESIZE_START`, `CH_RESIZE_MOVE`, `CH_RESIZE_END`). Main, preload, and tests import constants from this side-effect-free shared module; channel strings are never hardcoded elsewhere.
 - `src/preload/preload.ts` owns the `petApi` object exposed to the renderer via `contextBridge.exposeInMainWorld('petApi', ...)`. This is the sole communication surface between the Svelte renderer and the Electron main process.
 
 **petApi methods:**
@@ -83,6 +83,10 @@ selection UX, and CLI lifecycle semantics live in [`CLI.md`](CLI.md).
 - `dragStart(offsetX, offsetY)` — sends `CH_DRAG_START` with pointer offset within window.
 - `dragMove()` — sends `CH_DRAG_MOVE`; main repositions the window to track the cursor.
 - `dragEnd()` — sends `CH_DRAG_END`; main clears drag state.
+- `rendererReady()` — sends `CH_RENDERER_READY`; main shows the window via `showInactive()`.
+- `resizeStart(initialWidth, initialHeight)` — sends `CH_RESIZE_START`; main records the window origin and starting dimensions.
+- `resizeMove(screenX, screenY)` — sends `CH_RESIZE_MOVE`; main computes new width/height from cursor position relative to the window origin and calls `setBounds`.
+- `resizeEnd()` — sends `CH_RESIZE_END`; main saves the final bounds to the state store.
 
 **Does NOT:**
 - Never expose Node.js APIs directly — `contextIsolation` is always `true`, `nodeIntegration` is always `false`.

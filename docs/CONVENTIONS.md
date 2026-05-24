@@ -116,13 +116,18 @@ These apply across every stack in this project.
 - **Animation loop:** `setInterval`-based with per-frame duration sourced from the `pet.json`
   state machine definition.
 - **Pointer interactivity:** `pointermove` handler on the root element;
-  `event.target.closest('[data-avatar-mascot]')` determines whether the cursor is over the
-  interactive region.
+  `event.target.closest('[data-avatar-mascot]')` or `event.target.closest('.resize-handle')`
+  determines whether the cursor is over an interactive region.
 - **Dragging:** `pointerdown` starts drag, `pointermove` sends `drag-move` via `petApi`,
   `pointerup` ends the drag and sends `drag-end`.
-- **Resizing:** visual resize must preserve transparent-window click-through behavior,
-  route size changes through preload IPC to the Electron main process, and persist final
-  bounds on resize end.
+- **Resizing:** a `.resize-handle` div is positioned at the bottom-right of the pet container
+  using `position: absolute`. On `pointerdown` the handle calls `petApi.resizeStart(w, h)`;
+  `pointermove` on the window calls `petApi.resizeMove(screenX, screenY)` (forwarded only
+  when `resizing` is true); `pointerup` calls `petApi.resizeEnd()`. Main computes new
+  dimensions from cursor screen coordinates relative to the fixed window origin. Final bounds
+  are saved to the state store on `CH_RESIZE_END`. Click-through (`setIgnoreMouseEvents`) is
+  disabled while the cursor is over `.resize-handle` using the same `setPointerInteractive`
+  mechanism as dragging.
 
 ---
 

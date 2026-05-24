@@ -10,7 +10,7 @@ import { createAvatarWindow } from './avatar-window'
 import { createTray } from './tray'
 import { startSidecar, stopSidecar } from './sidecar'
 import { loadState, saveState, saveBounds } from './state-store'
-import { CH_DRAG_END, CH_RENDERER_READY } from '../shared/ipc-channels'
+import { CH_DRAG_END, CH_RENDERER_READY, CH_RESIZE_END } from '../shared/ipc-channels'
 
 // Track whether app.quit() was triggered via the tray Quit item so the
 // 'close' handler knows to allow the window to close.
@@ -80,6 +80,14 @@ app.whenReady().then(() => {
 
   // 7. Save bounds on drag-end.
   ipcMain.on(CH_DRAG_END, () => {
+    const b = win.getBounds()
+    const display = screen.getDisplayNearestPoint({ x: b.x, y: b.y })
+    const res = `${display.bounds.width}x${display.bounds.height}`
+    saveBounds(b, res)
+  })
+
+  // 7b. Save bounds on resize-end.
+  ipcMain.on(CH_RESIZE_END, () => {
     const b = win.getBounds()
     const display = screen.getDisplayNearestPoint({ x: b.x, y: b.y })
     const res = `${display.bounds.width}x${display.bounds.height}`

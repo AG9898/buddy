@@ -14,3 +14,28 @@ body {
   width: 100vw;
   height: 100vh;
 }
+
+.pet-container {
+  position: relative;
+  display: inline-block;
+}
+
+/* Resize handle: 12×12px triangle in the bottom-right corner of the pet sprite.
+   Hidden by default; visible when the user hovers over the pet container. */
+.resize-handle {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 12px;
+  height: 12px;
+  cursor: nwse-resize;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  /* Draw a south-east resize indicator using a border trick */
+  border-right: 3px solid rgba(255, 255, 255, 0.8);
+  border-bottom: 3px solid rgba(255, 255, 255, 0.8);
+}
+
+.pet-container:hover .resize-handle {
+  opacity: 1;
+}

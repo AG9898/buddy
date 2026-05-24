@@ -485,7 +485,7 @@
       "id": "FEAT-12",
       "title": "Add visual resize for the pet window",
       "description": "Implement mouse-driven visual resizing for the transparent Electron pet window. The renderer should expose a resize handle, preload should expose resize lifecycle IPC methods, and the main process should update BrowserWindow bounds while preserving click-through behavior. Final resized bounds must persist through the existing state store and be clamped/restored like other saved bounds.",
-      "status": "todo",
+      "status": "done",
       "priority": "high",
       "group_id": "FEAT",
       "depends_on": [
