@@ -1,60 +1,335 @@
 {
-  "id": "default",
-  "name": "Default Pet",
+  "id": "developer-buddy",
+  "name": "Developer Buddy",
   "spritesheet": "spritesheet.webp",
-  "frameWidth": 142,
-  "frameHeight": 154,
+  "frameWidth": 192,
+  "frameHeight": 208,
   "columns": 8,
   "rows": 9,
   "states": {
     "idle": {
       "frames": [
-        { "row": 0, "col": 0, "ms": 280 },
-        { "row": 0, "col": 1, "ms": 110 }
+        {
+          "row": 0,
+          "col": 0,
+          "ms": 280
+        },
+        {
+          "row": 0,
+          "col": 1,
+          "ms": 110
+        },
+        {
+          "row": 0,
+          "col": 2,
+          "ms": 110
+        },
+        {
+          "row": 0,
+          "col": 3,
+          "ms": 140
+        },
+        {
+          "row": 0,
+          "col": 4,
+          "ms": 140
+        },
+        {
+          "row": 0,
+          "col": 5,
+          "ms": 320
+        }
       ]
     },
-    "running": {
+    "running-right": {
       "frames": [
-        { "row": 7, "col": 0, "ms": 120 },
-        { "row": 7, "col": 1, "ms": 120 },
-        { "row": 7, "col": 2, "ms": 120 }
+        {
+          "row": 1,
+          "col": 0,
+          "ms": 120
+        },
+        {
+          "row": 1,
+          "col": 1,
+          "ms": 120
+        },
+        {
+          "row": 1,
+          "col": 2,
+          "ms": 120
+        },
+        {
+          "row": 1,
+          "col": 3,
+          "ms": 120
+        },
+        {
+          "row": 1,
+          "col": 4,
+          "ms": 120
+        },
+        {
+          "row": 1,
+          "col": 5,
+          "ms": 120
+        },
+        {
+          "row": 1,
+          "col": 6,
+          "ms": 120
+        },
+        {
+          "row": 1,
+          "col": 7,
+          "ms": 220
+        }
       ]
     },
-    "waiting": {
+    "running-left": {
       "frames": [
-        { "row": 6, "col": 0, "ms": 150 },
-        { "row": 6, "col": 1, "ms": 150 }
+        {
+          "row": 2,
+          "col": 0,
+          "ms": 120
+        },
+        {
+          "row": 2,
+          "col": 1,
+          "ms": 120
+        },
+        {
+          "row": 2,
+          "col": 2,
+          "ms": 120
+        },
+        {
+          "row": 2,
+          "col": 3,
+          "ms": 120
+        },
+        {
+          "row": 2,
+          "col": 4,
+          "ms": 120
+        },
+        {
+          "row": 2,
+          "col": 5,
+          "ms": 120
+        },
+        {
+          "row": 2,
+          "col": 6,
+          "ms": 120
+        },
+        {
+          "row": 2,
+          "col": 7,
+          "ms": 220
+        }
       ]
     },
-    "jumping": {
+    "waving": {
       "frames": [
-        { "row": 3, "col": 0, "ms": 100 },
-        { "row": 3, "col": 1, "ms": 100 },
-        { "row": 3, "col": 2, "ms": 100 },
-        { "row": 3, "col": 3, "ms": 100 }
+        {
+          "row": 3,
+          "col": 0,
+          "ms": 140
+        },
+        {
+          "row": 3,
+          "col": 1,
+          "ms": 140
+        },
+        {
+          "row": 3,
+          "col": 2,
+          "ms": 140
+        },
+        {
+          "row": 3,
+          "col": 3,
+          "ms": 280
+        }
       ],
       "once": true,
       "fallback": "idle"
     },
-    "waving": {
+    "jumping": {
       "frames": [
-        { "row": 4, "col": 0, "ms": 150 },
-        { "row": 4, "col": 1, "ms": 150 },
-        { "row": 4, "col": 2, "ms": 150 }
+        {
+          "row": 4,
+          "col": 0,
+          "ms": 140
+        },
+        {
+          "row": 4,
+          "col": 1,
+          "ms": 140
+        },
+        {
+          "row": 4,
+          "col": 2,
+          "ms": 140
+        },
+        {
+          "row": 4,
+          "col": 3,
+          "ms": 140
+        },
+        {
+          "row": 4,
+          "col": 4,
+          "ms": 280
+        }
       ],
       "once": true,
       "fallback": "idle"
     },
     "failed": {
       "frames": [
-        { "row": 5, "col": 0, "ms": 200 },
-        { "row": 5, "col": 1, "ms": 200 }
+        {
+          "row": 5,
+          "col": 0,
+          "ms": 140
+        },
+        {
+          "row": 5,
+          "col": 1,
+          "ms": 140
+        },
+        {
+          "row": 5,
+          "col": 2,
+          "ms": 140
+        },
+        {
+          "row": 5,
+          "col": 3,
+          "ms": 140
+        },
+        {
+          "row": 5,
+          "col": 4,
+          "ms": 140
+        },
+        {
+          "row": 5,
+          "col": 5,
+          "ms": 140
+        },
+        {
+          "row": 5,
+          "col": 6,
+          "ms": 140
+        },
+        {
+          "row": 5,
+          "col": 7,
+          "ms": 240
+        }
+      ]
+    },
+    "waiting": {
+      "frames": [
+        {
+          "row": 6,
+          "col": 0,
+          "ms": 150
+        },
+        {
+          "row": 6,
+          "col": 1,
+          "ms": 150
+        },
+        {
+          "row": 6,
+          "col": 2,
+          "ms": 150
+        },
+        {
+          "row": 6,
+          "col": 3,
+          "ms": 150
+        },
+        {
+          "row": 6,
+          "col": 4,
+          "ms": 150
+        },
+        {
+          "row": 6,
+          "col": 5,
+          "ms": 260
+        }
+      ]
+    },
+    "running": {
+      "frames": [
+        {
+          "row": 7,
+          "col": 0,
+          "ms": 120
+        },
+        {
+          "row": 7,
+          "col": 1,
+          "ms": 120
+        },
+        {
+          "row": 7,
+          "col": 2,
+          "ms": 120
+        },
+        {
+          "row": 7,
+          "col": 3,
+          "ms": 120
+        },
+        {
+          "row": 7,
+          "col": 4,
+          "ms": 120
+        },
+        {
+          "row": 7,
+          "col": 5,
+          "ms": 220
+        }
       ]
     },
     "review": {
       "frames": [
-        { "row": 8, "col": 0, "ms": 200 },
-        { "row": 8, "col": 1, "ms": 200 }
+        {
+          "row": 8,
+          "col": 0,
+          "ms": 150
+        },
+        {
+          "row": 8,
+          "col": 1,
+          "ms": 150
+        },
+        {
+          "row": 8,
+          "col": 2,
+          "ms": 150
+        },
+        {
+          "row": 8,
+          "col": 3,
+          "ms": 150
+        },
+        {
+          "row": 8,
+          "col": 4,
+          "ms": 150
+        },
+        {
+          "row": 8,
+          "col": 5,
+          "ms": 280
+        }
       ]
     }
   }

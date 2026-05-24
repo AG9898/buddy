@@ -280,3 +280,6 @@ The committed `pets/default/spritesheet.webp` is a generated color-grid placehol
 
 ### 2026-05-24 — buddy hatch should delegate imagegen to Codex CLI
 The hatch-pet workflow should be runnable from `buddy hatch`, but buddy should not implement an Anthropic image adapter or hold image-provider API keys. Keep `$imagegen` centralized in Codex by having the CLI invoke a Codex run for visual generation, then use the deterministic hatch-pet scripts to package buddy assets.
+
+### 2026-05-24 - hatch-pet manifests must stay UTF-8 without BOM
+PowerShell `Set-Content -Encoding UTF8` can write a UTF-8 BOM that makes hatch-pet Python scripts fail with `JSONDecodeError: Unexpected UTF-8 BOM`. When updating `imagegen-jobs.json` or run summaries from PowerShell, use `[System.Text.UTF8Encoding]::new($false)` with `[System.IO.File]::WriteAllText(...)`.

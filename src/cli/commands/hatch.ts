@@ -123,8 +123,6 @@ export async function runHatch(prompt: string, outputDir: string): Promise<void>
     root,
     '--sandbox',
     'workspace-write',
-    '--ask-for-approval',
-    'never',
     '-',
   ]
 

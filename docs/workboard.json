@@ -295,7 +295,7 @@
       "id": "ASSET-01",
       "title": "Generate production icon and default spritesheet via pet hatch skill",
       "description": "Use the Codex-delegated pet hatch workflow for buddy to produce two assets: (1) build/icon.ico - a 256x256 Windows application icon for the buddy pet character, referenced by electron-builder.yml for the installer and executable; (2) pets/default/spritesheet.webp - the production-quality 8-column x 9-row pixel-art spritesheet replacing the current color-grid placeholder. The renderer reads frame dimensions from pets/default/pet.json, so the generated spritesheet dimensions must match the packaged pet.json produced by package_for_buddy.py. Once real assets exist, remove or replace the placeholder spritesheet and ensure electron-builder.yml icon references resolve correctly so npm run build completes without icon workarounds.",
-      "status": "todo",
+      "status": "done",
       "priority": "high",
       "group_id": "ASSET",
       "depends_on": [
