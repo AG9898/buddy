@@ -6,7 +6,7 @@ import fs from 'fs'
 import path from 'path'
 import crypto from 'crypto'
 import { BrowserWindow } from 'electron'
-import { CH_STATE_CHANGE } from '../preload/preload'
+import { CH_STATE_CHANGE } from '../shared/ipc-channels'
 
 // ── Token helpers ─────────────────────────────────────────────────────────────
 

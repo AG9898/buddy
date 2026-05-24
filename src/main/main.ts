@@ -3,13 +3,14 @@
 // renderer-ready handshake, bounds saving, and graceful shutdown.
 
 import { app, ipcMain, screen } from 'electron'
+import type { Rectangle } from 'electron'
 import http from 'http'
 import path from 'path'
 import { createAvatarWindow } from './avatar-window'
 import { createTray } from './tray'
 import { startSidecar, stopSidecar } from './sidecar'
 import { loadState, saveState, saveBounds } from './state-store'
-import { CH_DRAG_END, CH_RENDERER_READY } from '../preload/preload'
+import { CH_DRAG_END, CH_RENDERER_READY } from '../shared/ipc-channels'
 
 // Track whether app.quit() was triggered via the tray Quit item so the
 // 'close' handler knows to allow the window to close.
@@ -18,9 +19,35 @@ let isQuitting = false
 // Reference to the sidecar server so we can stop it on quit.
 let sidecarServer: http.Server | null = null
 
+function clampBoundsToDisplay(bounds: Rectangle): Rectangle {
+  const display = screen.getDisplayMatching(bounds)
+  const area = display.workArea
+  const width = Math.min(bounds.width, area.width)
+  const height = Math.min(bounds.height, area.height)
+
+  return {
+    width,
+    height,
+    x: Math.min(Math.max(bounds.x, area.x), area.x + area.width - width),
+    y: Math.min(Math.max(bounds.y, area.y), area.y + area.height - height),
+  }
+}
+
 app.whenReady().then(() => {
   // 1. Load persisted state — provides bounds and open/hidden flag.
   const state = loadState()
+  const restoredBounds = clampBoundsToDisplay(state.bounds)
+  if (
+    restoredBounds.x !== state.bounds.x ||
+    restoredBounds.y !== state.bounds.y ||
+    restoredBounds.width !== state.bounds.width ||
+    restoredBounds.height !== state.bounds.height
+  ) {
+    const display = screen.getDisplayMatching(restoredBounds)
+    const res = `${display.bounds.width}x${display.bounds.height}`
+    saveBounds(restoredBounds, res)
+    state.bounds = restoredBounds
+  }
 
   // 2. Create the overlay window at the last-saved bounds (show:false — renderer
   //    must signal ready before we call showInactive).
@@ -32,7 +59,17 @@ app.whenReady().then(() => {
   // 4. Start the local HTTP sidecar (validates token, forwards events to renderer).
   sidecarServer = startSidecar(win)
 
-  // 5. Load the Svelte renderer.
+  // 5. Wait for the renderer to signal it is mounted before showing the window.
+  //    This prevents a brief blank transparent window from appearing.
+  //    Register before loading the renderer so a fast dev server cannot win the race.
+  ipcMain.once(CH_RENDERER_READY, () => {
+    if (state.open) {
+      win.moveTop()
+      win.showInactive()
+    }
+  })
+
+  // 6. Load the Svelte renderer.
   if (process.env['ELECTRON_RENDERER_URL']) {
     // Dev: electron-vite injects this env var pointing at the Vite dev server.
     void win.loadURL(process.env['ELECTRON_RENDERER_URL'])
@@ -40,15 +77,6 @@ app.whenReady().then(() => {
     // Production: load the built renderer index.html.
     void win.loadFile(path.join(__dirname, '../renderer/index.html'))
   }
-
-  // 6. Wait for the renderer to signal it is mounted before showing the window.
-  //    This prevents a brief blank transparent window from appearing.
-  ipcMain.once(CH_RENDERER_READY, () => {
-    if (state.open) {
-      win.moveTop()
-      win.showInactive()
-    }
-  })
 
   // 7. Save bounds on drag-end.
   ipcMain.on(CH_DRAG_END, () => {

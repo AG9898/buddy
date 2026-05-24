@@ -5,6 +5,7 @@ import { app, BrowserWindow, Menu, Tray, nativeImage } from 'electron'
 import path from 'path'
 import fs from 'fs'
 import { installHooksWithDialog } from './hooks-install'
+import { loadState, saveState } from './state-store'
 
 /**
  * Flag set to true by the Quit menu item so the 'close' handler in main.ts
@@ -46,12 +47,14 @@ export function createTray(win: BrowserWindow): Tray {
     {
       label: 'Show Pet',
       click: () => {
+        saveState({ ...loadState(), open: true, bounds: win.getBounds() })
         win.showInactive()
       },
     },
     {
       label: 'Hide Pet',
       click: () => {
+        saveState({ ...loadState(), open: false, bounds: win.getBounds() })
         win.hide()
       },
     },

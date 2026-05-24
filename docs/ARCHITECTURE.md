@@ -49,7 +49,7 @@ All components run on a single developer workstation. There is no server, no clo
 - After window creation: calls `setVisibleOnAllWorkspaces(true)`, `setAlwaysOnTop(true, "floating")`, and `showInactive()`.
 - Click-through toggle via `setIgnoreMouseEvents(true, { forward: true })` — disabled when renderer signals pointer is over an interactive region.
 - Local HTTP sidecar on `127.0.0.1:7777` (configurable via `BUDDY_PORT`): receives hook events, validates the `X-Petdex-Update-Token` header, and forwards events to the renderer via Electron IPC.
-- State persistence: reads and writes `%USERPROFILE%\.petdex-win\state.json` (window open/hidden, bounds, pet id, current animation state).
+- State persistence: reads and writes `%USERPROFILE%\.petdex-win\state.json` (window open/hidden, bounds, pet id, current animation state). Restored bounds are clamped into the nearest display work area before the window is created so stale or off-screen coordinates cannot hide the pet.
 - System tray (Show / Hide / Quit) to keep the process alive when the window is hidden.
 - Hook installation: `hooks-install.ts` exports `installHooks(options)` and `getHooksStatus(options)`. For Claude Code CLI it writes hook entries to `~/.claude/settings.json` (hooks section); for Codex CLI it appends shell environment-variable blocks to the target rc file. Both operations are idempotent. The module contains no top-level Electron import and is safe to call from the CLI layer (FEAT-09) without an Electron environment. The `installHooksWithDialog()` helper is intended for tray use only and dynamically requires Electron's `dialog` API at call time.
 - Files: `main.ts`, `avatar-window.ts`, `state-store.ts`, `sidecar.ts`, `tray.ts`, `hooks-install.ts`.
@@ -59,11 +59,11 @@ All components run on a single developer workstation. There is no server, no clo
 - Never read or write Codex's internal state files.
 - Never steal window focus — always use `showInactive()`.
 
-### Preload / contextBridge (`src/preload/preload.ts`)
+### Shared IPC channels (`src/shared/ipc-channels.ts`) and Preload / contextBridge (`src/preload/preload.ts`)
 
 **Owns:**
-- All IPC channel name string constants (`CH_STATE_SET`, `CH_STATE_CHANGE`, `CH_PTR_INTERACTIVE`, `CH_DRAG_START`, `CH_DRAG_MOVE`, `CH_DRAG_END`). Main process imports these constants from this file; they are never hardcoded elsewhere.
-- The `petApi` object exposed to the renderer via `contextBridge.exposeInMainWorld('petApi', ...)`. This is the sole communication surface between the Svelte renderer and the Electron main process.
+- `src/shared/ipc-channels.ts` owns all IPC channel name string constants (`CH_STATE_SET`, `CH_STATE_CHANGE`, `CH_PTR_INTERACTIVE`, `CH_DRAG_START`, `CH_DRAG_MOVE`, `CH_DRAG_END`, `CH_RENDERER_READY`). Main, preload, and tests import constants from this side-effect-free shared module; channel strings are never hardcoded elsewhere.
+- `src/preload/preload.ts` owns the `petApi` object exposed to the renderer via `contextBridge.exposeInMainWorld('petApi', ...)`. This is the sole communication surface between the Svelte renderer and the Electron main process.
 
 **petApi methods:**
 - `setState(state)` — sends `CH_STATE_SET` to main to request a state transition.
@@ -86,7 +86,7 @@ All components run on a single developer workstation. There is no server, no clo
 - Handles drag events and sends `drag-start` / `drag-move` / `drag-end` IPC messages to the main process.
 - Detects pointer entry/exit on interactive regions (`[data-avatar-mascot]`, `.resize-handle`) and signals the main process to toggle click-through.
 - Responds to `pet:state-change` IPC events to switch the active animation state.
-- Files: `index.html`, `App.svelte`, `PetSprite.svelte`, `styles.css`.
+- Files: `index.html`, `main.ts`, `App.svelte`, `PetSprite.svelte`, `styles.css`.
 
 **Does NOT:**
 - Never perform any file I/O or HTTP calls — all external communication goes through IPC to the main process.

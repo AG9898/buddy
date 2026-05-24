@@ -20,7 +20,7 @@ These apply across every stack in this project.
 - **No direct writes to Codex internal state files.** Treat `.codex-global-state.json` as
   read-only reference only — never write to it.
 - **IPC channel names are constants.** All IPC channel name strings are defined in
-  `src/preload/preload.ts`. Never hardcode channel name strings in main or renderer files.
+  `src/shared/ipc-channels.ts`. Never hardcode channel name strings in main or renderer files.
 - **HTTP sidecar binds 127.0.0.1 only.** Never bind to 0.0.0.0 or any non-loopback address.
 
 ---
@@ -47,7 +47,7 @@ These apply across every stack in this project.
 
 - Files: `kebab-case.ts`
 - Exported functions: camelCase; exported classes: PascalCase
-- IPC channel names: `kebab-case` strings, defined as constants in `preload.ts`
+- IPC channel names: `kebab-case` strings, defined as constants in `src/shared/ipc-channels.ts`
   (e.g., `pet:state-change`, `drag-start`)
 - Constants: `UPPER_SNAKE_CASE`
 
@@ -75,6 +75,8 @@ These apply across every stack in this project.
 ### Module and File Organization
 
 - One `.svelte` file per visual component.
+- `src/renderer/main.ts` is the only renderer bootstrap file; it mounts `App.svelte`
+  into `#app` and imports global styles.
 - Shared types: `src/renderer/types.ts`.
 - Animation logic: colocated in `PetSprite.svelte` — not extracted into a separate service.
 
