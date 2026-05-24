@@ -42,7 +42,8 @@ selection UX, and CLI lifecycle semantics live in [`CLI.md`](CLI.md).
 - `buddy hatch <prompt>`: prepares a hatch-pet run, verifies Codex CLI is installed and ready with `codex doctor`, then invokes `codex exec` as the image-generation worker so `$imagegen` is provided by Codex rather than by a buddy-owned image API adapter. The command packages the completed run into buddy's `pets/<id>/pet.json`, `spritesheet.webp`, and `build/icon.ico` formats.
 - Pet-management commands enumerate and select valid buddy-managed pets and Codex-compatible pet asset folders. Selection is persisted in buddy-owned state only.
 - CLI output is concise by default, styled when supported, plain in non-TTY contexts, and avoids dumping raw child-process output unless verbose/debug behavior is explicitly requested.
-- Files: `src/cli/index.ts`, `src/cli/commands/`.
+- Pet discovery module: `src/cli/pets.ts` — `discoverPets()` enumerates valid pets from `%USERPROFILE%\.petdex-win\pets` (buddy-managed) and `%USERPROFILE%\.codex\pets` (Codex-compatible, read-only). `validatePetFolder()` checks `pet.json` structure and spritesheet existence before admitting a candidate. `BUDDY_SPRITES_DIR` overrides the buddy-managed pets directory.
+- Files: `src/cli/index.ts`, `src/cli/commands/`, `src/cli/pets.ts`.
 - Build output: `npm run build:app` runs `electron-vite build` for Electron bundles and a Vite CLI build that emits `out/cli/index.js`, the package `bin.buddy` target.
 
 **Does NOT:**

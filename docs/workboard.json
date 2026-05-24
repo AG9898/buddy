@@ -525,7 +525,7 @@
       "id": "FEAT-13",
       "title": "Implement pet discovery and validation",
       "description": "Add a pet discovery module that enumerates valid buddy-managed pets from %USERPROFILE%/.petdex-win/pets and valid Codex-compatible pet asset folders from %USERPROFILE%/.codex/pets. Discovery must treat Codex folders as read-only asset sources, validate pet.json and the referenced spritesheet before returning candidates, and provide concise invalid-folder reasons for CLI use.",
-      "status": "todo",
+      "status": "done",
       "priority": "high",
       "group_id": "FEAT",
       "depends_on": [
