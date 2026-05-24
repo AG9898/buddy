@@ -21,6 +21,7 @@ import { runHooksInstall } from './commands/hooks.js'
 import { runState } from './commands/state.js'
 import { runDoctor } from './commands/doctor.js'
 import { runHatch } from './commands/hatch.js'
+import { runPetsList, runPetsShow, runPetsUse } from './commands/pets.js'
 import { printBanner } from './output.js'
 
 const program = new Command()
@@ -126,6 +127,40 @@ program
       error(err instanceof Error ? err.message : String(err))
       process.exit(1)
     })
+  })
+
+// ── buddy pets ────────────────────────────────────────────────────────────────
+const pets = program
+  .command('pets')
+  .description(
+    'Enumerate and select pets. ' +
+      'Pets can be buddy-managed (%USERPROFILE%\\.petdex-win\\pets) ' +
+      'or Codex-compatible (%USERPROFILE%\\.codex\\pets).',
+  )
+  .action(() => {
+    // Show help when `buddy pets` is run with no subcommand.
+    pets.help()
+  })
+
+pets
+  .command('list')
+  .description('List valid buddy-managed and Codex-compatible pets.')
+  .action(() => {
+    runPetsList()
+  })
+
+pets
+  .command('show')
+  .description('Print the currently selected pet and its source path.')
+  .action(() => {
+    runPetsShow()
+  })
+
+pets
+  .command('use <id>')
+  .description('Validate and persist a pet selection.')
+  .action((id: string) => {
+    runPetsUse(id)
   })
 
 program.parse(process.argv)

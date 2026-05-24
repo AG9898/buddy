@@ -563,7 +563,7 @@
       "id": "FEAT-14",
       "title": "Add CLI pet list and selection commands",
       "description": "Add buddy pets list, buddy pets show, and buddy pets use <id> commands backed by the pet discovery module. The commands should use the shared CLI output layer for styled/plain terminal output, clearly identify buddy-managed versus Codex-compatible pets, validate selections before persisting them, and store the active pet in buddy-owned state only.",
-      "status": "todo",
+      "status": "done",
       "priority": "high",
       "group_id": "FEAT",
       "depends_on": [

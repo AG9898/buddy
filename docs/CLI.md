@@ -18,14 +18,9 @@ usable from Windows PowerShell, Command Prompt, WSL shells, non-TTY scripts, and
 | `buddy hooks install [--rc <path>]` | Install Claude Code and Codex CLI hook entries. |
 | `buddy doctor` | Print a health checklist for process, sidecar, token, and hooks. |
 | `buddy hatch <prompt> [--output <dir>] [--verbose]` | Generate pet assets by delegating image work to Codex CLI, then package buddy assets. |
-
-Planned pet-management commands:
-
-| Command | Purpose |
-|---|---|
 | `buddy pets list` | List valid buddy-managed and Codex-compatible pets. |
-| `buddy pets use <id>` | Persist the active pet selection. |
 | `buddy pets show` | Print the currently selected pet and its source path. |
+| `buddy pets use <id>` | Validate and persist the active pet selection. |
 
 Planned window command:
 
