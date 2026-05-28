@@ -5,6 +5,7 @@ adding, renaming, removing, or changing any command under `src/cli/`.
 
 buddy is a terminal-first desktop pet app. The CLI should be concise, predictable, and
 usable from Windows PowerShell, Command Prompt, WSL shells, non-TTY scripts, and CI.
+The npm package is named `cli-buddy`, but the installed command remains `buddy`.
 
 ---
 
@@ -42,6 +43,9 @@ the pet.
 
 When run from WSL, `buddy start` uses WSL interop to invoke the Windows-side app. If
 interop is unavailable, print a clear actionable error and exit non-zero.
+
+Install examples should use `npm install -g cli-buddy`. User-facing command examples
+should continue to use `buddy ...`.
 
 ---
 
@@ -141,6 +145,10 @@ folders should be skipped or reported with a concise reason, not treated as acti
 The active pet selection is buddy-owned state. Persist it through the normal state store
 owned by the Electron main process, not by writing to Codex configuration files.
 
+Windows owns selected-pet rendering. WSL hook commands may send state events and may
+share/copy the buddy token and pet assets through documented Windows-backed paths, but WSL
+must not maintain a second independent active-pet registry.
+
 ---
 
 ## Window Controls
@@ -165,7 +173,6 @@ The canonical environment variable matrix is [`ENV_VARS.md`](ENV_VARS.md). CLI-r
 variables currently include:
 
 - `BUDDY_PORT`
-- `BUDDY_HOST`
 - `BUDDY_SPRITES_DIR`
 - `BUDDY_LOG_LEVEL`
 - `BUDDY_CODEX_COMMAND`

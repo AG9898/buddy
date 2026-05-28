@@ -11,10 +11,10 @@
 
 **A floating desktop pet for Windows that reacts to your AI coding assistant in real time.**
 
-[![npm version](https://img.shields.io/npm/v/buddy?color=f97316&labelColor=1a1a1a)](https://www.npmjs.com/package/buddy)
-[![license](https://img.shields.io/npm/l/buddy?color=f97316&labelColor=1a1a1a)](./LICENSE)
-[![platform](https://img.shields.io/badge/platform-Windows-f97316?labelColor=1a1a1a)](https://www.npmjs.com/package/buddy)
-[![node](https://img.shields.io/node/v/buddy?color=f97316&labelColor=1a1a1a)](https://nodejs.org)
+[![npm version](https://img.shields.io/npm/v/cli-buddy?color=f97316&labelColor=1a1a1a)](https://www.npmjs.com/package/cli-buddy)
+[![license](https://img.shields.io/npm/l/cli-buddy?color=f97316&labelColor=1a1a1a)](./LICENSE)
+[![platform](https://img.shields.io/badge/platform-Windows-f97316?labelColor=1a1a1a)](https://www.npmjs.com/package/cli-buddy)
+[![node](https://img.shields.io/node/v/cli-buddy?color=f97316&labelColor=1a1a1a)](https://nodejs.org)
 
 </div>
 
@@ -22,7 +22,7 @@
 
 buddy renders a transparent, always-on-top pixel-art character directly on your Windows desktop. It listens to hook events from **Claude Code** and **Codex CLI** and animates the pet as your agent works — running when tools fire, jumping when you send a prompt, waiting for permissions, and waving when the session ends.
 
-No login. No cloud. No installer GUI. Just `npm install -g buddy` and a CLI.
+No login. No cloud. No installer GUI. Just `npm install -g cli-buddy` and the `buddy` CLI.
 
 ---
 
@@ -47,9 +47,9 @@ No login. No cloud. No installer GUI. Just `npm install -g buddy` and a CLI.
 | Requirement | Notes |
 |---|---|
 | **Windows 10 or 11** | The Electron overlay is Windows-only |
-| **Node.js 18+** | Required for `npm install -g buddy` |
+| **Node.js 18+** | Required for `npm install -g cli-buddy` |
 | **Claude Code** or **Codex CLI** | At least one required for hook integration |
-| **WSL** _(optional)_ | Only needed for WSL-side hook events via `buddy-bridge` |
+| **WSL** _(optional)_ | Only needed for WSL-side hook events via `petdex-bridge` |
 | **Codex CLI** _(optional)_ | Only needed for `buddy hatch` pet generation |
 
 ---
@@ -59,7 +59,7 @@ No login. No cloud. No installer GUI. Just `npm install -g buddy` and a CLI.
 ### Windows (PowerShell / Command Prompt)
 
 ```sh
-npm install -g buddy
+npm install -g cli-buddy
 buddy start
 ```
 
@@ -68,19 +68,20 @@ The pet window appears on your desktop. `buddy start` launches the app detached 
 ### WSL
 
 ```sh
-npm install -g buddy
+npm install -g cli-buddy
 buddy start          # uses WSL interop to launch the Windows Electron app
 buddy hooks install  # wires Claude Code and Codex CLI hooks into your shell rc
 ```
 
 WSL interop must be enabled. If `buddy.exe` is not reachable, buddy prints a clear actionable error.
 
-### WSL bridge _(optional)_
+### WSL bridge
 
-Install inside WSL to route WSL shell hook events to the Windows pet:
+Install or build `petdex-bridge` inside WSL to route WSL shell hook events to the Windows pet:
 
 ```sh
-npm install -g buddy-bridge
+cd petdex-bridge
+cargo build --release --target x86_64-unknown-linux-gnu
 ```
 
 ---
@@ -89,7 +90,7 @@ npm install -g buddy-bridge
 
 ```sh
 # 1 — install
-npm install -g buddy
+npm install -g cli-buddy
 
 # 2 — launch the pet window
 buddy start
@@ -156,11 +157,12 @@ buddy state idle
 
 ## Pet Management
 
-buddy discovers pets from two locations:
+buddy discovers pets from three locations:
 
 | Source | Path | Notes |
 |---|---|---|
 | buddy-managed | `%USERPROFILE%\.petdex-win\pets` | Created by `buddy hatch`. Override with `BUDDY_SPRITES_DIR`. |
+| packaged | `<cli-buddy package>\pets` | Built-in read-only pets shipped with buddy, including `default`. |
 | Codex-compatible | `%USERPROFILE%\.codex\pets` | Read-only asset folders — buddy never writes Codex state. |
 
 A valid pet folder contains a `pet.json` state machine and a `spritesheet.webp` (8 × 9 grid).
@@ -180,7 +182,7 @@ Codex CLI must be installed and signed in (`codex login`) before hatching. Use `
 ### Browsing and selecting pets
 
 ```sh
-buddy pets list          # enumerate valid pets from both sources
+buddy pets list          # enumerate valid pets from all sources
 buddy pets show          # print the active selection
 buddy pets use orange-cat
 ```
@@ -223,7 +225,6 @@ All variables are optional — buddy runs with safe built-in defaults, no `.env`
 | Variable | Default | Description |
 |---|---|---|
 | `BUDDY_PORT` | `7777` | Port for the local HTTP hook sidecar. |
-| `BUDDY_HOST` | `127.0.0.1` | Sidecar bind address. Never set to `0.0.0.0`. |
 | `BUDDY_SPRITES_DIR` | `%USERPROFILE%\.petdex-win\pets` | Override the buddy-managed pets directory. |
 | `BUDDY_LOG_LEVEL` | `info` | Main process log level: `debug` `info` `warn` `error`. |
 | `BUDDY_CODEX_COMMAND` | `codex` | Codex CLI command used by `buddy hatch`. |
@@ -269,7 +270,7 @@ src/
   preload/        contextBridge — petApi exposed to the Svelte renderer
   renderer/       Svelte pet renderer and sprite animation state machine
   shared/         IPC channel constants (imported by main / preload / tests)
-petdex-bridge/    Rust WSL bridge (shipped as buddy-bridge on npm)
+petdex-bridge/    Rust WSL bridge for shell hook events
 pets/default/     Bundled default pet (pet.json + spritesheet.webp)
 docs/             Architecture, CLI contract, env vars, decisions, workboard
 ```

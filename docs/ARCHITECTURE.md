@@ -7,9 +7,9 @@
 
 ## Overview
 
-buddy is an npm-distributed developer tool that renders a floating, always-on-top, transparent pet character directly on the Windows desktop. It is built on a four-component architecture: a CLI entry point (`buddy`) that handles install-time setup and runtime commands, an Electron main process managing the window and HTTP sidecar, a Svelte renderer driving pet animation, and a Rust CLI binary (petdex-bridge) that runs in WSL and bridges shell hook events from WSL agents into the Windows-side Electron process. The system is entirely local — there are no cloud services, no accounts, and no network traffic leaving the machine.
+buddy is an npm-distributed developer tool that renders a floating, always-on-top, transparent pet character directly on the Windows desktop. The npm package is named `cli-buddy`, and it installs the `buddy` command. It is built on a four-component architecture: a CLI entry point (`buddy`) that handles install-time setup and runtime commands, an Electron main process managing the window and HTTP sidecar, a Svelte renderer driving pet animation, and a Rust CLI binary (petdex-bridge) that runs in WSL and bridges shell hook events from WSL agents into the Windows-side Electron process. The system is entirely local — there are no cloud services, no accounts, and no network traffic leaving the machine.
 
-buddy is installed via `npm install -g buddy` from either a Windows terminal or a WSL terminal. When installed in WSL the CLI uses the WSL interop layer to launch the Windows Electron process; when installed on Windows it launches directly.
+buddy is installed via `npm install -g cli-buddy` from either a Windows terminal or a WSL terminal. When installed in WSL the CLI uses the WSL interop layer to launch the Windows Electron process; when installed on Windows it launches directly.
 
 ---
 
@@ -20,7 +20,7 @@ All components run on a single developer workstation. There is no server, no clo
 - **buddy CLI** (`src/cli/`): npm `bin` entry point. Handles `start`, `stop`, `hooks install`, `state <name>`, `doctor`, `hatch <prompt>`, and `pets` (list/show/use) subcommands. Detects whether it is running in WSL or on Windows and adjusts behavior accordingly — in WSL it launches the Windows Electron app via WSL interop (`buddy.exe`). For asset generation, `buddy hatch` delegates visual generation to a Codex run that can use `$imagegen`, then packages the deterministic hatch-pet outputs for buddy.
 - **Electron main process** (Windows, `src/main/`): Manages the transparent frameless BrowserWindow, runs the local HTTP sidecar on `127.0.0.1:7777`, persists state to disk, and owns the system tray.
 - **Svelte renderer** (Windows, Electron webview, `src/renderer/`): Renders the pet character, drives the sprite animation state machine, and handles pointer interactivity and dragging.
-- **petdex-bridge** (WSL, Rust CLI binary, `petdex-bridge/`): A tiny cross-compiled Linux binary distributed as the companion npm package `buddy-bridge`. Invoked by WSL shell hooks; reads the shared update token and POSTs agent lifecycle events to the Electron HTTP sidecar via WSL localhost passthrough.
+- **petdex-bridge** (WSL, Rust CLI binary, `petdex-bridge/`): A tiny cross-compiled Linux binary distributed for WSL hook integration. Invoked by WSL shell hooks; reads the shared update token and POSTs agent lifecycle events to the Electron HTTP sidecar via WSL localhost passthrough.
 
 ---
 
@@ -40,7 +40,7 @@ selection UX, and CLI lifecycle semantics live in [`CLI.md`](CLI.md).
 - `buddy state <name>`: sends an HTTP POST to the running sidecar (works from both Windows and WSL via localhost passthrough).
 - `buddy doctor`: checks that the Electron process is running, the sidecar responds, the update token exists, and hooks are installed.
 - `buddy hatch <prompt>`: prepares a hatch-pet run, verifies Codex CLI is installed and ready with `codex doctor`, then invokes `codex exec` as the image-generation worker so `$imagegen` is provided by Codex rather than by a buddy-owned image API adapter. The command packages the completed run into buddy's `pets/<id>/pet.json`, `spritesheet.webp`, and `build/icon.ico` formats.
-- Pet-management commands enumerate and select valid buddy-managed pets and Codex-compatible pet asset folders. Selection is persisted in buddy-owned state only.
+- Pet-management commands enumerate and select valid buddy-managed pets, packaged pets, and Codex-compatible pet asset folders. Selection is persisted in buddy-owned state only.
 - CLI output is concise by default, styled when supported, plain in non-TTY contexts, and avoids dumping raw child-process output unless verbose/debug behavior is explicitly requested.
 - Pet discovery module: `src/cli/pets.ts` — `discoverPets()` enumerates valid pets from `%USERPROFILE%\.petdex-win\pets` (buddy-managed), the package `pets/` directory (packaged built-ins), and `%USERPROFILE%\.codex\pets` (Codex-compatible, read-only). `validatePetFolder()` checks `pet.json` structure and spritesheet existence before admitting a candidate. `BUDDY_SPRITES_DIR` overrides the buddy-managed pets directory.
 - Files: `src/cli/index.ts`, `src/cli/commands/`, `src/cli/pets.ts`.
@@ -51,6 +51,14 @@ selection UX, and CLI lifecycle semantics live in [`CLI.md`](CLI.md).
 - Never starts a long-running server process itself — it starts the Electron app which owns the sidecar.
 - Never owns image-provider credentials for hatch generation. If a user starts hatching from Claude Code or any other shell, buddy still delegates the visual generation phase to Codex CLI so `$imagegen` routing remains centralized.
 - Never reads or writes Codex internal state while discovering Codex-compatible pet folders.
+
+### Package and release layout
+
+The first public npm package name is `cli-buddy`, but the installed binary remains `buddy`.
+The package must be curated for npm: it should ship only the runtime files required for the
+CLI-launched Electron app, packaged pets, documented release files, and any required WSL
+bridge artifact. Agent skill folders, local build caches, and source-only planning files
+must not be published accidentally.
 
 ### Electron Main Process (`src/main/`)
 
@@ -116,6 +124,7 @@ selection UX, and CLI lifecycle semantics live in [`CLI.md`](CLI.md).
 - Reads the shared update token from `$HOME/.petdex-win/runtime/update-token`.
 - Accepts a state name as a CLI argument (`petdex-bridge state running`) and POSTs `{"state":"<name>","source":"claude-code"}` to `http://127.0.0.1:${BUDDY_PORT}/state` with the `X-Petdex-Update-Token` header.
 - Relies on WSL localhost passthrough to reach the Windows-side HTTP sidecar automatically.
+- Emits actionable non-zero errors when the token is missing, WSL localhost passthrough is not routing, or the Electron app is not running.
 
 **Does NOT:**
 - Never reads or writes any Codex internal state files.
@@ -185,8 +194,8 @@ There are no buddy-owned cloud services, managed databases, auth providers, or i
 | Environment | Electron app | petdex-bridge | State file |
 |---|---|---|---|
 | Local dev | `npm run dev` — Electron + Vite dev server on localhost | `cargo build --release --target x86_64-unknown-linux-gnu`, binary copied to WSL `$PATH` | `%USERPROFILE%\.petdex-win\state.json` (created on first run) |
-| Production | `npm install -g buddy` — electron-builder packages the app; the npm package ships the Electron binary and exposes the `buddy` CLI via the `bin` field | `npm install -g buddy-bridge` inside WSL — ships the pre-built `x86_64-unknown-linux-gnu` binary | Same path — persisted across updates |
-| WSL-only install | `npm install -g buddy` in WSL — CLI detects WSL, installs shell hooks, and invokes the Windows-side `buddy.exe` via WSL interop to launch the GUI | Same as above | Same path |
+| Production | `npm install -g cli-buddy` — electron-builder packages the app; the npm package ships the Electron runtime and exposes the `buddy` CLI via the `bin` field | WSL bridge install path ships the pre-built `x86_64-unknown-linux-gnu` binary | Same path — persisted across updates |
+| WSL-only install | `npm install -g cli-buddy` in WSL — CLI detects WSL, installs shell hooks, and invokes the Windows-side `buddy.exe` via WSL interop to launch the GUI | Same as above | Same path |
 
 See [`ENV_VARS.md`](ENV_VARS.md) for the canonical variable and secret matrix per environment.
 
@@ -195,7 +204,7 @@ See [`ENV_VARS.md`](ENV_VARS.md) for the canonical variable and secret matrix pe
 ## Constraints
 
 - **Windows-only.** The Electron app and renderer target `win32` exclusively. No macOS, no Linux native GUI.
-- **HTTP sidecar must bind `127.0.0.1` only.** Never change `BUDDY_HOST` to `0.0.0.0` or any non-loopback address.
+- **HTTP sidecar must bind `127.0.0.1` only.** Host binding is not a user-facing configuration surface; never bind to `0.0.0.0` or any non-loopback address.
 - **Never read or write any AI assistant CLI's internal config or state files.** buddy must never touch `.codex/`, `.claude/`, or equivalent internal directories of any CLI tool it integrates with.
 - **Window must be non-focusable by default.** Always use `showInactive()` to display the window; never call `focus()` or `show()` in a way that steals focus from the user's active application.
 - **Bounds must be saved on close, drag-end, and display-change events.** State must not be lost on crash — write `state.json` defensively at each of these points, not only on graceful exit.

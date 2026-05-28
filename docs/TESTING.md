@@ -79,6 +79,23 @@ preload, and renderer bundles. For CLI packaging changes, smoke-test the generat
 entry point with `node out/cli/index.js --help` and command-specific help such as
 `node out/cli/index.js hatch --help`.
 
+## Release Smoke Matrix
+
+Before publishing `cli-buddy`, verify the release candidate on a clean Windows machine and
+one WSL distribution:
+
+| Area | Check |
+|---|---|
+| npm package | `npm pack --dry-run` contains only intended runtime/docs assets and excludes agent skill folders and source-only working files. |
+| install | `npm install -g cli-buddy` installs the `buddy` command. |
+| launch | `buddy start` launches the Windows Electron app and returns control to the terminal. |
+| rendering | The default packaged pet renders, animates, drags, resizes visually, and survives restart. |
+| selected pets | `buddy pets list`, `buddy pets use <id>`, restart, and selected-pet render are verified from Windows; WSL path-sharing behavior is verified separately. |
+| state endpoint | `buddy state running` and authenticated `POST /state` visibly change pet state. |
+| hooks | Claude Code and Codex CLI hooks are installed and trigger visible state changes from Windows and WSL. |
+| WSL bridge | `petdex-bridge state running` in WSL reads the token, reaches `127.0.0.1:${BUDDY_PORT}`, and returns useful errors when the app is stopped. |
+| packaging | `npm run build` passes on a release-capable Windows/CI environment; `npm run build:win:local` remains a smoke-only fallback. |
+
 ---
 
 ## What Is Covered
@@ -99,8 +116,8 @@ output when supported, expected error messages and exit codes, hatch progress ou
 does not dump raw subprocess logs, and pet discovery/selection behavior.
 
 **Not covered (yet):** Visual regression, multi-monitor DPI scaling, packaged installer
-smoke test, Windows-native hook execution, resize pointer-event integration (requires
-Electron E2E).
+smoke test, Windows-native hook execution, WSL bridge execution, resize pointer-event
+integration (requires Electron E2E).
 
 ---
 

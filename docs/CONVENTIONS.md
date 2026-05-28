@@ -47,6 +47,15 @@ These apply across every stack in this project.
 - `vite.cli.config.ts` owns the package CLI bundle. Keep `package.json` `bin.buddy`
   pointed at the emitted `out/cli/index.js`, and keep `npm run build:app` producing that
   file on both Windows PowerShell and WSL.
+- The npm package name is `cli-buddy`; the installed command remains `buddy`. Keep docs,
+  package metadata, badges, and publish checks aligned to that split.
+- Release packaging uses `electron-builder`. Do not reintroduce electron-forge language or
+  scripts without a new decision record.
+- npm package contents must be curated with `files` or `.npmignore`. Do not publish agent
+  skill directories (`.agents/`, `.claude/`, `.codex/`), local caches, test fixtures that are
+  not needed at runtime, or source-only planning files by accident.
+- Any release-affecting package change must run `npm pack --dry-run` and inspect the
+  tarball contents before publishing.
 - `src/preload/preload.ts` — single preload file; exposes only `petApi` via
   `contextBridge.exposeInMainWorld`.
 - State read/write is isolated to `state-store.ts` — no other file writes to `state.json`.

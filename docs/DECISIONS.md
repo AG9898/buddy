@@ -60,6 +60,48 @@ What existing code or docs does this affect?>
 
 ## Resolved Decisions
 
+### RESOLVED-07 — First release package identity
+
+**Resolved:** 2026-05-28
+
+**Decision:** Publish the first public npm release under the package name `cli-buddy` while keeping the installed command name as `buddy`.
+
+**Why:** The unscoped npm package name `buddy` is already taken. `cli-buddy` was available during release planning and keeps the package discoverable while preserving the shorter `buddy` command users run after installation.
+
+**Alternatives rejected:** `terminal-buddy` is already taken on npm. Renaming the command to `cli-buddy` was rejected because the existing CLI, docs, hook commands, and user workflow are simpler with `buddy`.
+
+**Affects:** [PRD.md](PRD.md), [ARCHITECTURE.md](ARCHITECTURE.md), [CLI.md](CLI.md), [README.md](../README.md), [workboard.json](workboard.json)
+
+---
+
+### RESOLVED-06 — npm package ships the CLI-launched Electron app
+
+**Resolved:** 2026-05-28
+
+**Decision:** The `cli-buddy` npm package should install a usable CLI-launched Windows Electron app directly. Users install with `npm install -g cli-buddy` and run `buddy start`; no separate GUI installer step is required for the normal path.
+
+**Why:** The target users are developers and can follow terminal instructions, but the first-run path should still be as seamless as practical. Keeping npm as the distribution channel and `buddy` as the command matches the product's terminal-first shape.
+
+**Alternatives rejected:** A package that only downloads a separate installer adds moving parts and more failure modes. A GUI-first installer does not fit the terminal-first product.
+
+**Affects:** [ARCHITECTURE.md](ARCHITECTURE.md), [CLI.md](CLI.md), [TESTING.md](TESTING.md), [CONVENTIONS.md](CONVENTIONS.md)
+
+---
+
+### RESOLVED-05 — electron-builder is the packaging source of truth
+
+**Resolved:** 2026-05-28
+
+**Decision:** Use `electron-builder` as the packaging and publishing tool for v0.1. Documentation that still references electron-forge is stale and should be corrected.
+
+**Why:** The repository already uses `electron-builder.yml`, `npm run build`, and `npm run build:win:local`. Aligning docs to the implementation reduces release ambiguity.
+
+**Alternatives rejected:** Switching back to electron-forge before v0.1 would create unnecessary migration work and invalidate the current build scripts.
+
+**Affects:** [PRD.md](PRD.md), [ARCHITECTURE.md](ARCHITECTURE.md), [TESTING.md](TESTING.md), [CONVENTIONS.md](CONVENTIONS.md)
+
+---
+
 ### RESOLVED-03 — Adopt pet hatch skill (adapted) for icon and spritesheet generation
 
 **Resolved:** 2026-05-22

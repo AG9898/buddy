@@ -1,7 +1,7 @@
 {
   "$schema": "./workboard.schema.json",
   "schema_version": "1.0.0",
-  "last_updated": "2026-05-24",
+  "last_updated": "2026-05-28",
   "tasks": [
     {
       "id": "FEAT-01",
@@ -124,7 +124,7 @@
     {
       "id": "FEAT-05",
       "title": "Add system tray with Show/Hide/Quit",
-      "description": "Create src/main/tray.ts. Export createTray(win:BrowserWindow):Tray and export a mutable isQuitting boolean flag. createTray creates a Tray using the icon at build/tray-icon.png (a 16x16 placeholder PNG \u2014 create a minimal 1x1 white PNG if no icon exists yet). Set a context menu with three items: 'Show Pet' calls win.showInactive(), 'Hide Pet' calls win.hide(), 'Quit' sets isQuitting=true and calls app.quit(). Also set the tray tooltip to 'buddy'. In main.ts, after creating the window, add a win.on('close') handler: if !isQuitting, call event.preventDefault() and win.hide(). This keeps the Electron process alive when the user closes the window. The tray icon must remain visible in the system tray while the app is running.",
+      "description": "Create src/main/tray.ts. Export createTray(win:BrowserWindow):Tray and export a mutable isQuitting boolean flag. createTray creates a Tray using the icon at build/tray-icon.png (a 16x16 placeholder PNG — create a minimal 1x1 white PNG if no icon exists yet). Set a context menu with three items: 'Show Pet' calls win.showInactive(), 'Hide Pet' calls win.hide(), 'Quit' sets isQuitting=true and calls app.quit(). Also set the tray tooltip to 'buddy'. In main.ts, after creating the window, add a win.on('close') handler: if !isQuitting, call event.preventDefault() and win.hide(). This keeps the Electron process alive when the user closes the window. The tray icon must remain visible in the system tray while the app is running.",
       "status": "done",
       "priority": "high",
       "group_id": "FEAT",
@@ -184,7 +184,7 @@
     },
     {
       "id": "FEAT-07",
-      "title": "Wire main process \u2014 integrate modules, startup restore, bounds saving",
+      "title": "Wire main process — integrate modules, startup restore, bounds saving",
       "description": "Update src/main/main.ts to integrate all Phase 1 modules into a complete startup sequence. On app.whenReady(): (1) call loadState() to get persisted state; (2) create the overlay window via createAvatarWindow(state.bounds); (3) call createTray(win); (4) call startSidecar(win); (5) load the renderer (loadURL or loadFile for index.html); (6) wait for the renderer to signal ready via ipcMain.once('renderer-ready') before calling win.showInactive() if state.open is true. Wire bounds saving: on ipcMain.on('drag-end') call saveBounds(win.getBounds()); on screen.on('display-metrics-changed') call saveBounds(win.getBounds()); on win.on('close') (when isQuitting) call saveState({...loadState(), open:win.isVisible(), bounds:win.getBounds()}). On app.on('before-quit') set isQuitting=true, save final state, call stopSidecar. App.svelte must send 'renderer-ready' on mount so main knows the renderer is live before showing the window.",
       "status": "done",
       "priority": "high",
@@ -204,7 +204,7 @@
         "Changing display resolution saves the new bounds to state.json under byResolution",
         "Quitting via tray persists the window open/closed state; restart respects it",
         "npm run lint passes",
-        "npm run build completes without error (electron-forge packages the app as an npm-distributable binary)"
+        "npm run build completes without error (electron-builder packages the app as an npm-distributable binary)"
       ],
       "docs": [
         "docs/ARCHITECTURE.md",
@@ -221,8 +221,8 @@
     },
     {
       "id": "FEAT-08",
-      "title": "Implement hooks install \u2014 Claude Code CLI and Codex CLI shell/config hooks",
-      "description": "Create src/main/hooks-install.ts. Export installHooks(options:{claudeCode?:boolean, codexCli?:boolean, shellRcPath?:string}):HookInstallResult where HookInstallResult is {installed:string[], skipped:string[], errors:string[]}. Both targets are CLI tools that can run in WSL or a Windows terminal. The hook event mapping is: UserPromptSubmit->jumping, PreToolUse->running, PostToolUse->idle, PermissionRequest->waiting, Stop->waving.\\n\\nFor Claude Code CLI: write hook entries to ~/.claude/settings.json (hooks section) and/or append shell rc lines to the target rc file (default: ~/.zshrc or ~/.bashrc based on SHELL env). Each hook entry calls petdex-bridge (or buddy state) with the appropriate state name and the sidecar update token. Check for existing entries before writing (idempotency).\\n\\nFor Codex CLI: append shell hook lines to the target rc file. If Codex CLI has a native hook config file, write entries there too using the same five event names (UserPromptSubmit, PreToolUse, PostToolUse, PermissionRequest, Stop). Check for existing lines before appending (idempotency).\\n\\nExport getHooksStatus(options:{claudeCode?:boolean, codexCli?:boolean, shellRcPath?:string}):Record<string,boolean> that checks which hooks are currently installed. This module must be callable from both the tray (add tray menu item Install Hooks that calls installHooks({claudeCode:true, codexCli:true}) and shows a dialog.showMessageBox result summary) and from the CLI layer (buddy hooks install subcommand, implemented in FEAT-09). Do not import Electron APIs at the module'\\''s top level \u2014 use dynamic requires so the module is importable from the CLI without loading Electron.",
+      "title": "Implement hooks install — Claude Code CLI and Codex CLI shell/config hooks",
+      "description": "Create src/main/hooks-install.ts. Export installHooks(options:{claudeCode?:boolean, codexCli?:boolean, shellRcPath?:string}):HookInstallResult where HookInstallResult is {installed:string[], skipped:string[], errors:string[]}. Both targets are CLI tools that can run in WSL or a Windows terminal. The hook event mapping is: UserPromptSubmit->jumping, PreToolUse->running, PostToolUse->idle, PermissionRequest->waiting, Stop->waving.\\n\\nFor Claude Code CLI: write hook entries to ~/.claude/settings.json (hooks section) and/or append shell rc lines to the target rc file (default: ~/.zshrc or ~/.bashrc based on SHELL env). Each hook entry calls petdex-bridge (or buddy state) with the appropriate state name and the sidecar update token. Check for existing entries before writing (idempotency).\\n\\nFor Codex CLI: append shell hook lines to the target rc file. If Codex CLI has a native hook config file, write entries there too using the same five event names (UserPromptSubmit, PreToolUse, PostToolUse, PermissionRequest, Stop). Check for existing lines before appending (idempotency).\\n\\nExport getHooksStatus(options:{claudeCode?:boolean, codexCli?:boolean, shellRcPath?:string}):Record<string,boolean> that checks which hooks are currently installed. This module must be callable from both the tray (add tray menu item Install Hooks that calls installHooks({claudeCode:true, codexCli:true}) and shows a dialog.showMessageBox result summary) and from the CLI layer (buddy hooks install subcommand, implemented in FEAT-09). Do not import Electron APIs at the module'\\''s top level — use dynamic requires so the module is importable from the CLI without loading Electron.",
       "status": "done",
       "priority": "medium",
       "group_id": "FEAT",
@@ -254,7 +254,7 @@
     {
       "id": "FEAT-09",
       "title": "Implement buddy CLI entry point (start, stop, hooks install, state, doctor)",
-      "description": "Create src/cli/index.ts as the npm bin entry point (registered as \"buddy\" in package.json bin field). Use commander or yargs for subcommand parsing. Implement five subcommands: (1) start \u2014 detect environment via /proc/version: on Windows spawn the Electron app process directly; in WSL invoke Windows-side buddy.exe via WSL interop (cmd.exe /c start buddy.exe); if interop is unavailable print a clear actionable error and exit non-zero. (2) stop \u2014 find and terminate the running Electron process by name. (3) hooks install \u2014 call installHooks() from hooks-install.ts with options derived from the current environment (codex:true on Windows, claudeCode:true in WSL writing to ~/.zshrc or ~/.bashrc); print the HookInstallResult summary. (4) state <name> \u2014 read the update token from %USERPROFILE%/.petdex-win/runtime/update-token (Windows) or ~/.petdex-win/runtime/update-token (WSL), then POST {state:<name>} to http://127.0.0.1:${BUDDY_PORT}/state with X-Petdex-Update-Token header; print success or error. (5) doctor \u2014 check: Electron process is running, GET /health returns 200, update token file exists, hooks are installed (call getHooksStatus()); print a checklist with pass/fail for each item. Environment detection helper: export function isWSL():boolean that returns true when process.platform is linux and /proc/version contains Microsoft. All subcommands must work from both Windows (node.exe) and WSL (node). Do not import Electron directly in src/cli/ \u2014 it is not available in WSL.",
+      "description": "Create src/cli/index.ts as the npm bin entry point (registered as \"buddy\" in package.json bin field). Use commander or yargs for subcommand parsing. Implement five subcommands: (1) start — detect environment via /proc/version: on Windows spawn the Electron app process directly; in WSL invoke Windows-side buddy.exe via WSL interop (cmd.exe /c start buddy.exe); if interop is unavailable print a clear actionable error and exit non-zero. (2) stop — find and terminate the running Electron process by name. (3) hooks install — call installHooks() from hooks-install.ts with options derived from the current environment (codex:true on Windows, claudeCode:true in WSL writing to ~/.zshrc or ~/.bashrc); print the HookInstallResult summary. (4) state <name> — read the update token from %USERPROFILE%/.petdex-win/runtime/update-token (Windows) or ~/.petdex-win/runtime/update-token (WSL), then POST {state:<name>} to http://127.0.0.1:${BUDDY_PORT}/state with X-Petdex-Update-Token header; print success or error. (5) doctor — check: Electron process is running, GET /health returns 200, update token file exists, hooks are installed (call getHooksStatus()); print a checklist with pass/fail for each item. Environment detection helper: export function isWSL():boolean that returns true when process.platform is linux and /proc/version contains Microsoft. All subcommands must work from both Windows (node.exe) and WSL (node). Do not import Electron directly in src/cli/ — it is not available in WSL.",
       "status": "done",
       "priority": "critical",
       "group_id": "FEAT",
@@ -674,6 +674,227 @@
         "npm test",
         "npm run build:app",
         "node out/cli/index.js size --help"
+      ]
+    },
+    {
+      "id": "REL-01",
+      "title": "Align npm package identity and publish metadata",
+      "description": "Rename the npm package metadata for the first public release to cli-buddy while preserving the installed buddy command. Add release-safe package metadata including engines, license handling, repository links, publish scripts or prepack behavior, and a curated files/.npmignore policy so npm pack includes only intended runtime, docs, packaged pets, and release assets.",
+      "status": "todo",
+      "priority": "critical",
+      "group_id": "REL",
+      "depends_on": [],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "package.json name is cli-buddy and bin still exposes buddy",
+        "Package metadata includes appropriate engines, license, repository, and release fields",
+        "npm pack --dry-run excludes agent skill folders and source-only working files",
+        "README and release docs match the package name and command split",
+        "npm run lint, npm test, npm run build:app, and npm pack --dry-run pass"
+      ],
+      "docs": [
+        "README.md",
+        "docs/PRD.md",
+        "docs/ARCHITECTURE.md",
+        "docs/CONVENTIONS.md",
+        "docs/TESTING.md"
+      ],
+      "files": [
+        "package.json",
+        "package-lock.json",
+        ".npmignore",
+        "README.md"
+      ],
+      "commands": [
+        "npm run lint",
+        "npm test",
+        "npm run build:app",
+        "npm pack --dry-run"
+      ]
+    },
+    {
+      "id": "REL-02",
+      "title": "Harden installed Electron launch path",
+      "description": "Make a globally installed cli-buddy package launch the Windows Electron app through buddy start on a clean machine, not only from a development checkout. Resolve the runtime Electron dependency and packaged app path model, preserve detached CLI behavior, and avoid relying on devDependencies that are absent after npm install -g.",
+      "status": "todo",
+      "priority": "critical",
+      "group_id": "REL",
+      "depends_on": [
+        "REL-01"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "A clean npm global install can run buddy start and display the Electron pet app",
+        "buddy start does not require devDependencies from a source checkout",
+        "WSL interop launch still invokes the Windows-side buddy.exe path with actionable errors",
+        "buddy stop and buddy doctor work against the installed app",
+        "npm run lint, npm test, npm run build:app, and an installed-package smoke test pass"
+      ],
+      "docs": [
+        "docs/ARCHITECTURE.md",
+        "docs/CLI.md",
+        "docs/TESTING.md",
+        "README.md"
+      ],
+      "files": [
+        "package.json",
+        "electron-builder.yml",
+        "src/cli/commands/start.ts",
+        "src/cli/commands/stop.ts",
+        "src/cli/commands/doctor.ts"
+      ],
+      "commands": [
+        "npm run lint",
+        "npm test",
+        "npm run build:app",
+        "npm pack --dry-run"
+      ]
+    },
+    {
+      "id": "REL-03",
+      "title": "Implement petdex-bridge for WSL hook events",
+      "description": "Replace the placeholder Rust bridge with a production WSL CLI that accepts state commands, reads the shared update token, posts authenticated JSON to the Windows sidecar through localhost passthrough, respects BUDDY_PORT, and returns concise actionable errors for missing token, connection refusal, invalid input, and unauthorized responses.",
+      "status": "todo",
+      "priority": "critical",
+      "group_id": "REL",
+      "depends_on": [],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "petdex-bridge state <name> posts to http://127.0.0.1:${BUDDY_PORT}/state with X-Petdex-Update-Token",
+        "The bridge reads $HOME/.petdex-win/runtime/update-token and supports a documented token override if implemented",
+        "Expected failures produce non-panic non-zero exits with actionable terminal output",
+        "cargo fmt, cargo test, and cargo clippy -- -D warnings pass",
+        "A WSL manual smoke test changes the visible Windows pet state when the app is running"
+      ],
+      "docs": [
+        "docs/ARCHITECTURE.md",
+        "docs/ENV_VARS.md",
+        "docs/TESTING.md",
+        "docs/CONVENTIONS.md",
+        "README.md"
+      ],
+      "files": [
+        "petdex-bridge/Cargo.toml",
+        "petdex-bridge/src/main.rs"
+      ],
+      "commands": [
+        "cd petdex-bridge && cargo fmt --check",
+        "cd petdex-bridge && cargo test",
+        "cd petdex-bridge && cargo clippy -- -D warnings"
+      ]
+    },
+    {
+      "id": "REL-04",
+      "title": "Define and implement Windows WSL shared buddy paths",
+      "description": "Make Windows and WSL share buddy-owned token/state/pet assumptions without creating divergent active-pet registries. Windows remains responsible for rendering and selected-pet resolution; WSL setup should create or document the symlink/copy/path bridge needed for petdex-bridge and hooks to read the token and for users to understand where pets live.",
+      "status": "todo",
+      "priority": "high",
+      "group_id": "REL",
+      "depends_on": [
+        "REL-03"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "Windows-owned %USERPROFILE%/.petdex-win paths and WSL $HOME/.petdex-win paths are reconciled by documented setup behavior",
+        "petdex-bridge can read the update token from WSL after setup",
+        "Pet selection remains buddy-owned and does not write Codex internal state",
+        "buddy pets docs clearly explain Windows, packaged, WSL, and Codex-compatible pet locations",
+        "npm run lint, npm test, and the WSL bridge smoke path pass"
+      ],
+      "docs": [
+        "docs/ARCHITECTURE.md",
+        "docs/CLI.md",
+        "docs/ENV_VARS.md",
+        "docs/TESTING.md",
+        "README.md"
+      ],
+      "files": [
+        "src/cli/pets.ts",
+        "src/cli/commands/pets.ts",
+        "src/main/state-store.ts",
+        "petdex-bridge/src/main.rs"
+      ],
+      "commands": [
+        "npm run lint",
+        "npm test",
+        "cd petdex-bridge && cargo test"
+      ]
+    },
+    {
+      "id": "REL-05",
+      "title": "Verify and harden Claude Code and Codex hooks",
+      "description": "Audit current hook installation against real Claude Code and Codex CLI behavior on Windows and WSL, then harden install/status/doctor output so both integrations can be verified before v0.1. Preserve idempotency, avoid writing internal assistant state, and ensure hook commands invoke buddy or petdex-bridge according to the runtime environment.",
+      "status": "todo",
+      "priority": "critical",
+      "group_id": "REL",
+      "depends_on": [
+        "REL-03",
+        "REL-04"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "buddy hooks install writes the expected Claude Code hook configuration for the supported environment",
+        "buddy hooks install writes the expected Codex CLI hook configuration for the supported environment",
+        "buddy doctor accurately reports hook status on Windows and WSL",
+        "Manual Claude Code and Codex CLI hook events visibly change pet state on Windows",
+        "npm run lint and npm test pass with updated hook coverage"
+      ],
+      "docs": [
+        "docs/CLI.md",
+        "docs/ARCHITECTURE.md",
+        "docs/TESTING.md",
+        "README.md"
+      ],
+      "files": [
+        "src/main/hooks-install.ts",
+        "src/main/hooks-install.test.ts",
+        "src/cli/commands/hooks.ts",
+        "src/cli/commands/doctor.ts",
+        "petdex-bridge/src/main.rs"
+      ],
+      "commands": [
+        "npm run lint",
+        "npm test",
+        "cd petdex-bridge && cargo test"
+      ]
+    },
+    {
+      "id": "REL-06",
+      "title": "Run first release clean machine verification",
+      "description": "Execute the documented release smoke matrix on a clean Windows machine and one WSL distribution after package, selected-pet, WSL bridge, and hook work is complete. Capture any release-blocking failures as follow-up tasks instead of relying on development-machine behavior.",
+      "status": "todo",
+      "priority": "critical",
+      "group_id": "REL",
+      "depends_on": [
+        "FEAT-15",
+        "REL-01",
+        "REL-02",
+        "REL-05"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "npm install -g cli-buddy installs buddy on a clean Windows machine",
+        "buddy start renders the default pet and selected pet after restart",
+        "buddy state, Claude Code hooks, Codex hooks, and petdex-bridge state changes are visibly verified",
+        "npm pack --dry-run and electron-builder release build outputs are inspected",
+        "Any failures are fixed or recorded as explicit blocking workboard tasks"
+      ],
+      "docs": [
+        "docs/TESTING.md",
+        "README.md",
+        "AGENTS.md"
+      ],
+      "files": [
+        "docs/TESTING.md",
+        "README.md",
+        "AGENTS.md"
+      ],
+      "commands": [
+        "npm run lint",
+        "npm test",
+        "npm run build:app",
+        "npm pack --dry-run",
+        "npm run build"
       ]
     }
   ]
