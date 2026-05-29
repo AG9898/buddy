@@ -3,6 +3,13 @@
 interface PetApi {
   setState(state: string): void
   onStateChange(cb: (payload: { state: string }) => void): void
+  getActivePet(): Promise<{
+    id: string
+    source: 'buddy' | 'packaged' | 'codex'
+    manifest: PetManifest
+    spritesheetUrl: string
+    initialState: string
+  }>
   setPointerInteractive(interactive: boolean): void
   dragStart(offsetX: number, offsetY: number): void
   dragMove(): void
@@ -18,6 +25,37 @@ interface PetApi {
 }
 
 declare global {
+  interface PetFrame {
+    row: number
+    col: number
+    ms: number
+  }
+
+  interface PetStateDefinition {
+    frames: PetFrame[]
+    once?: boolean
+    fallback?: string
+  }
+
+  interface PetManifest {
+    id: string
+    name: string
+    columns: number
+    rows: number
+    frameWidth: number
+    frameHeight: number
+    spritesheet: string
+    states: Record<string, PetStateDefinition>
+  }
+
+  interface ActivePet {
+    id: string
+    source: 'buddy' | 'packaged' | 'codex'
+    manifest: PetManifest
+    spritesheetUrl: string
+    initialState: string
+  }
+
   interface Window {
     petApi: PetApi
   }

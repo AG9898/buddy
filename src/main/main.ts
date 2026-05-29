@@ -10,7 +10,8 @@ import { createAvatarWindow } from './avatar-window'
 import { createTray } from './tray'
 import { startSidecar, stopSidecar } from './sidecar'
 import { loadState, saveState, saveBounds } from './state-store'
-import { CH_DRAG_END, CH_RENDERER_READY, CH_RESIZE_END } from '../shared/ipc-channels'
+import { resolveActivePet } from './pet-assets'
+import { CH_ACTIVE_PET_GET, CH_DRAG_END, CH_RENDERER_READY, CH_RESIZE_END } from '../shared/ipc-channels'
 
 // Track whether app.quit() was triggered via the tray Quit item so the
 // 'close' handler knows to allow the window to close.
@@ -52,6 +53,8 @@ app.whenReady().then(() => {
   // 2. Create the overlay window at the last-saved bounds (show:false — renderer
   //    must signal ready before we call showInactive).
   const win = createAvatarWindow(state.bounds)
+
+  ipcMain.handle(CH_ACTIVE_PET_GET, () => resolveActivePet(loadState().pet))
 
   // 3. Create the system tray (keeps the process alive when the window is hidden).
   createTray(win)

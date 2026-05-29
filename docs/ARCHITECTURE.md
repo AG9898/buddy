@@ -18,8 +18,8 @@ buddy is installed via `npm install -g cli-buddy` from either a Windows terminal
 All components run on a single developer workstation. There is no server, no cloud service, and no external network dependency.
 
 - **buddy CLI** (`src/cli/`): npm `bin` entry point. Handles `start`, `stop`, `hooks install`, `state <name>`, `doctor`, `hatch <prompt>`, and `pets` (list/show/use) subcommands. Detects whether it is running in WSL or on Windows and adjusts behavior accordingly — in WSL it launches the Windows Electron app via WSL interop (`buddy.exe`). For asset generation, `buddy hatch` delegates visual generation to a Codex run that can use `$imagegen`, then packages the deterministic hatch-pet outputs for buddy.
-- **Electron main process** (Windows, `src/main/`): Manages the transparent frameless BrowserWindow, runs the local HTTP sidecar on `127.0.0.1:7777`, persists state to disk, and owns the system tray.
-- **Svelte renderer** (Windows, Electron webview, `src/renderer/`): Renders the pet character, drives the sprite animation state machine, and handles pointer interactivity and dragging.
+- **Electron main process** (Windows, `src/main/`): Manages the transparent frameless BrowserWindow, runs the local HTTP sidecar on `127.0.0.1:7777`, persists state to disk, resolves the selected pet assets, and owns the system tray.
+- **Svelte renderer** (Windows, Electron webview, `src/renderer/`): Renders the selected pet character from the main-provided manifest and spritesheet URL, drives the sprite animation state machine, and handles pointer interactivity and dragging.
 - **petdex-bridge** (WSL, Rust CLI binary, `petdex-bridge/`): A tiny cross-compiled Linux binary distributed for WSL hook integration. Invoked by WSL shell hooks; reads the shared update token and POSTs agent lifecycle events to the Electron HTTP sidecar via WSL localhost passthrough.
 
 ---
@@ -74,7 +74,7 @@ development build dependency.
 - Local HTTP sidecar on `127.0.0.1:7777` (configurable via `BUDDY_PORT`): receives hook events, validates the `X-Petdex-Update-Token` header, and forwards events to the renderer via Electron IPC.
 - State persistence: reads and writes `%USERPROFILE%\.petdex-win\state.json` (window open/hidden, bounds, pet id, current animation state). Restored bounds are clamped into the nearest display work area before the window is created so stale or off-screen coordinates cannot hide the pet.
 - Window resize: receives resize interactions from the renderer, updates BrowserWindow bounds, preserves click-through behavior, and persists final bounds on resize end.
-- Pet selection: owns active pet state and asset loading. The CLI may request or persist selection through buddy-owned surfaces, but Electron main remains responsible for loading assets into the renderer.
+- Pet selection: owns active pet state and asset loading. `pet-assets.ts` resolves the persisted `state.pet.id` against validated buddy-managed, packaged, and Codex-compatible pet folders, falls back to the packaged `default` pet with a diagnostic when the selected id is missing or invalid, and exposes only the active manifest plus a renderer-safe spritesheet `file://` URL over preload IPC.
 - System tray (Show / Hide / Quit) to keep the process alive when the window is hidden.
 - Hook installation: `hooks-install.ts` exports `installHooks(options)` and `getHooksStatus(options)`. For Claude Code CLI it writes hook entries to `~/.claude/settings.json` (hooks section); for Codex CLI it appends shell environment-variable blocks to the target rc file. Both operations are idempotent. The module contains no top-level Electron import and is safe to call from the CLI layer (FEAT-09) without an Electron environment. The `installHooksWithDialog()` helper is intended for tray use only and dynamically requires Electron's `dialog` API at call time.
 - Files: `main.ts`, `avatar-window.ts`, `state-store.ts`, `sidecar.ts`, `tray.ts`, `hooks-install.ts`.
@@ -93,6 +93,7 @@ development build dependency.
 **petApi methods:**
 - `setState(state)` — sends `CH_STATE_SET` to main to request a state transition.
 - `onStateChange(cb)` — registers a listener for `CH_STATE_CHANGE` pushed by main.
+- `getActivePet()` — invokes `CH_ACTIVE_PET_GET` to receive the resolved active pet manifest, source label, spritesheet URL, and startup animation state. The renderer does not receive pet directory listings or arbitrary filesystem access.
 - `setPointerInteractive(interactive)` — sends `CH_PTR_INTERACTIVE` to toggle click-through.
 - `dragStart(offsetX, offsetY)` — sends `CH_DRAG_START` with pointer offset within window.
 - `dragMove()` — sends `CH_DRAG_MOVE`; main repositions the window to track the cursor.
@@ -110,8 +111,8 @@ development build dependency.
 ### Svelte Renderer (`src/renderer/`)
 
 **Owns:**
-- Renders the pet character as a CSS `background-position` animation over a spritesheet (8 columns × 9 rows pixel-art grid).
-- Drives the sprite animation state machine from a `pet.json` frame-sequence definition.
+- Renders the pet character as a CSS `background-position` animation over the spritesheet URL provided by Electron main.
+- Drives the sprite animation state machine from the active pet manifest provided by Electron main.
 - Handles drag events and sends `drag-start` / `drag-move` / `drag-end` IPC messages to the main process.
 - Detects pointer entry/exit on interactive regions (`[data-avatar-mascot]`, `.resize-handle`) and signals the main process to toggle click-through.
 - Responds to `pet:state-change` IPC events to switch the active animation state.

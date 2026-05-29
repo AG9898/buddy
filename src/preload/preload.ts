@@ -3,6 +3,7 @@ import {
   CH_DRAG_END,
   CH_DRAG_MOVE,
   CH_DRAG_START,
+  CH_ACTIVE_PET_GET,
   CH_PTR_INTERACTIVE,
   CH_RENDERER_READY,
   CH_RESIZE_END,
@@ -28,6 +29,19 @@ contextBridge.exposeInMainWorld('petApi', {
     ipcRenderer.on(CH_STATE_CHANGE, (_event, payload: { state: string }) => {
       cb(payload)
     })
+  },
+
+  /**
+   * Request the resolved active pet manifest and renderer-safe spritesheet URL.
+   */
+  getActivePet(): Promise<{
+    id: string
+    source: 'buddy' | 'packaged' | 'codex'
+    manifest: unknown
+    spritesheetUrl: string
+    initialState: string
+  }> {
+    return ipcRenderer.invoke(CH_ACTIVE_PET_GET)
   },
 
   /**

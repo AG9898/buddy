@@ -149,6 +149,9 @@ folders should be skipped or reported with a concise reason, not treated as acti
 
 The active pet selection is buddy-owned state. Persist it through the normal state store
 owned by the Electron main process, not by writing to Codex configuration files.
+`buddy pets use <id>` affects the next Electron startup or renderer reload: the main
+process resolves the selected id, validates the matching `pet.json` and spritesheet, and
+falls back to the packaged `default` pet if the stored selection no longer resolves.
 
 Windows owns selected-pet rendering. WSL hook commands may send state events and may
 share/copy the buddy token and pet assets through documented Windows-backed paths, but WSL

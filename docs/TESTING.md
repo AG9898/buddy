@@ -100,7 +100,7 @@ one WSL distribution:
 | install | `npm install -g cli-buddy` installs the `buddy` command and the npm-managed Electron runtime dependency used by `buddy start`. |
 | launch | `buddy start` launches the Windows Electron app and returns control to the terminal. |
 | rendering | The default packaged pet renders, animates, drags, resizes visually, and survives restart. |
-| selected pets | `buddy pets list`, `buddy pets use <id>`, restart, and selected-pet render are verified from Windows; WSL path-sharing behavior is verified separately. |
+| selected pets | `buddy pets list`, `buddy pets use <id>`, restart, main-process active-pet fallback diagnostics, and selected-pet render are verified from Windows; WSL path-sharing behavior is verified separately. |
 | state endpoint | `buddy state running` and authenticated `POST /state` visibly change pet state. |
 | hooks | Claude Code and Codex CLI hooks are installed and trigger visible state changes from Windows and WSL. |
 | WSL bridge | `petdex-bridge state running` in WSL reads the token, reaches `127.0.0.1:${BUDDY_PORT}`, and returns useful errors when the app is stopped. |
@@ -122,6 +122,10 @@ checks cover missing token and stopped-sidecar error output.
 **Electron E2E:** Window appears at startup, pet state changes via HTTP POST animate
 correctly, state persists across restart, tray Show/Hide/Quit work.
 
+**Main-process unit tests:** State persistence and active-pet asset resolution, including
+selected buddy-managed pets, persisted startup state, and fallback to packaged default
+when a stored pet id no longer resolves.
+
 **CLI tests:** Command help and changed command behavior, non-TTY/plain output, styled
 output when supported, expected error messages and exit codes, hatch progress output that
 does not dump raw subprocess logs, pet discovery/selection behavior, and runtime path
@@ -140,6 +144,7 @@ integration (requires Electron E2E).
 | File | Domain | What It Covers |
 |---|---|---|
 | `src/main/state-store.test.ts` | State persistence | loadState defaults, saveState directory creation, round-trip fidelity, saveBounds byResolution key |
+| `src/main/pet-assets.test.ts` | Active pet assets | Selected pet resolution, packaged default fallback diagnostics, persisted startup state, pet manifest validation |
 | `src/cli/env.test.ts` | CLI environment | isWSL() detection, buddyPort() defaults and overrides, sidecarBaseUrl() |
 | `src/main/hooks-install.test.ts` | Hook installation | installHooks idempotency, getHooksStatus, Claude Code and Codex CLI targets |
 | `src/cli/output.test.ts` | CLI output layer | status/success/warn/error helpers, NO_COLOR plain mode, check/subCheck/bullet/label, banner text, separator |

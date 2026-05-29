@@ -603,7 +603,7 @@
       "id": "FEAT-15",
       "title": "Load selected pet assets in Electron",
       "description": "Wire the persisted active pet selection into Electron startup and renderer asset loading. The main process should resolve the selected pet through validated buddy-owned pet metadata, fall back safely to the default pet if the selection is missing or invalid, and provide the renderer the selected pet manifest and spritesheet path without exposing arbitrary file access.",
-      "status": "todo",
+      "status": "done",
       "priority": "high",
       "group_id": "FEAT",
       "depends_on": [

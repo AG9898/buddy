@@ -1,47 +1,22 @@
 <script lang="ts">
   import { onDestroy } from 'svelte'
-  import petData from '../../pets/default/pet.json'
-
-  // --- Types ---
-  interface Frame {
-    row: number
-    col: number
-    ms: number
-  }
-
-  interface StateDefinition {
-    frames: Frame[]
-    once?: boolean
-    fallback?: string
-  }
-
-  interface PetJson {
-    columns: number
-    rows: number
-    frameWidth: number
-    frameHeight: number
-    spritesheet: string
-    states: Record<string, StateDefinition>
-  }
 
   // --- Props ---
   interface Props {
     state: string
+    pet: PetManifest
+    spritesheetUrl: string
   }
-  let { state: petState }: Props = $props()
+  let { state: petState, pet, spritesheetUrl }: Props = $props()
 
   // --- Constants from pet.json ---
-  const pet = petData as PetJson
-  const COLUMNS = pet.columns
-  const ROWS = pet.rows
-  const FRAME_WIDTH = pet.frameWidth
-  const FRAME_HEIGHT = pet.frameHeight
-
-  // Spritesheet co-located with pet.json
-  const SPRITESHEET_URL = new URL('../../pets/default/spritesheet.webp', import.meta.url).href
+  const COLUMNS = $derived(pet.columns)
+  const ROWS = $derived(pet.rows)
+  const FRAME_WIDTH = $derived(pet.frameWidth)
+  const FRAME_HEIGHT = $derived(pet.frameHeight)
 
   // background-size: "800% 900%" for 8 cols × 9 rows
-  const BG_SIZE = `${COLUMNS * 100}% ${ROWS * 100}%`
+  const BG_SIZE = $derived(`${COLUMNS * 100}% ${ROWS * 100}%`)
 
   // --- Reactive display state ---
   let bgPosition = $state('0% 0%')
@@ -52,7 +27,7 @@
   // Version counter: increment to cancel any in-flight animation cycle
   let animVersion = 0
 
-  function frameToPosition(frame: Frame): string {
+  function frameToPosition(frame: PetFrame): string {
     const xPct = COLUMNS > 1 ? (frame.col / (COLUMNS - 1)) * 100 : 0
     const yPct = ROWS > 1 ? (frame.row / (ROWS - 1)) * 100 : 0
     return `${xPct}% ${yPct}%`
@@ -66,7 +41,7 @@
     }
   }
 
-  function getStateDef(stateName: string): StateDefinition {
+  function getStateDef(stateName: string): PetStateDefinition {
     return pet.states[stateName] ?? pet.states['idle']
   }
 
@@ -182,7 +157,7 @@
     style="
       width: 100%;
       height: 100%;
-      background-image: url('{SPRITESHEET_URL}');
+      background-image: url('{spritesheetUrl}');
       background-size: {BG_SIZE};
       background-position: {bgPosition};
       background-repeat: no-repeat;
