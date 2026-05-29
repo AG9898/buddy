@@ -862,7 +862,7 @@
       "id": "REL-06",
       "title": "Run first release clean machine verification",
       "description": "Execute the documented release smoke matrix on a clean Windows machine and one WSL distribution after package, selected-pet, WSL bridge, and hook work is complete. Capture any release-blocking failures as follow-up tasks instead of relying on development-machine behavior.",
-      "status": "todo",
+      "status": "done",
       "priority": "critical",
       "group_id": "REL",
       "depends_on": [

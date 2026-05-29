@@ -106,6 +106,21 @@ one WSL distribution:
 | WSL bridge | `petdex-bridge state running` in WSL reads the token through `$HOME/.petdex-win` symlink/copy or `BUDDY_DATA_DIR`, reaches `127.0.0.1:${BUDDY_PORT}`, and returns useful errors when the app is stopped. |
 | packaging | `npm run build` passes on a release-capable Windows/CI environment; `npm run build:win:local` remains a smoke-only fallback. |
 
+### Dev-Machine Smoke Results (2026-05-29)
+
+Automated checks run on dev machine (Windows 11, no Developer Mode):
+
+| Command | Result |
+|---|---|
+| `npm run lint` | PASS |
+| `npm test` (128 tests) | PASS (5 pre-existing Windows path failures fixed) |
+| `npm run build:app` | PASS — all four bundles emitted |
+| `npm pack --dry-run` | PASS — 20 files, no agent skill folders or source-only files |
+| `npm run build:win:local` | PASS — produces `dist\buddy Setup 0.1.0.exe` |
+| `npm run build` | FAIL (expected) — symlink privilege error (no Developer Mode); use CI or Administrator for release builds |
+
+Visual install/render/hooks/WSL-bridge checks require a separate clean Windows machine; not yet verified.
+
 ---
 
 ## What Is Covered

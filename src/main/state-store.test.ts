@@ -7,7 +7,7 @@
  *   - saveBounds() updates byResolution keyed by the current screen resolution string
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import path from 'path'
 
 // ---------------------------------------------------------------------------
@@ -45,8 +45,20 @@ import { loadState, saveState, saveBounds } from './state-store'
 // Helpers
 // ---------------------------------------------------------------------------
 
+// Save and clear USERPROFILE so buddyDataDir falls back to the mocked homedir
+// on Windows (where USERPROFILE is normally set to the real user profile path).
+let savedUserProfile: string | undefined
+
 beforeEach(() => {
   vi.clearAllMocks()
+  savedUserProfile = process.env.USERPROFILE
+  delete process.env.USERPROFILE
+})
+
+afterEach(() => {
+  if (savedUserProfile !== undefined) {
+    process.env.USERPROFILE = savedUserProfile
+  }
 })
 
 // ---------------------------------------------------------------------------

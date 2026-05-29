@@ -54,8 +54,10 @@ import {
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 const HOOK_EVENTS = Object.keys(HOOK_EVENT_MAP)
-const CLAUDE_SETTINGS = `${MOCK_HOME}/.claude/settings.json`
-const CODEX_HOOKS = `${MOCK_HOME}/.codex/hooks.json`
+// Use path.join so separator matches the OS-specific output of hooks-install.ts
+import path from 'path'
+const CLAUDE_SETTINGS = path.join(MOCK_HOME, '.claude', 'settings.json')
+const CODEX_HOOKS = path.join(MOCK_HOME, '.codex', 'hooks.json')
 
 beforeEach(() => {
   vi.clearAllMocks()

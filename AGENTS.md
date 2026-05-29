@@ -306,3 +306,6 @@ Windows remains the owner of rendering, active pet selection, and token creation
 
 ### 2026-05-29 - Codex hooks use hooks.json, not shell rc exports
 Current Codex CLI hook configuration uses `~/.codex/hooks.json`; the old shell rc `CODEX_HOOK_*` export approach is not the supported installer target. After `buddy hooks install`, users may still need to review/trust the new Codex command hooks from `/hooks` before Codex executes them.
+
+### 2026-05-29 - Windows path separators break cross-platform unit tests
+Unit tests that compare file paths using template literal strings (e.g. `${MOCK_HOME}/.codex/hooks.json`) fail on Windows because `path.join` produces backslash separators while the string literal uses forward slashes. Always use `path.join(MOCK_HOME, '.codex', 'hooks.json')` for path assertions in tests. Additionally, `USERPROFILE` env var on Windows overrides the mocked `os.homedir()` when `buddyDataDir` resolves paths; tests must clear `process.env.USERPROFILE` in `beforeEach` and restore it in `afterEach` so the mocked home is used.
