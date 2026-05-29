@@ -9,7 +9,7 @@
 
 buddy is an npm-distributed developer tool that renders a floating, always-on-top, transparent pet character directly on the Windows desktop. The npm package is named `cli-buddy`, and it installs the `buddy` command. It is built on a four-component architecture: a CLI entry point (`buddy`) that handles install-time setup and runtime commands, an Electron main process managing the window and HTTP sidecar, a Svelte renderer driving pet animation, and a Rust CLI binary (petdex-bridge) that runs in WSL and bridges shell hook events from WSL agents into the Windows-side Electron process. The system is entirely local — there are no cloud services, no accounts, and no network traffic leaving the machine.
 
-buddy is installed via `npm install -g cli-buddy` from either a Windows terminal or a WSL terminal. When installed in WSL the CLI uses the WSL interop layer to launch the Windows Electron process; when installed on Windows it launches directly.
+buddy is installed via `npm install -g cli-buddy` from either a Windows terminal or a WSL terminal. The npm package installs the `buddy` CLI and an npm-managed Electron runtime dependency so `buddy start` can launch the built app without a source checkout or devDependencies. When installed in WSL the CLI uses the WSL interop layer to launch the Windows Electron process; when installed on Windows it launches directly.
 
 ---
 
@@ -45,6 +45,7 @@ selection UX, and CLI lifecycle semantics live in [`CLI.md`](CLI.md).
 - Pet discovery module: `src/cli/pets.ts` — `discoverPets()` enumerates valid pets from `%USERPROFILE%\.petdex-win\pets` (buddy-managed), the package `pets/` directory (packaged built-ins), and `%USERPROFILE%\.codex\pets` (Codex-compatible, read-only). `validatePetFolder()` checks `pet.json` structure and spritesheet existence before admitting a candidate. `BUDDY_SPRITES_DIR` overrides the buddy-managed pets directory.
 - Files: `src/cli/index.ts`, `src/cli/commands/`, `src/cli/pets.ts`.
 - Build output: `npm run build:app` runs `electron-vite build` for Electron bundles and a Vite CLI build that emits `out/cli/index.js`, the package `bin.buddy` target.
+- Runtime launch helpers: `src/cli/runtime.ts` resolves the installed package root, the Electron app path, and the npm-installed Electron executable. `buddy start` spawns that executable detached with the package root as the app argument, and `buddy doctor` reports whether the runtime dependency is available.
 
 **Does NOT:**
 - Never manages window state directly — all window operations go through the Electron main process.
@@ -60,6 +61,9 @@ guardrail. `npm pack` runs `npm run build:app` through `prepack`, then ships onl
 runtime output (`out/`), packaged pets, the Windows icon/build metadata, README/LICENSE,
 and selected public docs. Agent skill folders, source-only planning files, workboard
 metadata, tests, local build caches, and Rust source are excluded from the npm tarball.
+Electron is listed as an optional production dependency for the npm package so global
+installs receive the Electron executable even though source checkouts still use it as a
+development build dependency.
 
 ### Electron Main Process (`src/main/`)
 

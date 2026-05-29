@@ -294,3 +294,6 @@ Use `npm.cmd test` and `npm.cmd run lint` from PowerShell so execution policy do
 
 ### 2026-05-24 - packaged pets must be discoverable and default id must resolve
 `buddy pets list` scans `%USERPROFILE%\.petdex-win\pets`, the package `pets/` directory, and `%USERPROFILE%\.codex\pets`. Keep `pets/default/pet.json` id set to `default`; otherwise the default state store selection reports as unresolved even though the bundled sprite files exist.
+
+### 2026-05-29 - global npm start needs a production Electron runtime
+`buddy start` in a clean `npm install -g cli-buddy` cannot rely on `devDependencies`, so Electron must remain available to installed packages as an optional production dependency. Keep CLI launch path logic in `src/cli/runtime.ts`; it resolves the package root and Electron executable without importing Electron APIs.

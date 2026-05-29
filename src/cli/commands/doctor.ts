@@ -19,6 +19,7 @@ import { getHooksStatus } from '../../main/hooks-install.js'
 import { sidecarBaseUrl } from '../env.js'
 import { isWSL } from '../env.js'
 import { heading, check, subCheck, closeSeparator, success, error } from '../output.js'
+import { resolveElectronBin, resolvePackageRoot } from '../runtime.js'
 
 function resolveTokenPath(): string {
   const base = process.env['USERPROFILE'] ?? os.homedir()
@@ -86,7 +87,18 @@ function checkHooks(): Record<string, boolean> {
 export async function runDoctor(): Promise<void> {
   heading('buddy doctor')
 
-  // 1. Process check
+  // 1. Runtime check
+  const electronBin = resolveElectronBin()
+  const runtimeOk = electronBin !== null
+  check(
+    'Electron runtime available',
+    runtimeOk,
+    runtimeOk
+      ? electronBin
+      : `Expected Electron under ${resolvePackageRoot()} -- reinstall with: npm install -g cli-buddy`,
+  )
+
+  // 2. Process check
   const processRunning = checkProcessRunning()
   check(
     'Electron process running',
@@ -94,7 +106,7 @@ export async function runDoctor(): Promise<void> {
     processRunning ? undefined : 'Run: buddy start',
   )
 
-  // 2. Sidecar check
+  // 3. Sidecar check
   const sidecarOk = await checkSidecar()
   check(
     `Sidecar /health → HTTP 200  ${sidecarBaseUrl()}`,
@@ -102,7 +114,7 @@ export async function runDoctor(): Promise<void> {
     sidecarOk ? undefined : 'Ensure the buddy app is running: buddy start',
   )
 
-  // 3. Token file
+  // 4. Token file
   const tokenOk = checkTokenFile()
   const tokenFile = resolveTokenPath()
   check(
@@ -111,7 +123,7 @@ export async function runDoctor(): Promise<void> {
     tokenOk ? tokenFile : `Expected: ${tokenFile}  —  run buddy start once to generate it`,
   )
 
-  // 4. Hooks
+  // 5. Hooks
   const hooksStatus = checkHooks()
   const hookEntries = Object.entries(hooksStatus)
   const allHooksOk = hookEntries.every(([, v]) => v)
@@ -128,11 +140,12 @@ export async function runDoctor(): Promise<void> {
 
   closeSeparator()
 
-  const allOk = processRunning && sidecarOk && tokenOk && allHooksOk
+  const allOk = runtimeOk && processRunning && sidecarOk && tokenOk && allHooksOk
   if (allOk) {
     success('All checks passed.')
   } else {
     const failing = [
+      !runtimeOk && 'Electron runtime missing (reinstall: npm install -g cli-buddy)',
       !processRunning && 'process not running (run: buddy start)',
       !sidecarOk && 'sidecar not responding (ensure buddy app is running)',
       !tokenOk && 'token missing (start buddy once to generate it)',

@@ -716,7 +716,7 @@
       "id": "REL-02",
       "title": "Harden installed Electron launch path",
       "description": "Make a globally installed cli-buddy package launch the Windows Electron app through buddy start on a clean machine, not only from a development checkout. Resolve the runtime Electron dependency and packaged app path model, preserve detached CLI behavior, and avoid relying on devDependencies that are absent after npm install -g.",
-      "status": "todo",
+      "status": "done",
       "priority": "critical",
       "group_id": "REL",
       "depends_on": [

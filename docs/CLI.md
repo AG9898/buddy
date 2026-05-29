@@ -37,6 +37,11 @@ Planned window command:
 Electron process owns the BrowserWindow, local sidecar, tray, state persistence, and all
 long-running work. The CLI must not keep a long-running server process alive.
 
+In a published npm install, `buddy start` resolves the `cli-buddy` package root and the
+npm-installed Electron runtime, then launches Electron with the package root as the app
+path. It must not rely on devDependencies or the current working directory being a source
+checkout.
+
 `buddy stop` is the process termination command. The app may still expose hide/show from
 the tray or future CLI commands, but `stop` means "quit the Electron app", not merely hide
 the pet.
@@ -203,3 +208,6 @@ CLI changes should include focused tests or smoke checks for:
 - Pet discovery from buddy-managed, packaged, and Codex-compatible directories.
 - Invalid pet folder handling.
 - Built CLI smoke tests through `node out/cli/index.js --help` after packaging changes.
+- Installed-package smoke tests should install the packed tarball with production
+  dependencies only and verify that `require.resolve("electron", { paths: [packageRoot] })`
+  succeeds for the installed package.

@@ -19,6 +19,10 @@ npm run build:app
 # Build and inspect the npm release tarball contents
 npm pack --dry-run
 
+# Smoke-test the packed package as an installed dependency
+npm pack
+npm install --omit=dev --prefix <temp-dir> ./cli-buddy-0.1.0.tgz
+
 # Run a single test file
 npm test -- src/renderer/PetSprite.test.ts
 
@@ -90,7 +94,7 @@ one WSL distribution:
 | Area | Check |
 |---|---|
 | npm package | `npm pack --dry-run` contains only intended runtime/docs assets and excludes agent skill folders and source-only working files. |
-| install | `npm install -g cli-buddy` installs the `buddy` command. |
+| install | `npm install -g cli-buddy` installs the `buddy` command and the npm-managed Electron runtime dependency used by `buddy start`. |
 | launch | `buddy start` launches the Windows Electron app and returns control to the terminal. |
 | rendering | The default packaged pet renders, animates, drags, resizes visually, and survives restart. |
 | selected pets | `buddy pets list`, `buddy pets use <id>`, restart, and selected-pet render are verified from Windows; WSL path-sharing behavior is verified separately. |
@@ -116,7 +120,8 @@ correctly, state persists across restart, tray Show/Hide/Quit work.
 
 **CLI tests:** Command help and changed command behavior, non-TTY/plain output, styled
 output when supported, expected error messages and exit codes, hatch progress output that
-does not dump raw subprocess logs, and pet discovery/selection behavior.
+does not dump raw subprocess logs, pet discovery/selection behavior, and runtime path
+resolution for installed npm package layouts.
 
 **Not covered (yet):** Visual regression, multi-monitor DPI scaling, packaged installer
 smoke test, Windows-native hook execution, WSL bridge execution, resize pointer-event
@@ -137,6 +142,7 @@ integration (requires Electron E2E).
 | `src/cli/commands/hatch.test.ts` | Hatch command | Normal mode suppresses raw subprocess output, verbose flag/env shows subprocess detail, skill-missing error, incomplete packaging error, success summary with pet id and next-step hint |
 | `src/cli/pets.test.ts` | Pet discovery | isValidPetJson schema validation, validatePetFolder for valid/missing/invalid entries, discoverPets buddy+codex sources, invalid folder reasons, buddyPetsDir/codexPetsDir path resolution and overrides |
 | `src/cli/commands/pets.test.ts` | Pets commands | pets list with source labels and active-pet marker, pets show active pet and unresolved-id warning, pets use validation and state.json persistence, no-writes-to-Codex paths, error messages and exit codes |
+| `src/cli/runtime.test.ts` | CLI runtime launch | package-root walking from built CLI output and missing-Electron detection for installed package layouts |
 
 ---
 

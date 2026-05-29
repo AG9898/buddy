@@ -23,6 +23,8 @@
 buddy renders a transparent, always-on-top pixel-art character directly on your Windows desktop. It listens to hook events from **Claude Code** and **Codex CLI** and animates the pet as your agent works — running when tools fire, jumping when you send a prompt, waiting for permissions, and waving when the session ends.
 
 No login. No cloud. No installer GUI. Just `npm install -g cli-buddy` and the `buddy` CLI.
+The npm package includes the built app and installs the Electron runtime dependency that
+`buddy start` uses, so a global install does not need a source checkout.
 
 ---
 
@@ -261,6 +263,9 @@ The public npm package is named `cli-buddy`, but it installs the `buddy` command
 runtime output, bundled pets, icon/build metadata, README/LICENSE, and selected
 release docs. Agent skill folders, source-only planning files, tests, local caches,
 and workboard files are excluded by the package allowlist and `.npmignore` guardrail.
+Electron is installed as an optional production dependency of the package, which gives
+`buddy start` a runtime executable after `npm install -g cli-buddy` without shipping
+source-only dev dependencies.
 
 ### WSL bridge (optional)
 
@@ -333,6 +338,8 @@ Full details: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
 ```sh
 buddy doctor   # checks process, sidecar, token, and hook status in one pass
 ```
+`buddy doctor` also verifies that the Electron runtime dependency is present. If that
+check fails, reinstall with `npm install -g cli-buddy`.
 
 **Hooks aren't triggering animations**
 Re-run `buddy hooks install`, restart your shell, and confirm your AI CLI fires hooks.

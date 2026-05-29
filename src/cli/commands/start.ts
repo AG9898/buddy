@@ -11,6 +11,7 @@
 import { spawn } from 'child_process'
 import { isWSL } from '../env.js'
 import { success, error } from '../output.js'
+import { resolveElectronAppPath, resolveElectronBin, resolvePackageRoot } from '../runtime.js'
 
 export function runStart(): void {
   if (isWSL()) {
@@ -22,22 +23,24 @@ export function runStart(): void {
 
 function startOnWindows(): void {
   // Spawn the Electron app in the background, detached so the CLI can exit.
-  // When installed globally via npm, the 'buddy-electron' binary (or 'electron .')
-  // is reachable via the package main field. We launch via node with the package
-  // main script resolved from the same package root.
+  const packageRoot = resolvePackageRoot()
   const electronBin = resolveElectronBin()
   if (!electronBin) {
     error(
-      'Could not locate the Electron binary.',
-      'Ensure buddy is installed correctly and try: npm install -g buddy',
+      'Could not locate the Electron runtime for buddy.',
+      [
+        'Ensure the package was installed with production dependencies:',
+        '  npm install -g cli-buddy',
+        `Package root checked: ${packageRoot}`,
+      ].join('\n'),
     )
     process.exit(1)
   }
 
-  const child = spawn(electronBin, ['.'], {
+  const child = spawn(electronBin, [resolveElectronAppPath(packageRoot)], {
     detached: true,
     stdio: 'ignore',
-    cwd: resolvePackageRoot(),
+    cwd: packageRoot,
   })
   child.unref()
   success('buddy started.')
@@ -89,36 +92,8 @@ function printWSLInteropError(): void {
       '       echo 1 > /proc/sys/fs/binfmt_misc/WSLInterop',
       '     Or set [interop] enabled=true in /etc/wsl.conf and restart WSL.',
       '  2. Ensure buddy is installed on the Windows side:',
-      '       npm install -g buddy   (in a Windows terminal, not WSL)',
+      '       npm install -g cli-buddy   (in a Windows terminal, not WSL)',
       '  3. Then retry:  buddy start',
     ].join('\n'),
   )
-}
-
-function resolveElectronBin(): string | null {
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const electronPath: string = require('electron') as string
-    return electronPath
-  } catch {
-    return null
-  }
-}
-
-function resolvePackageRoot(): string {
-  // Walk up from __dirname to find package.json root.
-  // In production the CLI is at <root>/out/cli/index.js; in dev at src/cli/index.ts.
-  // We want the directory that contains package.json.
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const path = require('path') as typeof import('path')
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const fs = require('fs') as typeof import('fs')
-  let dir = __dirname
-  for (let i = 0; i < 6; i++) {
-    if (fs.existsSync(path.join(dir, 'package.json'))) {
-      return dir
-    }
-    dir = path.dirname(dir)
-  }
-  return __dirname
 }
