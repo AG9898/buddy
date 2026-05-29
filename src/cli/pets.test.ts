@@ -332,6 +332,13 @@ describe('buddyPetsDir()', () => {
     expect(dir).toBe('/custom/pets/dir')
   })
 
+  it('uses BUDDY_DATA_DIR for the default buddy-managed pets path', () => {
+    vi.stubEnv('BUDDY_DATA_DIR', '/mnt/c/Users/TestUser/.petdex-win')
+    vi.stubEnv('BUDDY_SPRITES_DIR', '')
+    const dir = buddyPetsDir()
+    expect(dir).toBe(path.join('/mnt/c/Users/TestUser/.petdex-win', 'pets'))
+  })
+
   it('falls back to os.homedir() when USERPROFILE is not set', () => {
     // Delete USERPROFILE so the ?? fallback to os.homedir() is triggered
     const saved = process.env['USERPROFILE']

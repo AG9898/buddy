@@ -7,6 +7,7 @@
 import fs from 'fs'
 import os from 'os'
 import path from 'path'
+import { buddyTokenPath } from '../shared/buddy-paths'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -49,8 +50,7 @@ function defaultRcPath(): string {
 
 /** Token file path (Windows style via USERPROFILE, or XDG-style home). */
 function tokenPath(): string {
-  const base = process.env['USERPROFILE'] ?? homeDir()
-  return path.join(base, '.petdex-win', 'runtime', 'update-token')
+  return buddyTokenPath(process.env, homeDir())
 }
 
 // ── Claude Code settings.json helpers ────────────────────────────────────────

@@ -787,7 +787,7 @@
       "id": "REL-04",
       "title": "Define and implement Windows WSL shared buddy paths",
       "description": "Make Windows and WSL share buddy-owned token/state/pet assumptions without creating divergent active-pet registries. Windows remains responsible for rendering and selected-pet resolution; WSL setup should create or document the symlink/copy/path bridge needed for petdex-bridge and hooks to read the token and for users to understand where pets live.",
-      "status": "todo",
+      "status": "done",
       "priority": "high",
       "group_id": "REL",
       "depends_on": [

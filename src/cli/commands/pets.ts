@@ -6,7 +6,7 @@
  *   pets show        Print the currently selected pet and its source path.
  *   pets use <id>    Validate and persist a pet selection.
  *
- * Selection is stored in buddy-owned state (%USERPROFILE%\.petdex-win\state.json).
+ * Selection is stored in buddy-owned state (<buddy data dir>\state.json).
  * Never reads or writes Codex internal state.
  * No Electron imports in this module.
  */
@@ -15,6 +15,7 @@ import fs from 'fs'
 import os from 'os'
 import path from 'path'
 import { discoverPets, type PetEntry } from '../pets.js'
+import { buddyStatePath } from '../../shared/buddy-paths.js'
 import {
   heading,
   success,
@@ -35,8 +36,7 @@ import {
 
 /** Absolute path to the buddy-owned state file. */
 function stateFilePath(): string {
-  const base = process.env['USERPROFILE'] ?? os.homedir()
-  return path.join(base, '.petdex-win', 'state.json')
+  return buddyStatePath(process.env, os.homedir())
 }
 
 interface RawPetRecord {

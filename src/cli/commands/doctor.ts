@@ -14,16 +14,15 @@ import fs from 'fs'
 import http from 'http'
 import { execSync } from 'child_process'
 import os from 'os'
-import path from 'path'
 import { getHooksStatus } from '../../main/hooks-install.js'
 import { sidecarBaseUrl } from '../env.js'
 import { isWSL } from '../env.js'
 import { heading, check, subCheck, closeSeparator, success, error } from '../output.js'
 import { resolveElectronBin, resolvePackageRoot } from '../runtime.js'
+import { buddyTokenPath } from '../../shared/buddy-paths.js'
 
 function resolveTokenPath(): string {
-  const base = process.env['USERPROFILE'] ?? os.homedir()
-  return path.join(base, '.petdex-win', 'runtime', 'update-token')
+  return buddyTokenPath(process.env, os.homedir())
 }
 
 function checkProcessRunning(): boolean {

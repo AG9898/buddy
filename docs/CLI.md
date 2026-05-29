@@ -134,7 +134,7 @@ buddy supports three pet sources:
 
 | Source | Default path | Notes |
 |---|---|---|
-| buddy-managed pets | `%USERPROFILE%\.petdex-win\pets` | Primary location for pets created by `buddy hatch`. |
+| buddy-managed pets | `%USERPROFILE%\.petdex-win\pets` on Windows, `$HOME/.petdex-win/pets` in WSL | Primary location for pets created by `buddy hatch`; rooted under `BUDDY_DATA_DIR` when that override is set. |
 | packaged pets | `<buddy package>\pets` | Built-in read-only pets shipped with buddy, including `default`. |
 | Codex-compatible pets | `%USERPROFILE%\.codex\pets` | Read as asset folders only. buddy must not read or write Codex internal state. |
 
@@ -153,9 +153,18 @@ owned by the Electron main process, not by writing to Codex configuration files.
 process resolves the selected id, validates the matching `pet.json` and spritesheet, and
 falls back to the packaged `default` pet if the stored selection no longer resolves.
 
-Windows owns selected-pet rendering. WSL hook commands may send state events and may
-share/copy the buddy token and pet assets through documented Windows-backed paths, but WSL
-must not maintain a second independent active-pet registry.
+Windows owns selected-pet rendering. WSL hook commands may send state events and may share
+the buddy token and pet assets, but WSL must not maintain a second independent active-pet
+registry. The preferred WSL setup is:
+
+```sh
+ln -s /mnt/c/Users/<you>/.petdex-win ~/.petdex-win
+```
+
+If symlinks are not practical, copy `%USERPROFILE%\.petdex-win\runtime\update-token` to
+`$HOME/.petdex-win/runtime/update-token`, or set
+`BUDDY_DATA_DIR=/mnt/c/Users/<you>/.petdex-win` for WSL commands. `BUDDY_TOKEN` remains a
+temporary debugging override, not the normal hook setup.
 
 ---
 
@@ -181,6 +190,7 @@ The canonical environment variable matrix is [`ENV_VARS.md`](ENV_VARS.md). CLI-r
 variables currently include:
 
 - `BUDDY_PORT`
+- `BUDDY_DATA_DIR`
 - `BUDDY_SPRITES_DIR`
 - `BUDDY_LOG_LEVEL`
 - `BUDDY_CODEX_COMMAND`

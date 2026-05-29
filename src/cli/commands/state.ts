@@ -11,15 +11,13 @@
 import fs from 'fs'
 import http from 'http'
 import os from 'os'
-import path from 'path'
 import { sidecarBaseUrl } from '../env.js'
+import { buddyTokenPath } from '../../shared/buddy-paths.js'
 import { success, error, label } from '../output.js'
 
 /** Absolute path to the shared update token file. */
 function resolveTokenPath(): string {
-  // On Windows USERPROFILE is set; in WSL HOME is the Linux home.
-  const base = process.env['USERPROFILE'] ?? os.homedir()
-  return path.join(base, '.petdex-win', 'runtime', 'update-token')
+  return buddyTokenPath(process.env, os.homedir())
 }
 
 function readToken(): string | null {

@@ -3,20 +3,19 @@
 
 import http from 'http'
 import fs from 'fs'
-import path from 'path'
 import crypto from 'crypto'
 import { BrowserWindow } from 'electron'
 import { CH_STATE_CHANGE } from '../shared/ipc-channels'
+import { buddyRuntimeDir, buddyTokenPath } from '../shared/buddy-paths'
 
 // ── Token helpers ─────────────────────────────────────────────────────────────
 
 function tokenDir(): string {
-  const base = process.env['USERPROFILE'] ?? process.env['HOME'] ?? ''
-  return path.join(base, '.petdex-win', 'runtime')
+  return buddyRuntimeDir(process.env, process.env['HOME'] ?? '')
 }
 
 function tokenPath(): string {
-  return path.join(tokenDir(), 'update-token')
+  return buddyTokenPath(process.env, process.env['HOME'] ?? '')
 }
 
 function loadOrCreateToken(): string {

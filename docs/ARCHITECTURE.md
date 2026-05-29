@@ -42,7 +42,8 @@ selection UX, and CLI lifecycle semantics live in [`CLI.md`](CLI.md).
 - `buddy hatch <prompt>`: prepares a hatch-pet run, verifies Codex CLI is installed and ready with `codex doctor`, then invokes `codex exec` as the image-generation worker so `$imagegen` is provided by Codex rather than by a buddy-owned image API adapter. The command packages the completed run into buddy's `pets/<id>/pet.json`, `spritesheet.webp`, and `build/icon.ico` formats.
 - Pet-management commands enumerate and select valid buddy-managed pets, packaged pets, and Codex-compatible pet asset folders. Selection is persisted in buddy-owned state only.
 - CLI output is concise by default, styled when supported, plain in non-TTY contexts, and avoids dumping raw child-process output unless verbose/debug behavior is explicitly requested.
-- Pet discovery module: `src/cli/pets.ts` — `discoverPets()` enumerates valid pets from `%USERPROFILE%\.petdex-win\pets` (buddy-managed), the package `pets/` directory (packaged built-ins), and `%USERPROFILE%\.codex\pets` (Codex-compatible, read-only). `validatePetFolder()` checks `pet.json` structure and spritesheet existence before admitting a candidate. `BUDDY_SPRITES_DIR` overrides the buddy-managed pets directory.
+- Shared path helpers: `src/shared/buddy-paths.ts` defines the buddy-owned data root and derived state, runtime token, and buddy-managed pet paths. Windows defaults to `%USERPROFILE%\.petdex-win`; WSL defaults to `$HOME/.petdex-win`, which should be a symlink/copy bridge to the Windows-owned directory or overridden with `BUDDY_DATA_DIR`.
+- Pet discovery module: `src/cli/pets.ts` — `discoverPets()` enumerates valid pets from `<buddy data dir>\pets` (buddy-managed), the package `pets` directory (packaged built-ins), and `%USERPROFILE%\.codex\pets` (Codex-compatible, read-only). `validatePetFolder()` checks `pet.json` structure and spritesheet existence before admitting a candidate. `BUDDY_SPRITES_DIR` overrides only the buddy-managed pets directory.
 - Files: `src/cli/index.ts`, `src/cli/commands/`, `src/cli/pets.ts`.
 - Build output: `npm run build:app` runs `electron-vite build` for Electron bundles and a Vite CLI build that emits `out/cli/index.js`, the package `bin.buddy` target.
 - Runtime launch helpers: `src/cli/runtime.ts` resolves the installed package root, the Electron app path, and the npm-installed Electron executable. `buddy start` spawns that executable detached with the package root as the app argument, and `buddy doctor` reports whether the runtime dependency is available.
@@ -72,7 +73,7 @@ development build dependency.
 - After window creation: calls `setVisibleOnAllWorkspaces(true)`, `setAlwaysOnTop(true, "floating")`, and `showInactive()`.
 - Click-through toggle via `setIgnoreMouseEvents(true, { forward: true })` — disabled when renderer signals pointer is over an interactive region.
 - Local HTTP sidecar on `127.0.0.1:7777` (configurable via `BUDDY_PORT`): receives hook events, validates the `X-Petdex-Update-Token` header, and forwards events to the renderer via Electron IPC.
-- State persistence: reads and writes `%USERPROFILE%\.petdex-win\state.json` (window open/hidden, bounds, pet id, current animation state). Restored bounds are clamped into the nearest display work area before the window is created so stale or off-screen coordinates cannot hide the pet.
+- State persistence: reads and writes `<buddy data dir>\state.json` (window open/hidden, bounds, pet id, current animation state). Restored bounds are clamped into the nearest display work area before the window is created so stale or off-screen coordinates cannot hide the pet.
 - Window resize: receives resize interactions from the renderer, updates BrowserWindow bounds, preserves click-through behavior, and persists final bounds on resize end.
 - Pet selection: owns active pet state and asset loading. `pet-assets.ts` resolves the persisted `state.pet.id` against validated buddy-managed, packaged, and Codex-compatible pet folders, falls back to the packaged `default` pet with a diagnostic when the selected id is missing or invalid, and exposes only the active manifest plus a renderer-safe spritesheet `file://` URL over preload IPC.
 - System tray (Show / Hide / Quit) to keep the process alive when the window is hidden.
@@ -127,7 +128,7 @@ development build dependency.
 
 **Owns:**
 - A single-purpose CLI binary cross-compiled for `x86_64-unknown-linux-gnu` (runs in WSL).
-- Reads the shared update token from `BUDDY_TOKEN` when set, otherwise from `$HOME/.petdex-win/runtime/update-token`.
+- Reads the shared update token from `BUDDY_TOKEN` when set, otherwise from `<buddy data dir>/runtime/update-token` (`$HOME/.petdex-win/runtime/update-token` by default in WSL).
 - Accepts a state name as a CLI argument (`petdex-bridge state running`) and POSTs `{"state":"<name>","source":"claude-code"}` to `http://127.0.0.1:${BUDDY_PORT}/state` with the `X-Petdex-Update-Token` header.
 - Relies on WSL localhost passthrough to reach the Windows-side HTTP sidecar automatically.
 - Emits actionable non-zero errors when the token is missing, `BUDDY_PORT` is invalid, the sidecar rejects the token, WSL localhost passthrough is not routing, or the Electron app is not running.
@@ -144,7 +145,7 @@ development build dependency.
 
 1. An agent CLI event fires in WSL (e.g., Claude Code `PreToolUse` hook).
 2. The shell hook (`.zshrc` / `.bashrc`) calls `petdex-bridge state running`.
-3. petdex-bridge reads the token from `BUDDY_TOKEN` or `~/.petdex-win/runtime/update-token`.
+3. petdex-bridge reads the token from `BUDDY_TOKEN` or `<buddy data dir>/runtime/update-token`.
 4. petdex-bridge POSTs `{"state":"running","source":"claude-code"}` to `http://127.0.0.1:7777/state` with the `X-Petdex-Update-Token` header. WSL localhost passthrough routes this to the Windows host automatically.
 5. The Electron HTTP sidecar validates the token and receives the payload.
 6. The sidecar sends `pet:state-change { state: "running" }` to the renderer via Electron IPC.
@@ -173,7 +174,7 @@ development build dependency.
 
 buddy has no user-facing authentication. Access to the HTTP sidecar is secured by a shared-secret token:
 
-- **Token location:** `%USERPROFILE%\.petdex-win\runtime\update-token` (Windows) and `$HOME/.petdex-win/runtime/update-token` (WSL symlink or copy). `petdex-bridge` also accepts a `BUDDY_TOKEN` override for temporary debugging.
+- **Token location:** `<buddy data dir>\runtime\update-token`. Windows creates it under `%USERPROFILE%\.petdex-win`; WSL reads `$HOME/.petdex-win/runtime/update-token` by default, with the expected setup being a symlink/copy bridge to the Windows-owned directory or `BUDDY_DATA_DIR` pointing at the Windows-mounted `.petdex-win` root. `petdex-bridge` also accepts a `BUDDY_TOKEN` override for temporary debugging.
 - **Enforcement:** Every POST to `/state` must carry the `X-Petdex-Update-Token` header. The Electron sidecar rejects requests with a missing or incorrect token with HTTP 401.
 - **Scope:** Loopback-only binding (`127.0.0.1`) means the token is a defense-in-depth measure against other local processes — there is no remote attack surface.
 - **Rotation:** Delete and regenerate the token file; restart the Electron app to pick up the new value.

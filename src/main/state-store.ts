@@ -1,10 +1,10 @@
-// FEAT-03: read/write %USERPROFILE%\.petdex-win\state.json
+// FEAT-03: read/write <buddy data dir>\state.json
 // See docs/ARCHITECTURE.md for AppState schema.
 
 import fs from 'fs'
 import os from 'os'
-import path from 'path'
 import type { Rectangle } from 'electron'
+import { buddyDataDir, buddyStatePath } from '../shared/buddy-paths'
 
 /** Bounds of the overlay window on screen. */
 export interface BoundsRecord {
@@ -36,14 +36,14 @@ export interface AppState {
 // Internal helpers
 // ---------------------------------------------------------------------------
 
-/** Absolute path to %USERPROFILE%\.petdex-win */
+/** Absolute path to the buddy-owned data directory. */
 function petdexWinDir(): string {
-  return path.join(os.homedir(), '.petdex-win')
+  return buddyDataDir(process.env, os.homedir())
 }
 
 /** Absolute path to the state JSON file. */
 function stateFilePath(): string {
-  return path.join(petdexWinDir(), 'state.json')
+  return buddyStatePath(process.env, os.homedir())
 }
 
 /** Default state returned when no valid persisted state exists. */

@@ -168,8 +168,10 @@ These apply across every stack in this project.
 
 ### Patterns
 
-- **Token resolution:** read from `$HOME/.petdex-win/runtime/update-token`; accept
-  `BUDDY_TOKEN` env var as an override.
+- **Token resolution:** read from `<buddy data dir>/runtime/update-token`
+  (`$HOME/.petdex-win/runtime/update-token` by default in WSL); accept
+  `BUDDY_TOKEN` env var as an override. `BUDDY_DATA_DIR` may point the bridge at the
+  Windows-mounted `.petdex-win` directory when a WSL symlink/copy is not practical.
 - **HTTP client:** use `ureq` (sync, small binary footprint) — not `reqwest` (async, large).
 - **CLI surface:** implement the supported `state <name>` subcommand first; add new
   subcommands only when a workboard task defines their behavior.

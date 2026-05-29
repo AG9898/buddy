@@ -3,6 +3,7 @@ import os from 'os'
 import path from 'path'
 import { pathToFileURL } from 'url'
 import type { PetRecord } from './state-store'
+import { buddyManagedPetsDir } from '../shared/buddy-paths'
 
 export interface PetFrame {
   row: number
@@ -48,8 +49,7 @@ export interface ActivePetAsset {
 function buddyPetsDir(): string {
   const override = process.env['BUDDY_SPRITES_DIR']
   if (override) return override
-  const base = process.env['USERPROFILE'] ?? os.homedir()
-  return path.join(base, '.petdex-win', 'pets')
+  return buddyManagedPetsDir(process.env, os.homedir())
 }
 
 function codexPetsDir(): string {

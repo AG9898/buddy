@@ -103,7 +103,7 @@ one WSL distribution:
 | selected pets | `buddy pets list`, `buddy pets use <id>`, restart, main-process active-pet fallback diagnostics, and selected-pet render are verified from Windows; WSL path-sharing behavior is verified separately. |
 | state endpoint | `buddy state running` and authenticated `POST /state` visibly change pet state. |
 | hooks | Claude Code and Codex CLI hooks are installed and trigger visible state changes from Windows and WSL. |
-| WSL bridge | `petdex-bridge state running` in WSL reads the token, reaches `127.0.0.1:${BUDDY_PORT}`, and returns useful errors when the app is stopped. |
+| WSL bridge | `petdex-bridge state running` in WSL reads the token through `$HOME/.petdex-win` symlink/copy or `BUDDY_DATA_DIR`, reaches `127.0.0.1:${BUDDY_PORT}`, and returns useful errors when the app is stopped. |
 | packaging | `npm run build` passes on a release-capable Windows/CI environment; `npm run build:win:local` remains a smoke-only fallback. |
 
 ---
@@ -146,13 +146,14 @@ integration (requires Electron E2E).
 | `src/main/state-store.test.ts` | State persistence | loadState defaults, saveState directory creation, round-trip fidelity, saveBounds byResolution key |
 | `src/main/pet-assets.test.ts` | Active pet assets | Selected pet resolution, packaged default fallback diagnostics, persisted startup state, pet manifest validation |
 | `src/cli/env.test.ts` | CLI environment | isWSL() detection, buddyPort() defaults and overrides, sidecarBaseUrl() |
+| `src/shared/buddy-paths.test.ts` | Shared paths | buddy data root defaults, `BUDDY_DATA_DIR` override, and derived state/token/pet paths |
 | `src/main/hooks-install.test.ts` | Hook installation | installHooks idempotency, getHooksStatus, Claude Code and Codex CLI targets |
 | `src/cli/output.test.ts` | CLI output layer | status/success/warn/error helpers, NO_COLOR plain mode, check/subCheck/bullet/label, banner text, separator |
 | `src/cli/commands/hatch.test.ts` | Hatch command | Normal mode suppresses raw subprocess output, verbose flag/env shows subprocess detail, skill-missing error, incomplete packaging error, success summary with pet id and next-step hint |
 | `src/cli/pets.test.ts` | Pet discovery | isValidPetJson schema validation, validatePetFolder for valid/missing/invalid entries, discoverPets buddy+codex sources, invalid folder reasons, buddyPetsDir/codexPetsDir path resolution and overrides |
 | `src/cli/commands/pets.test.ts` | Pets commands | pets list with source labels and active-pet marker, pets show active pet and unresolved-id warning, pets use validation and state.json persistence, no-writes-to-Codex paths, error messages and exit codes |
 | `src/cli/runtime.test.ts` | CLI runtime launch | package-root walking from built CLI output and missing-Electron detection for installed package layouts |
-| `petdex-bridge/src/main.rs` | WSL bridge | CLI parsing, state payload construction, loopback URL construction, and empty-state validation |
+| `petdex-bridge/src/main.rs` | WSL bridge | CLI parsing, state payload construction, loopback URL construction, token path override, and empty-state validation |
 
 ---
 

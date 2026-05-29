@@ -500,4 +500,27 @@ describe('runPetsUse()', () => {
     expect(callArgs[0]).toContain('.petdex-win')
     expect(callArgs[0]).toContain('state.json')
   })
+
+  it('writes selected pet state under BUDDY_DATA_DIR when configured', async () => {
+    vi.stubEnv('BUDDY_DATA_DIR', '/mnt/c/Users/TestUser/.petdex-win')
+    mockReaddirSync.mockImplementation((dirPath: unknown) => {
+      const p = dirPath as string
+      if (p.includes('.petdex-win')) return [{ name: 'test-cat', isDirectory: () => true }]
+      return []
+    })
+    mockReadFileSync.mockImplementation((filePath: unknown) => {
+      const p = filePath as string
+      if (p.endsWith('state.json')) throw new Error('ENOENT')
+      return JSON.stringify(VALID_PET_JSON)
+    })
+    mockExistsSync.mockReturnValue(true)
+
+    const { runPetsUse } = await import('./pets.js')
+    const cap = captureOutput()
+    runPetsUse('test-cat')
+    cap.restore()
+
+    const callArgs = mockWriteFileSync.mock.calls[0] as [string, string, string]
+    expect(callArgs[0]).toBe(path.join('/mnt/c/Users/TestUser/.petdex-win', 'state.json'))
+  })
 })

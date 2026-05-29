@@ -19,8 +19,9 @@ All variables are optional. The app ships with safe defaults for every variable.
 | Variable | Required | Default | Description | Where set |
 |---|---|---|---|---|
 | `BUDDY_PORT` | No | `7777` | Port for the local HTTP hook sidecar. petdex-bridge and any Windows hook must POST to this same port. | `.env` (dev) or Electron app config |
+| `BUDDY_DATA_DIR` | No | `%USERPROFILE%\.petdex-win` on Windows, `$HOME/.petdex-win` in WSL | Override the buddy-owned data root for state, runtime token, and buddy-managed pets. Prefer a WSL symlink/copy to the Windows-owned directory; use this only when a symlink is not practical. | `.env` (dev), Windows shell, or WSL shell |
 | `BUDDY_TOKEN` | No | _(unset)_ | Token override for `petdex-bridge`; when unset, the bridge reads `$HOME/.petdex-win/runtime/update-token`. Use only for debugging or temporary WSL token sharing. | WSL shell |
-| `BUDDY_SPRITES_DIR` | No | `%USERPROFILE%\.petdex-win\pets` | Override directory for sprite/pet asset files. buddy also checks `%USERPROFILE%\.codex\pets` as a fallback. | `.env` (dev) or app settings UI |
+| `BUDDY_SPRITES_DIR` | No | `<BUDDY_DATA_DIR>\pets` | Override only the buddy-managed pet asset directory. buddy also checks packaged pets and `%USERPROFILE%\.codex\pets` as read-only sources. | `.env` (dev) or app settings UI |
 | `BUDDY_LOG_LEVEL` | No | `info` | Log verbosity for the Electron main process. Accepted values: `debug`, `info`, `warn`, `error`. | `.env` (dev) or Electron app config |
 | `BUDDY_CODEX_COMMAND` | No | `codex` | Command used by `buddy hatch` to invoke Codex CLI for hatch-pet `$imagegen` work. Override only when Codex is installed under a non-standard command name or path. Paths with spaces should be quoted by the shell. | `.env` (dev) or shell |
 | `BUDDY_VERBOSE` | No | _(unset)_ | Set to `1` to enable verbose/debug subprocess output in `buddy hatch` (equivalent to `--verbose` flag or `BUDDY_LOG_LEVEL=debug`). | `.env` (dev) or shell |
@@ -52,8 +53,9 @@ No `.env.example` is required or maintained. The variable matrix above is the ca
 | Variable | Local dev | Production (packaged) |
 |---|---|---|
 | `BUDDY_PORT` | Optional — defaults to `7777` | Optional — defaults to `7777` |
+| `BUDDY_DATA_DIR` | Optional — defaults to `%USERPROFILE%\.petdex-win` | Optional — defaults to `%USERPROFILE%\.petdex-win` for the Windows app and `$HOME/.petdex-win` for WSL tools |
 | `BUDDY_TOKEN` | Optional — only used by `petdex-bridge` | Optional — only used by `petdex-bridge` |
-| `BUDDY_SPRITES_DIR` | Optional — defaults to `%USERPROFILE%\.petdex-win\pets` | Optional — defaults to `%USERPROFILE%\.petdex-win\pets` |
+| `BUDDY_SPRITES_DIR` | Optional — defaults to `<BUDDY_DATA_DIR>\pets` | Optional — defaults to `<BUDDY_DATA_DIR>\pets` |
 | `BUDDY_LOG_LEVEL` | Optional — recommend `debug` during dev | Optional — defaults to `info` |
 | `BUDDY_CODEX_COMMAND` | Optional — defaults to `codex` | Optional — defaults to `codex` |
 | `BUDDY_VERBOSE` | Optional — set to `1` to enable verbose subprocess output in `buddy hatch` | Optional — defaults to unset |
@@ -62,6 +64,9 @@ No `.env.example` is required or maintained. The variable matrix above is the ca
 
 For WSL hook support, `petdex-bridge` reads the same `BUDDY_PORT` value as the Windows app
 and resolves the token from `BUDDY_TOKEN` first, then
-`$HOME/.petdex-win/runtime/update-token`. Prefer the token file for normal hook use. If WSL
-cannot read that path, setup must create a symlink or copy from the Windows-owned
-`%USERPROFILE%\.petdex-win\runtime` location before hooks are considered healthy.
+`$HOME/.petdex-win/runtime/update-token` unless `BUDDY_DATA_DIR` points at another
+`.petdex-win` root. Prefer the token file for normal hook use. The supported WSL setup is
+to make `$HOME/.petdex-win` a symlink to the Windows-owned `%USERPROFILE%\.petdex-win`
+directory, or to copy the `runtime/update-token` file into the WSL directory after
+starting buddy on Windows. Set `BUDDY_DATA_DIR=/mnt/c/Users/<you>/.petdex-win` only when
+that path bridge is clearer than a symlink.

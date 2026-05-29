@@ -5,6 +5,7 @@ use serde::Serialize;
 use thiserror::Error;
 
 const DEFAULT_PORT: u16 = 7777;
+const DATA_DIR_ENV: &str = "BUDDY_DATA_DIR";
 const TOKEN_ENV: &str = "BUDDY_TOKEN";
 const PORT_ENV: &str = "BUDDY_PORT";
 const SOURCE: &str = "claude-code";
@@ -37,7 +38,7 @@ enum BridgeError {
     MissingHome,
 
     #[error(
-        "update token not found at {path}. Start buddy on Windows, then share or copy the token into WSL. Set BUDDY_TOKEN to override."
+        "update token not found at {path}. Start buddy on Windows, then symlink/copy the Windows .petdex-win directory to WSL or set BUDDY_DATA_DIR. Set BUDDY_TOKEN to override."
     )]
     MissingToken { path: String },
 
@@ -121,12 +122,20 @@ fn state_url(port: u16) -> String {
     format!("http://127.0.0.1:{port}/state")
 }
 
-fn token_path() -> Result<PathBuf, BridgeError> {
+fn data_dir() -> Result<PathBuf, BridgeError> {
+    if let Ok(raw) = env::var(DATA_DIR_ENV) {
+        let trimmed = raw.trim();
+        if !trimmed.is_empty() {
+            return Ok(PathBuf::from(trimmed));
+        }
+    }
+
     let home = env::var("HOME").map_err(|_| BridgeError::MissingHome)?;
-    Ok(PathBuf::from(home)
-        .join(".petdex-win")
-        .join("runtime")
-        .join("update-token"))
+    Ok(PathBuf::from(home).join(".petdex-win"))
+}
+
+fn token_path() -> Result<PathBuf, BridgeError> {
+    Ok(data_dir()?.join("runtime").join("update-token"))
 }
 
 fn read_token() -> Result<String, BridgeError> {
@@ -209,6 +218,21 @@ mod tests {
     #[test]
     fn builds_loopback_state_url() {
         assert_eq!(state_url(7778), "http://127.0.0.1:7778/state");
+    }
+
+    #[test]
+    fn token_path_uses_buddy_data_dir_override() {
+        env::set_var(DATA_DIR_ENV, "/mnt/c/Users/Ada/.petdex-win");
+
+        let path = token_path().expect("token path");
+
+        assert_eq!(
+            path,
+            PathBuf::from("/mnt/c/Users/Ada/.petdex-win")
+                .join("runtime")
+                .join("update-token")
+        );
+        env::remove_var(DATA_DIR_ENV);
     }
 
     #[test]

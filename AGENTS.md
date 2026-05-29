@@ -300,3 +300,6 @@ Electron main resolves the selected pet and sends only one manifest plus one spr
 
 ### 2026-05-29 - global npm start needs a production Electron runtime
 `buddy start` in a clean `npm install -g cli-buddy` cannot rely on `devDependencies`, so Electron must remain available to installed packages as an optional production dependency. Keep CLI launch path logic in `src/cli/runtime.ts`; it resolves the package root and Electron executable without importing Electron APIs.
+
+### 2026-05-29 - WSL shares the Windows-owned .petdex-win directory
+Windows remains the owner of rendering, active pet selection, and token creation, while WSL tools read the same data through `$HOME/.petdex-win`. Prefer symlinking `$HOME/.petdex-win` to `/mnt/c/Users/<you>/.petdex-win`; use `BUDDY_DATA_DIR` only when a symlink or token copy is not practical.

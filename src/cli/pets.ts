@@ -2,7 +2,7 @@
  * Pet discovery and validation module for the buddy CLI.
  *
  * Enumerates valid pet folders from three sources:
- *   - buddy-managed pets: %USERPROFILE%/.petdex-win/pets   (read/write)
+ *   - buddy-managed pets: <buddy data dir>/pets            (read/write)
  *   - packaged pets:       <buddy package>/pets             (read-only built-ins)
  *   - Codex-compatible pets: %USERPROFILE%/.codex/pets     (read-only asset source)
  *
@@ -17,6 +17,7 @@ import fs from 'fs'
 import os from 'os'
 import path from 'path'
 import { fileURLToPath } from 'url'
+import { buddyManagedPetsDir } from '../shared/buddy-paths.js'
 
 // ── Pet data types ────────────────────────────────────────────────────────────
 
@@ -79,13 +80,12 @@ export interface DiscoveryResult {
 
 /**
  * Absolute path to the buddy-managed pets directory.
- * Respects BUDDY_SPRITES_DIR override from env.
+ * Respects BUDDY_SPRITES_DIR override from env, otherwise derives from BUDDY_DATA_DIR.
  */
 export function buddyPetsDir(): string {
   const override = process.env['BUDDY_SPRITES_DIR']
   if (override) return override
-  const base = process.env['USERPROFILE'] ?? os.homedir()
-  return path.join(base, '.petdex-win', 'pets')
+  return buddyManagedPetsDir(process.env, os.homedir())
 }
 
 /**
