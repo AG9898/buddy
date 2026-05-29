@@ -19,6 +19,7 @@ All variables are optional. The app ships with safe defaults for every variable.
 | Variable | Required | Default | Description | Where set |
 |---|---|---|---|---|
 | `BUDDY_PORT` | No | `7777` | Port for the local HTTP hook sidecar. petdex-bridge and any Windows hook must POST to this same port. | `.env` (dev) or Electron app config |
+| `BUDDY_TOKEN` | No | _(unset)_ | Token override for `petdex-bridge`; when unset, the bridge reads `$HOME/.petdex-win/runtime/update-token`. Use only for debugging or temporary WSL token sharing. | WSL shell |
 | `BUDDY_SPRITES_DIR` | No | `%USERPROFILE%\.petdex-win\pets` | Override directory for sprite/pet asset files. buddy also checks `%USERPROFILE%\.codex\pets` as a fallback. | `.env` (dev) or app settings UI |
 | `BUDDY_LOG_LEVEL` | No | `info` | Log verbosity for the Electron main process. Accepted values: `debug`, `info`, `warn`, `error`. | `.env` (dev) or Electron app config |
 | `BUDDY_CODEX_COMMAND` | No | `codex` | Command used by `buddy hatch` to invoke Codex CLI for hatch-pet `$imagegen` work. Override only when Codex is installed under a non-standard command name or path. Paths with spaces should be quoted by the shell. | `.env` (dev) or shell |
@@ -51,6 +52,7 @@ No `.env.example` is required or maintained. The variable matrix above is the ca
 | Variable | Local dev | Production (packaged) |
 |---|---|---|
 | `BUDDY_PORT` | Optional — defaults to `7777` | Optional — defaults to `7777` |
+| `BUDDY_TOKEN` | Optional — only used by `petdex-bridge` | Optional — only used by `petdex-bridge` |
 | `BUDDY_SPRITES_DIR` | Optional — defaults to `%USERPROFILE%\.petdex-win\pets` | Optional — defaults to `%USERPROFILE%\.petdex-win\pets` |
 | `BUDDY_LOG_LEVEL` | Optional — recommend `debug` during dev | Optional — defaults to `info` |
 | `BUDDY_CODEX_COMMAND` | Optional — defaults to `codex` | Optional — defaults to `codex` |
@@ -58,7 +60,8 @@ No `.env.example` is required or maintained. The variable matrix above is the ca
 
 `buddy hatch` must not require `ANTHROPIC_API_KEY` or any other buddy-owned image provider secret. Image generation is delegated to Codex CLI, which uses its own configured authentication and `$imagegen` route. Before starting a hatch run, buddy checks the configured Codex command with `--version` and `doctor --summary --ascii`; failures should be fixed with `codex login`, `codex doctor`, or by setting `BUDDY_CODEX_COMMAND`.
 
-For WSL hook support, `petdex-bridge` reads the same `BUDDY_PORT` value and token path as
-the Windows app. If WSL cannot read `$HOME/.petdex-win/runtime/update-token`, setup must
-create a symlink or copy from the Windows-owned `%USERPROFILE%\.petdex-win\runtime`
-location before hooks are considered healthy.
+For WSL hook support, `petdex-bridge` reads the same `BUDDY_PORT` value as the Windows app
+and resolves the token from `BUDDY_TOKEN` first, then
+`$HOME/.petdex-win/runtime/update-token`. Prefer the token file for normal hook use. If WSL
+cannot read that path, setup must create a symlink or copy from the Windows-owned
+`%USERPROFILE%\.petdex-win\runtime` location before hooks are considered healthy.

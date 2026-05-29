@@ -754,7 +754,7 @@
       "id": "REL-03",
       "title": "Implement petdex-bridge for WSL hook events",
       "description": "Replace the placeholder Rust bridge with a production WSL CLI that accepts state commands, reads the shared update token, posts authenticated JSON to the Windows sidecar through localhost passthrough, respects BUDDY_PORT, and returns concise actionable errors for missing token, connection refusal, invalid input, and unauthorized responses.",
-      "status": "todo",
+      "status": "done",
       "priority": "critical",
       "group_id": "REL",
       "depends_on": [],

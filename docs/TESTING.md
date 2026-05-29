@@ -32,6 +32,9 @@ npm run test:coverage
 # Run Rust unit tests
 cd petdex-bridge && cargo test
 
+# Lint the WSL bridge
+cd petdex-bridge && cargo clippy -- -D warnings
+
 # Run Electron E2E tests (requires Windows, launches Electron)
 npm run test:e2e
 ```
@@ -112,8 +115,9 @@ transitions, `once` + `fallback` logic), pointer interactivity detection logic (
 `.resize-handle` region), resize lifecycle IPC calls (`resizeStart`/`resizeMove`/`resizeEnd`),
 App component IPC event handling.
 
-**Rust unit tests:** petdex-bridge CLI arg parsing, HTTP payload construction, token file
-reading, exit codes on connection failure.
+**Rust unit tests:** petdex-bridge CLI arg parsing, HTTP payload construction, loopback
+URL construction, invalid state handling, and invalid port handling. Manual bridge smoke
+checks cover missing token and stopped-sidecar error output.
 
 **Electron E2E:** Window appears at startup, pet state changes via HTTP POST animate
 correctly, state persists across restart, tray Show/Hide/Quit work.
@@ -143,6 +147,7 @@ integration (requires Electron E2E).
 | `src/cli/pets.test.ts` | Pet discovery | isValidPetJson schema validation, validatePetFolder for valid/missing/invalid entries, discoverPets buddy+codex sources, invalid folder reasons, buddyPetsDir/codexPetsDir path resolution and overrides |
 | `src/cli/commands/pets.test.ts` | Pets commands | pets list with source labels and active-pet marker, pets show active pet and unresolved-id warning, pets use validation and state.json persistence, no-writes-to-Codex paths, error messages and exit codes |
 | `src/cli/runtime.test.ts` | CLI runtime launch | package-root walking from built CLI output and missing-Electron detection for installed package layouts |
+| `petdex-bridge/src/main.rs` | WSL bridge | CLI parsing, state payload construction, loopback URL construction, and empty-state validation |
 
 ---
 

@@ -84,7 +84,12 @@ Install or build `petdex-bridge` inside WSL to route WSL shell hook events to th
 ```sh
 cd petdex-bridge
 cargo build --release --target x86_64-unknown-linux-gnu
+target/x86_64-unknown-linux-gnu/release/petdex-bridge state running
 ```
+
+The bridge reads `BUDDY_PORT` (default `7777`) and sends authenticated JSON to
+`http://127.0.0.1:${BUDDY_PORT}/state`. It reads the update token from
+`$HOME/.petdex-win/runtime/update-token`; set `BUDDY_TOKEN` only as a temporary override.
 
 ---
 
@@ -227,6 +232,7 @@ All variables are optional — buddy runs with safe built-in defaults, no `.env`
 | Variable | Default | Description |
 |---|---|---|
 | `BUDDY_PORT` | `7777` | Port for the local HTTP hook sidecar. |
+| `BUDDY_TOKEN` | _(unset)_ | Temporary token override for `petdex-bridge`; normally read from `$HOME/.petdex-win/runtime/update-token`. |
 | `BUDDY_SPRITES_DIR` | `%USERPROFILE%\.petdex-win\pets` | Override the buddy-managed pets directory. |
 | `BUDDY_LOG_LEVEL` | `info` | Main process log level: `debug` `info` `warn` `error`. |
 | `BUDDY_CODEX_COMMAND` | `codex` | Codex CLI command used by `buddy hatch`. |

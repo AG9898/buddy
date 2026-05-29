@@ -171,8 +171,11 @@ These apply across every stack in this project.
 - **Token resolution:** read from `$HOME/.petdex-win/runtime/update-token`; accept
   `BUDDY_TOKEN` env var as an override.
 - **HTTP client:** use `ureq` (sync, small binary footprint) — not `reqwest` (async, large).
-- **Exit codes:** 0 on success, non-zero on connection failure. Electron not running is a
-  common and expected case — do not panic, just exit with a non-zero code.
+- **CLI surface:** implement the supported `state <name>` subcommand first; add new
+  subcommands only when a workboard task defines their behavior.
+- **Exit codes:** 0 on success, non-zero on invalid input, missing token, unauthorized
+  sidecar response, or connection failure. Electron not running is a common and expected
+  case — do not panic, just exit with a non-zero code.
 
 ---
 

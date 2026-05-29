@@ -126,10 +126,10 @@ development build dependency.
 
 **Owns:**
 - A single-purpose CLI binary cross-compiled for `x86_64-unknown-linux-gnu` (runs in WSL).
-- Reads the shared update token from `$HOME/.petdex-win/runtime/update-token`.
+- Reads the shared update token from `BUDDY_TOKEN` when set, otherwise from `$HOME/.petdex-win/runtime/update-token`.
 - Accepts a state name as a CLI argument (`petdex-bridge state running`) and POSTs `{"state":"<name>","source":"claude-code"}` to `http://127.0.0.1:${BUDDY_PORT}/state` with the `X-Petdex-Update-Token` header.
 - Relies on WSL localhost passthrough to reach the Windows-side HTTP sidecar automatically.
-- Emits actionable non-zero errors when the token is missing, WSL localhost passthrough is not routing, or the Electron app is not running.
+- Emits actionable non-zero errors when the token is missing, `BUDDY_PORT` is invalid, the sidecar rejects the token, WSL localhost passthrough is not routing, or the Electron app is not running.
 
 **Does NOT:**
 - Never reads or writes any Codex internal state files.
@@ -143,7 +143,7 @@ development build dependency.
 
 1. An agent CLI event fires in WSL (e.g., Claude Code `PreToolUse` hook).
 2. The shell hook (`.zshrc` / `.bashrc`) calls `petdex-bridge state running`.
-3. petdex-bridge reads the token from `~/.petdex-win/runtime/update-token`.
+3. petdex-bridge reads the token from `BUDDY_TOKEN` or `~/.petdex-win/runtime/update-token`.
 4. petdex-bridge POSTs `{"state":"running","source":"claude-code"}` to `http://127.0.0.1:7777/state` with the `X-Petdex-Update-Token` header. WSL localhost passthrough routes this to the Windows host automatically.
 5. The Electron HTTP sidecar validates the token and receives the payload.
 6. The sidecar sends `pet:state-change { state: "running" }` to the renderer via Electron IPC.
@@ -172,7 +172,7 @@ development build dependency.
 
 buddy has no user-facing authentication. Access to the HTTP sidecar is secured by a shared-secret token:
 
-- **Token location:** `%USERPROFILE%\.petdex-win\runtime\update-token` (Windows) and `$HOME/.petdex-win/runtime/update-token` (WSL symlink or copy).
+- **Token location:** `%USERPROFILE%\.petdex-win\runtime\update-token` (Windows) and `$HOME/.petdex-win/runtime/update-token` (WSL symlink or copy). `petdex-bridge` also accepts a `BUDDY_TOKEN` override for temporary debugging.
 - **Enforcement:** Every POST to `/state` must carry the `X-Petdex-Update-Token` header. The Electron sidecar rejects requests with a missing or incorrect token with HTTP 401.
 - **Scope:** Loopback-only binding (`127.0.0.1`) means the token is a defense-in-depth measure against other local processes — there is no remote attack surface.
 - **Rotation:** Delete and regenerate the token file; restart the Electron app to pick up the new value.
