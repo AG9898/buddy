@@ -642,7 +642,7 @@
       "id": "FEAT-16",
       "title": "Add optional CLI resize command",
       "description": "Add a secondary terminal resize command after visual resize exists. The command should allow users to set a scale or explicit dimensions from the CLI, validate bounds, persist through the same state ownership model as visual resize, and avoid direct unsafe window-file mutation. This task is lower priority than visual resize and should follow the behavior defined in docs/CLI.md.",
-      "status": "todo",
+      "status": "done",
       "priority": "medium",
       "group_id": "FEAT",
       "depends_on": [

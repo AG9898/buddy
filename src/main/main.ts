@@ -11,7 +11,7 @@ import { createTray } from './tray'
 import { startSidecar, stopSidecar } from './sidecar'
 import { loadState, saveState, saveBounds } from './state-store'
 import { resolveActivePet } from './pet-assets'
-import { CH_ACTIVE_PET_GET, CH_DRAG_END, CH_RENDERER_READY, CH_RESIZE_END } from '../shared/ipc-channels'
+import { CH_ACTIVE_PET_GET, CH_CLI_RESIZE, CH_DRAG_END, CH_RENDERER_READY, CH_RESIZE_END } from '../shared/ipc-channels'
 
 // Track whether app.quit() was triggered via the tray Quit item so the
 // 'close' handler knows to allow the window to close.
@@ -95,6 +95,18 @@ app.whenReady().then(() => {
     const display = screen.getDisplayNearestPoint({ x: b.x, y: b.y })
     const res = `${display.bounds.width}x${display.bounds.height}`
     saveBounds(b, res)
+  })
+
+  // 7c. CLI resize: apply dimensions from `buddy size` command and persist.
+  ipcMain.on(CH_CLI_RESIZE, (_event, payload: { width: number; height: number }) => {
+    const current = win.getBounds()
+    const display = screen.getDisplayNearestPoint({ x: current.x, y: current.y })
+    const area = display.workArea
+    const w = Math.min(payload.width, area.width)
+    const h = Math.min(payload.height, area.height)
+    win.setBounds({ ...current, width: w, height: h })
+    const res = `${display.bounds.width}x${display.bounds.height}`
+    saveBounds({ ...current, width: w, height: h }, res)
   })
 
   // 8. Save bounds when the display configuration changes (resolution, scale, etc.).

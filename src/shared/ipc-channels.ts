@@ -11,3 +11,5 @@ export const CH_ACTIVE_PET_GET = 'active-pet-get'
 export const CH_RESIZE_START = 'resize-start'
 export const CH_RESIZE_MOVE = 'resize-move'
 export const CH_RESIZE_END = 'resize-end'
+/** Sent from sidecar → main when a CLI resize request arrives. Payload: { width, height }. */
+export const CH_CLI_RESIZE = 'cli-resize'

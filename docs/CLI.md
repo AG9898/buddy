@@ -22,12 +22,7 @@ The npm package is named `cli-buddy`, but the installed command remains `buddy`.
 | `buddy pets list` | List valid buddy-managed, packaged, and Codex-compatible pets. |
 | `buddy pets show` | Print the currently selected pet and its source path. |
 | `buddy pets use <id>` | Validate and persist the active pet selection. |
-
-Planned window command:
-
-| Command | Purpose |
-|---|---|
-| `buddy size <scale-or-width>` | Resize from the terminal after visual resize support exists. Secondary priority. |
+| `buddy size <scale-or-width>` | Resize the pet window from the terminal. Accepts a scale factor (e.g., `1.5`, `2x`) or explicit WxH dimensions (e.g., `400x300`). |
 
 ---
 
@@ -192,10 +187,19 @@ Electron main owns all window operations. CLI commands may request state changes
 the sidecar or future IPC-backed command surfaces, but they must not directly mutate
 window files or bypass the Electron process.
 
-Visual resize is the primary resize interaction. The renderer should expose a resize
-handle, main should resize the BrowserWindow, and the sprite should scale to fit inside
-the current transparent window without clipping. The app should persist bounds at resize
-end. CLI resize is secondary and should follow the same ownership rule.
+Visual resize is the primary resize interaction. The renderer exposes a resize handle,
+main resizes the BrowserWindow, and the sprite scales to fit inside the current
+transparent window without clipping. The app persists bounds at resize end.
+
+`buddy size` is the secondary CLI resize command. It accepts:
+- A scale factor relative to the default 356×320 window: `buddy size 1.5` or `buddy size 2x`
+- Explicit pixel dimensions: `buddy size 400x300`
+
+`buddy size` POSTs the computed dimensions to `POST /resize` on the local HTTP sidecar
+(same token-authenticated flow as `buddy state`). The sidecar forwards a `CH_CLI_RESIZE`
+IPC message to Electron main, which calls `setBounds` and persists the final bounds via
+`saveBounds`. The accepted size range is 80–1200 pixels per dimension. Sizes outside
+this range produce a non-zero exit with an actionable error message.
 
 Resize behavior must preserve transparent-window constraints, click-through behavior, and
 the existing renderer-ready `showInactive()` lifecycle.

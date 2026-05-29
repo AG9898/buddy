@@ -22,6 +22,7 @@ import { runState } from './commands/state.js'
 import { runDoctor } from './commands/doctor.js'
 import { runHatch } from './commands/hatch.js'
 import { runPetsList, runPetsShow, runPetsUse } from './commands/pets.js'
+import { runSize } from './commands/size.js'
 import { printBanner } from './output.js'
 
 const program = new Command()
@@ -134,6 +135,18 @@ program
       error(err instanceof Error ? err.message : String(err))
       process.exit(1)
     })
+  })
+
+// ── buddy size ────────────────────────────────────────────────────────────────
+program
+  .command('size <scale-or-width>')
+  .description(
+    'Resize the buddy pet window from the terminal. ' +
+      'Accepts a scale factor (e.g., 1.5 or 2x) or explicit WxH dimensions (e.g., 400x300). ' +
+      'Uses the same bounds validation and persistence model as visual resize.',
+  )
+  .action((sizeArg: string) => {
+    runSize(sizeArg)
   })
 
 // ── buddy pets ────────────────────────────────────────────────────────────────

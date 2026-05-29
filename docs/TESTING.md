@@ -153,6 +153,7 @@ integration (requires Electron E2E).
 | `src/cli/commands/hatch.test.ts` | Hatch command | Normal mode suppresses raw subprocess output, verbose flag/env shows subprocess detail, skill-missing error, incomplete packaging error, success summary with pet id and next-step hint |
 | `src/cli/pets.test.ts` | Pet discovery | isValidPetJson schema validation, validatePetFolder for valid/missing/invalid entries, discoverPets buddy+codex sources, invalid folder reasons, buddyPetsDir/codexPetsDir path resolution and overrides |
 | `src/cli/commands/pets.test.ts` | Pets commands | pets list with source labels and active-pet marker, pets show active pet and unresolved-id warning, pets use validation and state.json persistence, no-writes-to-Codex paths, error messages and exit codes |
+| `src/cli/commands/size.test.ts` | Size command | parseSizeInput scale factor/explicit WxH/invalid input, validateBounds min/max enforcement, runSize invalid format errors, out-of-bounds errors, missing token error, POST /resize payload and token, success output, sidecar non-200 error, ECONNREFUSED error |
 | `src/cli/runtime.test.ts` | CLI runtime launch | package-root walking from built CLI output and missing-Electron detection for installed package layouts |
 | `petdex-bridge/src/main.rs` | WSL bridge | CLI parsing, state payload construction, loopback URL construction, token path override, and empty-state validation |
 

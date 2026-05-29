@@ -5,7 +5,7 @@ import http from 'http'
 import fs from 'fs'
 import crypto from 'crypto'
 import { BrowserWindow } from 'electron'
-import { CH_STATE_CHANGE } from '../shared/ipc-channels'
+import { CH_STATE_CHANGE, CH_CLI_RESIZE } from '../shared/ipc-channels'
 import { buddyRuntimeDir, buddyTokenPath } from '../shared/buddy-paths'
 
 // ── Token helpers ─────────────────────────────────────────────────────────────
@@ -148,6 +148,79 @@ function makeHandler(win: BrowserWindow, token: string) {
       }
 
       jsonReply(res, 200, { ok: true })
+      return
+    }
+
+    // POST /resize — token required; resizes the BrowserWindow via main-process IPC
+    if (url === '/resize') {
+      if (method !== 'POST') {
+        jsonReply(res, 405, { error: 'method not allowed' })
+        return
+      }
+
+      const ct = req.headers['content-type'] ?? ''
+      if (!ct.includes('application/json')) {
+        jsonReply(res, 400, { error: 'Content-Type must be application/json' })
+        return
+      }
+
+      const incomingToken = req.headers['x-petdex-update-token'] ?? ''
+      if (incomingToken !== token) {
+        jsonReply(res, 401, { error: 'unauthorized' })
+        return
+      }
+
+      let rawBody: string
+      try {
+        rawBody = await readBody(req)
+      } catch {
+        jsonReply(res, 400, { error: 'request body too large or unreadable' })
+        return
+      }
+
+      let parsed: unknown
+      try {
+        parsed = JSON.parse(rawBody)
+      } catch {
+        jsonReply(res, 400, { error: 'invalid JSON' })
+        return
+      }
+
+      if (
+        typeof parsed !== 'object' ||
+        parsed === null ||
+        typeof (parsed as Record<string, unknown>)['width'] !== 'number' ||
+        typeof (parsed as Record<string, unknown>)['height'] !== 'number'
+      ) {
+        jsonReply(res, 400, { error: 'missing or invalid width/height fields' })
+        return
+      }
+
+      const { width, height } = parsed as { width: number; height: number }
+
+      // Bounds validation: enforce min/max size
+      const MIN_SIZE = 80
+      const MAX_SIZE = 1200
+      if (
+        !Number.isFinite(width) ||
+        !Number.isFinite(height) ||
+        width < MIN_SIZE ||
+        height < MIN_SIZE ||
+        width > MAX_SIZE ||
+        height > MAX_SIZE
+      ) {
+        jsonReply(res, 400, {
+          error: `width and height must each be between ${MIN_SIZE} and ${MAX_SIZE} pixels`,
+        })
+        return
+      }
+
+      // Forward to main process via IPC
+      if (!win.isDestroyed()) {
+        win.webContents.send(CH_CLI_RESIZE, { width: Math.round(width), height: Math.round(height) })
+      }
+
+      jsonReply(res, 200, { ok: true, width: Math.round(width), height: Math.round(height) })
       return
     }
 
