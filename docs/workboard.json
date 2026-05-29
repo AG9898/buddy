@@ -824,7 +824,7 @@
       "id": "REL-05",
       "title": "Verify and harden Claude Code and Codex hooks",
       "description": "Audit current hook installation against real Claude Code and Codex CLI behavior on Windows and WSL, then harden install/status/doctor output so both integrations can be verified before v0.1. Preserve idempotency, avoid writing internal assistant state, and ensure hook commands invoke buddy or petdex-bridge according to the runtime environment.",
-      "status": "todo",
+      "status": "done",
       "priority": "critical",
       "group_id": "REL",
       "depends_on": [

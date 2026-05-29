@@ -80,6 +80,7 @@ function checkHooks(): Record<string, boolean> {
   return getHooksStatus({
     claudeCode: true,
     codexCli: true,
+    runtime: isWSL() ? 'wsl' : 'windows',
   })
 }
 

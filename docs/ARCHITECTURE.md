@@ -36,7 +36,7 @@ selection UX, and CLI lifecycle semantics live in [`CLI.md`](CLI.md).
 - Environment detection: reads `/proc/version` to determine if running in WSL or natively on Windows.
 - On Windows: `buddy start` spawns the Electron app process detached and returns control to the terminal; `buddy stop` terminates it.
 - In WSL: `buddy start` invokes the Windows-side `buddy.exe` via WSL interop; prints a clear actionable error if interop is unavailable.
-- `buddy hooks install`: writes shell hook entries for Claude Code CLI and Codex CLI (both operate via shell hooks / rc files — no desktop app config is written).
+- `buddy hooks install`: writes user-level hook entries for Claude Code CLI and Codex CLI. Claude Code receives entries in `~/.claude/settings.json`; Codex CLI receives entries in `~/.codex/hooks.json`. Windows hooks call `buddy state <name>`, and WSL hooks call `petdex-bridge state <name>`.
 - `buddy state <name>`: sends an HTTP POST to the running sidecar (works from both Windows and WSL via localhost passthrough).
 - `buddy doctor`: checks that the Electron process is running, the sidecar responds, the update token exists, and hooks are installed.
 - `buddy hatch <prompt>`: prepares a hatch-pet run, verifies Codex CLI is installed and ready with `codex doctor`, then invokes `codex exec` as the image-generation worker so `$imagegen` is provided by Codex rather than by a buddy-owned image API adapter. The command packages the completed run into buddy's `pets/<id>/pet.json`, `spritesheet.webp`, and `build/icon.ico` formats.
@@ -77,7 +77,7 @@ development build dependency.
 - Window resize: receives resize interactions from the renderer, updates BrowserWindow bounds, preserves click-through behavior, and persists final bounds on resize end.
 - Pet selection: owns active pet state and asset loading. `pet-assets.ts` resolves the persisted `state.pet.id` against validated buddy-managed, packaged, and Codex-compatible pet folders, falls back to the packaged `default` pet with a diagnostic when the selected id is missing or invalid, and exposes only the active manifest plus a renderer-safe spritesheet `file://` URL over preload IPC.
 - System tray (Show / Hide / Quit) to keep the process alive when the window is hidden.
-- Hook installation: `hooks-install.ts` exports `installHooks(options)` and `getHooksStatus(options)`. For Claude Code CLI it writes hook entries to `~/.claude/settings.json` (hooks section); for Codex CLI it appends shell environment-variable blocks to the target rc file. Both operations are idempotent. The module contains no top-level Electron import and is safe to call from the CLI layer (FEAT-09) without an Electron environment. The `installHooksWithDialog()` helper is intended for tray use only and dynamically requires Electron's `dialog` API at call time.
+- Hook installation: `hooks-install.ts` exports `installHooks(options)` and `getHooksStatus(options)`. For Claude Code CLI it writes hook entries to `~/.claude/settings.json` (hooks section); for Codex CLI it writes hook entries to `~/.codex/hooks.json`. Both operations are idempotent and preserve unrelated entries. The installer is runtime-aware: Windows hooks invoke `buddy state <name>`, while WSL hooks invoke `petdex-bridge state <name>`. The module contains no top-level Electron import and is safe to call from the CLI layer (FEAT-09) without an Electron environment. The `installHooksWithDialog()` helper is intended for tray use only and dynamically requires Electron's `dialog` API at call time.
 - Files: `main.ts`, `avatar-window.ts`, `state-store.ts`, `sidecar.ts`, `tray.ts`, `hooks-install.ts`.
 
 **Does NOT:**
@@ -144,7 +144,7 @@ development build dependency.
 ### (a) WSL hook → petdex-bridge → HTTP sidecar → Electron IPC → Svelte renderer
 
 1. An agent CLI event fires in WSL (e.g., Claude Code `PreToolUse` hook).
-2. The shell hook (`.zshrc` / `.bashrc`) calls `petdex-bridge state running`.
+2. The user-level hook entry calls `petdex-bridge state running`.
 3. petdex-bridge reads the token from `BUDDY_TOKEN` or `<buddy data dir>/runtime/update-token`.
 4. petdex-bridge POSTs `{"state":"running","source":"claude-code"}` to `http://127.0.0.1:7777/state` with the `X-Petdex-Update-Token` header. WSL localhost passthrough routes this to the Windows host automatically.
 5. The Electron HTTP sidecar validates the token and receives the payload.

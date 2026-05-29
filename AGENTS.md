@@ -303,3 +303,6 @@ Electron main resolves the selected pet and sends only one manifest plus one spr
 
 ### 2026-05-29 - WSL shares the Windows-owned .petdex-win directory
 Windows remains the owner of rendering, active pet selection, and token creation, while WSL tools read the same data through `$HOME/.petdex-win`. Prefer symlinking `$HOME/.petdex-win` to `/mnt/c/Users/<you>/.petdex-win`; use `BUDDY_DATA_DIR` only when a symlink or token copy is not practical.
+
+### 2026-05-29 - Codex hooks use hooks.json, not shell rc exports
+Current Codex CLI hook configuration uses `~/.codex/hooks.json`; the old shell rc `CODEX_HOOK_*` export approach is not the supported installer target. After `buddy hooks install`, users may still need to review/trust the new Codex command hooks from `/hooks` before Codex executes them.

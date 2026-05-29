@@ -77,10 +77,9 @@ hooks
   .command('install')
   .description(
     'Write Claude Code and Codex CLI hook entries. ' +
-      'On Windows writes to ~/.claude/settings.json; ' +
-      'in WSL also appends to ~/.zshrc or ~/.bashrc.',
+      'On Windows they call buddy state; in WSL they call petdex-bridge state.',
   )
-  .option('--rc <path>', 'Path to shell rc file (overrides default ~/.zshrc / ~/.bashrc)')
+  .option('--rc <path>', 'Deprecated; retained for older scripts and ignored')
   .action(function (this: CommandType) {
     const opts = this.opts() as { rc?: string }
     runHooksInstall(opts.rc)

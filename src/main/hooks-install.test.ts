@@ -2,7 +2,7 @@
  * Unit tests for src/main/hooks-install.ts
  * Acceptance criteria:
  *   - installHooks({claudeCode:true}) writes all five Claude Code hook events to settings.json
- *   - installHooks({codexCli:true, shellRcPath}) appends Codex shell blocks to the rc file
+ *   - installHooks({codexCli:true}) writes all five Codex hook events to hooks.json
  *   - Re-running installHooks is idempotent (no duplicate entries)
  *   - getHooksStatus() accurately reports which hooks are installed
  *   - No top-level Electron import — module loads without Electron
@@ -16,13 +16,11 @@ const {
   mockReadFileSync,
   mockWriteFileSync,
   mockMkdirSync,
-  mockAppendFileSync,
   mockExistsSync,
 } = vi.hoisted(() => ({
   mockReadFileSync: vi.fn(),
   mockWriteFileSync: vi.fn(),
   mockMkdirSync: vi.fn(),
-  mockAppendFileSync: vi.fn(),
   mockExistsSync: vi.fn(),
 }))
 
@@ -31,13 +29,11 @@ vi.mock('fs', () => ({
     readFileSync: mockReadFileSync,
     writeFileSync: mockWriteFileSync,
     mkdirSync: mockMkdirSync,
-    appendFileSync: mockAppendFileSync,
     existsSync: mockExistsSync,
   },
   readFileSync: mockReadFileSync,
   writeFileSync: mockWriteFileSync,
   mkdirSync: mockMkdirSync,
-  appendFileSync: mockAppendFileSync,
   existsSync: mockExistsSync,
 }))
 
@@ -58,7 +54,8 @@ import {
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 const HOOK_EVENTS = Object.keys(HOOK_EVENT_MAP)
-const DEFAULT_RC = `${MOCK_HOME}/.bashrc` // SHELL env is unset in test — defaults to bashrc
+const CLAUDE_SETTINGS = `${MOCK_HOME}/.claude/settings.json`
+const CODEX_HOOKS = `${MOCK_HOME}/.codex/hooks.json`
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -115,6 +112,21 @@ describe('installHooks — claudeCode', () => {
     expect(mockWriteFileSync).not.toHaveBeenCalled()
   })
 
+  it('writes petdex-bridge commands for WSL-hosted Claude Code hooks', () => {
+    let written = ''
+    mockWriteFileSync.mockImplementation((_p: unknown, data: unknown) => {
+      written = data as string
+    })
+
+    const result = installHooks({ claudeCode: true, runtime: 'wsl' })
+
+    expect(result.errors).toHaveLength(0)
+    const settings = JSON.parse(written) as { hooks: Record<string, { hooks: { command: string }[] }[]> }
+    expect(settings.hooks['PreToolUse']?.[0]?.hooks[0]?.command).toBe(
+      'petdex-bridge state running',
+    )
+  })
+
   it('only installs missing events when settings.json has some hooks already', () => {
     // Pre-populate settings.json with two hook events.
     const partial = {
@@ -158,58 +170,61 @@ describe('installHooks — claudeCode', () => {
 // ── installHooks — Codex CLI ───────────────────────────────────────────────
 
 describe('installHooks — codexCli', () => {
-  it('appends all five shell blocks when rc file does not exist', () => {
-    const appended: string[] = []
-    mockAppendFileSync.mockImplementation((_p: unknown, data: unknown) => {
-      appended.push(data as string)
+  it('writes all five hook events to ~/.codex/hooks.json when starting from empty', () => {
+    let writtenPath = ''
+    let written = ''
+    mockWriteFileSync.mockImplementation((p: unknown, data: unknown) => {
+      writtenPath = p as string
+      written = data as string
     })
 
-    const result = installHooks({ codexCli: true, shellRcPath: DEFAULT_RC })
+    const result = installHooks({ codexCli: true })
 
     expect(result.errors).toHaveLength(0)
     expect(result.installed).toHaveLength(5)
     expect(result.skipped).toHaveLength(0)
+    expect(writtenPath).toBe(CODEX_HOOKS)
     for (const event of HOOK_EVENTS) {
       expect(result.installed).toContain(`codex-cli:${event}`)
     }
 
-    // The appended content should contain all five sentinel markers.
-    const all = appended.join('')
+    const settings = JSON.parse(written) as { hooks: Record<string, { hooks: { command: string }[] }[]> }
     for (const event of HOOK_EVENTS) {
-      expect(all).toContain(`# buddy-hooks-install codex ${event}`)
+      expect(settings.hooks[event]).toBeDefined()
     }
+    expect(settings.hooks['PreToolUse']?.[0]?.hooks[0]?.command).toBe('buddy state running')
   })
 
-  it('is idempotent — does not append duplicate blocks', () => {
-    // First run: build what would have been appended.
-    const appendedParts: string[] = []
-    mockAppendFileSync.mockImplementation((_p: unknown, data: unknown) => {
-      appendedParts.push(data as string)
+  it('is idempotent — does not create duplicate entries', () => {
+    let capturedJson = ''
+    mockWriteFileSync.mockImplementation((_p: unknown, data: unknown) => {
+      capturedJson = data as string
     })
-    installHooks({ codexCli: true, shellRcPath: DEFAULT_RC })
-    const existingContent = appendedParts.join('')
+    installHooks({ codexCli: true })
 
-    // Second run: rc file now contains the blocks.
-    mockReadFileSync.mockReturnValue(existingContent)
-    mockAppendFileSync.mockClear()
-    const result2 = installHooks({ codexCli: true, shellRcPath: DEFAULT_RC })
+    mockReadFileSync.mockReturnValue(capturedJson)
+    mockWriteFileSync.mockClear()
+    const result2 = installHooks({ codexCli: true })
 
     expect(result2.installed).toHaveLength(0)
     expect(result2.skipped).toHaveLength(5)
     expect(result2.errors).toHaveLength(0)
-    expect(mockAppendFileSync).not.toHaveBeenCalled()
+    expect(mockWriteFileSync).not.toHaveBeenCalled()
   })
 
-  it('uses custom shellRcPath when provided', () => {
-    const customRc = '/custom/path/.rc'
-    let appendedPath = ''
-    mockAppendFileSync.mockImplementation((p: unknown) => {
-      appendedPath = p as string
+  it('writes petdex-bridge commands for WSL-hosted Codex hooks', () => {
+    let written = ''
+    mockWriteFileSync.mockImplementation((_p: unknown, data: unknown) => {
+      written = data as string
     })
 
-    installHooks({ codexCli: true, shellRcPath: customRc })
+    const result = installHooks({ codexCli: true, runtime: 'wsl' })
 
-    expect(appendedPath).toBe(customRc)
+    expect(result.errors).toHaveLength(0)
+    const settings = JSON.parse(written) as { hooks: Record<string, { hooks: { command: string }[] }[]> }
+    expect(settings.hooks['PreToolUse']?.[0]?.hooks[0]?.command).toBe(
+      'petdex-bridge state running',
+    )
   })
 })
 
@@ -217,7 +232,7 @@ describe('installHooks — codexCli', () => {
 
 describe('getHooksStatus', () => {
   it('returns false for all hooks when settings.json and rc file do not exist', () => {
-    const status = getHooksStatus({ claudeCode: true, codexCli: true, shellRcPath: DEFAULT_RC })
+    const status = getHooksStatus({ claudeCode: true, codexCli: true })
 
     for (const event of HOOK_EVENTS) {
       expect(status[`claude-code:${event}`]).toBe(false)
@@ -233,7 +248,10 @@ describe('getHooksStatus', () => {
     installHooks({ claudeCode: true })
 
     // Now simulate settings.json containing the written data.
-    mockReadFileSync.mockReturnValue(written)
+    mockReadFileSync.mockImplementation((p: unknown) => {
+      if (p === CLAUDE_SETTINGS) return written
+      throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' })
+    })
 
     const status = getHooksStatus({ claudeCode: true })
     for (const event of HOOK_EVENTS) {
@@ -241,17 +259,19 @@ describe('getHooksStatus', () => {
     }
   })
 
-  it('returns true for codex-cli hooks after installHooks appends rc blocks', () => {
-    const appendedParts: string[] = []
-    mockAppendFileSync.mockImplementation((_p: unknown, data: unknown) => {
-      appendedParts.push(data as string)
+  it('returns true for codex-cli hooks after installHooks writes hooks.json', () => {
+    let written = ''
+    mockWriteFileSync.mockImplementation((_p: unknown, data: unknown) => {
+      written = data as string
     })
-    installHooks({ codexCli: true, shellRcPath: DEFAULT_RC })
+    installHooks({ codexCli: true })
 
-    // rc file now contains what was appended.
-    mockReadFileSync.mockReturnValue(appendedParts.join(''))
+    mockReadFileSync.mockImplementation((p: unknown) => {
+      if (p === CODEX_HOOKS) return written
+      throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' })
+    })
 
-    const status = getHooksStatus({ codexCli: true, shellRcPath: DEFAULT_RC })
+    const status = getHooksStatus({ codexCli: true })
     for (const event of HOOK_EVENTS) {
       expect(status[`codex-cli:${event}`]).toBe(true)
     }

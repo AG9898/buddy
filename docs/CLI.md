@@ -100,6 +100,24 @@ output is added, document it in [`ENV_VARS.md`](ENV_VARS.md).
 
 ---
 
+## Hook Installation
+
+`buddy hooks install` configures both supported assistant CLIs in the current host
+environment:
+
+- Claude Code hooks are written to `~/.claude/settings.json`.
+- Codex CLI hooks are written to `~/.codex/hooks.json`.
+- Windows-hosted hooks run `buddy state <name>`.
+- WSL-hosted hooks run `petdex-bridge state <name>` so hook events cross into the
+  Windows Electron sidecar through the WSL bridge.
+
+The command is idempotent and preserves unrelated hook entries in existing JSON files.
+The legacy `--rc <path>` flag is accepted for older scripts but is ignored; Codex CLI
+hooks no longer use shell rc environment-variable exports.
+
+After installing Codex hooks, users may need to open `/hooks` inside Codex CLI to review
+and trust the new command hooks before Codex will execute them.
+
 ## Hatch Workflow Output
 
 `buddy hatch` is a user command, not a transcript dump. It delegates the visual generation

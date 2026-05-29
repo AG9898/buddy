@@ -72,7 +72,7 @@ The pet window appears on your desktop. `buddy start` launches the app detached 
 ```sh
 npm install -g cli-buddy
 buddy start          # uses WSL interop to launch the Windows Electron app
-buddy hooks install  # wires Claude Code and Codex CLI hooks into your shell rc
+buddy hooks install  # wires Claude Code and Codex CLI hooks for WSL
 ```
 
 WSL interop must be enabled. If `buddy.exe` is not reachable, buddy prints a clear actionable error.
@@ -133,7 +133,7 @@ buddy <command> [options]
 | `buddy start` | Launch the Electron pet window, return control to the terminal. |
 | `buddy stop` | Quit the running pet app. |
 | `buddy state <name>` | Manually push a state (`idle`, `running`, `waiting`, …). |
-| `buddy hooks install` | Write Claude Code + Codex CLI hooks into your shell rc file. |
+| `buddy hooks install` | Write Claude Code + Codex CLI hook entries. |
 | `buddy doctor` | Health check: process, sidecar, token, and hook status. |
 | `buddy hatch <prompt>` | Generate a new pet via Codex CLI image generation. |
 | `buddy pets list` | List all valid buddy-managed and Codex-compatible pets. |
@@ -146,7 +146,7 @@ buddy <command> [options]
 |---|---|---|
 | `--output <dir>` | `hatch` | Custom output directory for the generated pet. |
 | `--verbose` | `hatch` | Show raw Codex subprocess output. |
-| `--rc <path>` | `hooks install` | Target a specific rc file instead of the default. |
+| `--rc <path>` | `hooks install` | Deprecated compatibility flag; ignored. |
 
 ---
 
@@ -207,7 +207,16 @@ buddy pets use orange-cat
 
 ## Hook Integration
 
-`buddy hooks install` writes hook entries for Claude Code and Codex CLI into your shell rc (`.zshrc` or `.bashrc`). The event pipeline from there:
+`buddy hooks install` writes hook entries for Claude Code and Codex CLI in the current
+host environment:
+
+- Claude Code: `~/.claude/settings.json`
+- Codex CLI: `~/.codex/hooks.json`
+- Windows hooks call `buddy state <name>`
+- WSL hooks call `petdex-bridge state <name>`
+
+After installing Codex hooks, open `/hooks` in Codex CLI if prompted and trust the new
+buddy command hooks. The event pipeline from there:
 
 ```
 [ Claude Code / Codex CLI hook fires ]

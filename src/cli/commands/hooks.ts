@@ -1,10 +1,8 @@
 /**
  * buddy hooks install — write Claude Code and/or Codex CLI hook entries.
  *
- * On Windows: installs Codex CLI hooks (shell rc is rarely used on Windows,
- * but we also install Claude Code hooks since settings.json is accessible).
- * In WSL: installs Claude Code hooks to ~/.claude/settings.json and
- * appends Codex shell blocks to ~/.zshrc or ~/.bashrc.
+ * On Windows: installs hooks that call `buddy state <name>`.
+ * In WSL: installs hooks that call `petdex-bridge state <name>`.
  *
  * No Electron imports in this module.
  */
@@ -17,7 +15,8 @@ export function runHooksInstall(shellRcPath?: string): void {
 
   const result: HookInstallResult = installHooks({
     claudeCode: true,
-    codexCli: inWSL,
+    codexCli: true,
+    runtime: inWSL ? 'wsl' : 'windows',
     shellRcPath,
   })
 

@@ -122,9 +122,10 @@ checks cover missing token and stopped-sidecar error output.
 **Electron E2E:** Window appears at startup, pet state changes via HTTP POST animate
 correctly, state persists across restart, tray Show/Hide/Quit work.
 
-**Main-process unit tests:** State persistence and active-pet asset resolution, including
-selected buddy-managed pets, persisted startup state, and fallback to packaged default
-when a stored pet id no longer resolves.
+**Main-process unit tests:** State persistence, active-pet asset resolution, and hook
+installation/status. Hook tests cover Claude Code `settings.json`, Codex CLI
+`hooks.json`, Windows `buddy state` commands, WSL `petdex-bridge state` commands,
+idempotency, and missing-hook status.
 
 **CLI tests:** Command help and changed command behavior, non-TTY/plain output, styled
 output when supported, expected error messages and exit codes, hatch progress output that
@@ -147,7 +148,7 @@ integration (requires Electron E2E).
 | `src/main/pet-assets.test.ts` | Active pet assets | Selected pet resolution, packaged default fallback diagnostics, persisted startup state, pet manifest validation |
 | `src/cli/env.test.ts` | CLI environment | isWSL() detection, buddyPort() defaults and overrides, sidecarBaseUrl() |
 | `src/shared/buddy-paths.test.ts` | Shared paths | buddy data root defaults, `BUDDY_DATA_DIR` override, and derived state/token/pet paths |
-| `src/main/hooks-install.test.ts` | Hook installation | installHooks idempotency, getHooksStatus, Claude Code and Codex CLI targets |
+| `src/main/hooks-install.test.ts` | Hook installation | installHooks idempotency, getHooksStatus, Claude Code settings, Codex hooks.json, Windows and WSL command targets |
 | `src/cli/output.test.ts` | CLI output layer | status/success/warn/error helpers, NO_COLOR plain mode, check/subCheck/bullet/label, banner text, separator |
 | `src/cli/commands/hatch.test.ts` | Hatch command | Normal mode suppresses raw subprocess output, verbose flag/env shows subprocess detail, skill-missing error, incomplete packaging error, success summary with pet id and next-step hint |
 | `src/cli/pets.test.ts` | Pet discovery | isValidPetJson schema validation, validatePetFolder for valid/missing/invalid entries, discoverPets buddy+codex sources, invalid folder reasons, buddyPetsDir/codexPetsDir path resolution and overrides |

@@ -25,9 +25,6 @@ export const HOOK_EVENT_MAP: Record<string, string> = {
 /** Ordered list of all five hook events. */
 const HOOK_EVENTS = Object.keys(HOOK_EVENT_MAP)
 
-/** Sentinel comment injected into rc files so we can detect existing entries. */
-const RC_SENTINEL = '# buddy-hooks-install'
-
 // ── Path helpers ──────────────────────────────────────────────────────────────
 
 function homeDir(): string {
@@ -39,13 +36,9 @@ function claudeSettingsPath(): string {
   return path.join(homeDir(), '.claude', 'settings.json')
 }
 
-/** Default shell rc path — ~/.zshrc when SHELL contains zsh, else ~/.bashrc. */
-function defaultRcPath(): string {
-  const shell = process.env['SHELL'] ?? ''
-  if (shell.includes('zsh')) {
-    return path.join(homeDir(), '.zshrc')
-  }
-  return path.join(homeDir(), '.bashrc')
+/** ~/.codex/hooks.json */
+function codexHooksPath(): string {
+  return path.join(homeDir(), '.codex', 'hooks.json')
 }
 
 /** Token file path (Windows style via USERPROFILE, or XDG-style home). */
@@ -63,6 +56,21 @@ interface ClaudeHookCommand {
 interface ClaudeHookEntry {
   matcher: string
   hooks: ClaudeHookCommand[]
+}
+
+interface HookCommand {
+  type: 'command'
+  command: string
+}
+
+interface HookEntry {
+  matcher: string
+  hooks: HookCommand[]
+}
+
+interface HookSettings {
+  hooks?: Record<string, HookEntry[]>
+  [key: string]: unknown
 }
 
 interface ClaudeSettings {
@@ -90,12 +98,34 @@ function saveClaudeSettings(settings: ClaudeSettings): void {
   fs.writeFileSync(claudeSettingsPath(), JSON.stringify(settings, null, 2), 'utf8')
 }
 
+function loadCodexHooks(): HookSettings {
+  const filePath = codexHooksPath()
+  try {
+    const raw = fs.readFileSync(filePath, 'utf8')
+    const parsed: unknown = JSON.parse(raw)
+    if (typeof parsed === 'object' && parsed !== null) {
+      return parsed as HookSettings
+    }
+  } catch {
+    // File missing or invalid — start fresh.
+  }
+  return {}
+}
+
+function saveCodexHooks(settings: HookSettings): void {
+  const dir = path.dirname(codexHooksPath())
+  fs.mkdirSync(dir, { recursive: true })
+  fs.writeFileSync(codexHooksPath(), JSON.stringify(settings, null, 2), 'utf8')
+}
+
 /**
  * Build the buddy command string for a given pet state.
- * Uses `buddy state <state>` so it works from both Windows and WSL.
+ * Uses `buddy state <state>` for Windows-hosted hooks and `petdex-bridge state
+ * <state>` for WSL-hosted hooks so WSL agent events cross into the Windows app
+ * through the Rust bridge.
  */
-function buddyStateCommand(petState: string): string {
-  return `buddy state ${petState}`
+function stateCommand(petState: string, runtime: HookRuntime): string {
+  return runtime === 'wsl' ? `petdex-bridge state ${petState}` : `buddy state ${petState}`
 }
 
 /**
@@ -108,44 +138,35 @@ function isClaudeHookInstalled(settings: ClaudeSettings, event: string): boolean
   const entries = hooks[event] ?? []
   const petState = HOOK_EVENT_MAP[event]
   if (!petState) return false
-  const expected = buddyStateCommand(petState)
+  const expected = stateCommand(petState, currentHookRuntime())
   return entries.some((entry) =>
     entry.hooks?.some((h) => h.type === 'command' && h.command === expected),
   )
 }
 
-// ── Shell rc helpers ──────────────────────────────────────────────────────────
-
 /**
- * Build the shell hook line for a given Codex event and pet state.
- * Written as a POSIX shell function bound via the Codex environment variable
- * convention used in shell rc files.  The format mirrors the existing
- * petdex hook style found in handoff.md.
- *
- * Each block has the form:
- *   # buddy-hooks-install codex UserPromptSubmit
- *   export CODEX_HOOK_USER_PROMPT_SUBMIT="buddy state jumping"
+ * Check whether a Codex hook entry for a given event already exists in
+ * ~/.codex/hooks.json with the expected runtime command.
  */
-function codexShellBlock(event: string, petState: string): string {
-  const varName = `CODEX_HOOK_${event.replace(/([A-Z])/g, '_$1').slice(1).toUpperCase()}`
-  return `${RC_SENTINEL} codex ${event}\nexport ${varName}="buddy state ${petState}"`
-}
-
-/**
- * Check whether a Codex shell block for `event` already exists in rc content.
- */
-function isCodexRcBlockPresent(content: string, event: string): boolean {
-  return content.includes(`${RC_SENTINEL} codex ${event}`)
+function isHookInstalled(settings: HookSettings, event: string, command: string): boolean {
+  const hooks = settings.hooks ?? {}
+  const entries = hooks[event] ?? []
+  return entries.some((entry) =>
+    entry.hooks?.some((h) => h.type === 'command' && h.command === command),
+  )
 }
 
 // ── Public types ──────────────────────────────────────────────────────────────
 
+export type HookRuntime = 'windows' | 'wsl'
+
 export interface HookInstallOptions {
   claudeCode?: boolean
   codexCli?: boolean
+  runtime?: HookRuntime
   /**
-   * Path to the shell rc file for shell-based hooks.
-   * Defaults to ~/.zshrc or ~/.bashrc based on the SHELL env variable.
+   * Deprecated legacy option retained for CLI compatibility. Codex hooks are
+   * installed to ~/.codex/hooks.json, not shell rc files.
    */
   shellRcPath?: string
 }
@@ -156,97 +177,118 @@ export interface HookInstallResult {
   errors: string[]
 }
 
+let hookRuntimeOverride: HookRuntime | null = null
+
+function currentHookRuntime(): HookRuntime {
+  return hookRuntimeOverride ?? 'windows'
+}
+
+function withHookRuntime<T>(runtime: HookRuntime | undefined, fn: () => T): T {
+  const previous = hookRuntimeOverride
+  hookRuntimeOverride = runtime ?? 'windows'
+  try {
+    return fn()
+  } finally {
+    hookRuntimeOverride = previous
+  }
+}
+
 // ── installHooks ──────────────────────────────────────────────────────────────
 
 /**
  * Install Claude Code CLI and/or Codex CLI hooks.
  *
  * - Claude Code: writes hook entries to ~/.claude/settings.json.
- * - Codex CLI: appends shell hook lines to the specified (or default) rc file.
+ * - Codex CLI: writes hook entries to ~/.codex/hooks.json.
  * - Both targets are idempotent — no duplicates are written.
  *
  * This function contains NO top-level Electron imports and is safe to call
  * from the CLI layer (FEAT-09) without an Electron environment.
  */
 export function installHooks(options: HookInstallOptions = {}): HookInstallResult {
-  const result: HookInstallResult = { installed: [], skipped: [], errors: [] }
+  return withHookRuntime(options.runtime, () => {
+    const result: HookInstallResult = { installed: [], skipped: [], errors: [] }
 
-  // ── Claude Code CLI ────────────────────────────────────────────────────────
-  if (options.claudeCode) {
-    try {
-      const settings = loadClaudeSettings()
-      if (!settings.hooks) {
-        settings.hooks = {}
-      }
-
-      let changed = false
-
-      for (const event of HOOK_EVENTS) {
-        const petState = HOOK_EVENT_MAP[event]
-        if (!petState) continue
-
-        if (isClaudeHookInstalled(settings, event)) {
-          result.skipped.push(`claude-code:${event}`)
-          continue
-        }
-
-        // Append a new hook entry for this event.
-        if (!settings.hooks[event]) {
-          settings.hooks[event] = []
-        }
-        settings.hooks[event].push({
-          matcher: '',
-          hooks: [{ type: 'command', command: buddyStateCommand(petState) }],
-        })
-        result.installed.push(`claude-code:${event}`)
-        changed = true
-      }
-
-      if (changed) {
-        saveClaudeSettings(settings)
-      }
-    } catch (err) {
-      result.errors.push(`claude-code: ${err instanceof Error ? err.message : String(err)}`)
-    }
-  }
-
-  // ── Codex CLI (shell rc) ───────────────────────────────────────────────────
-  if (options.codexCli) {
-    const rcPath = options.shellRcPath ?? defaultRcPath()
-    try {
-      // Read existing content (empty string if file does not exist).
-      let content = ''
+    // ── Claude Code CLI ──────────────────────────────────────────────────────
+    if (options.claudeCode) {
       try {
-        content = fs.readFileSync(rcPath, 'utf8')
-      } catch {
-        // File does not exist yet — will be created.
-      }
-
-      const blocksToAppend: string[] = []
-
-      for (const event of HOOK_EVENTS) {
-        const petState = HOOK_EVENT_MAP[event]
-        if (!petState) continue
-
-        if (isCodexRcBlockPresent(content, event)) {
-          result.skipped.push(`codex-cli:${event}`)
-          continue
+        const settings = loadClaudeSettings()
+        if (!settings.hooks) {
+          settings.hooks = {}
         }
 
-        blocksToAppend.push(codexShellBlock(event, petState))
-        result.installed.push(`codex-cli:${event}`)
-      }
+        let changed = false
 
-      if (blocksToAppend.length > 0) {
-        const append = '\n' + blocksToAppend.join('\n') + '\n'
-        fs.appendFileSync(rcPath, append, 'utf8')
+        for (const event of HOOK_EVENTS) {
+          const petState = HOOK_EVENT_MAP[event]
+          if (!petState) continue
+
+          if (isClaudeHookInstalled(settings, event)) {
+            result.skipped.push(`claude-code:${event}`)
+            continue
+          }
+
+          // Append a new hook entry for this event.
+          if (!settings.hooks[event]) {
+            settings.hooks[event] = []
+          }
+          settings.hooks[event].push({
+            matcher: '',
+            hooks: [{ type: 'command', command: stateCommand(petState, currentHookRuntime()) }],
+          })
+          result.installed.push(`claude-code:${event}`)
+          changed = true
+        }
+
+        if (changed) {
+          saveClaudeSettings(settings)
+        }
+      } catch (err) {
+        result.errors.push(`claude-code: ${err instanceof Error ? err.message : String(err)}`)
       }
-    } catch (err) {
-      result.errors.push(`codex-cli: ${err instanceof Error ? err.message : String(err)}`)
     }
-  }
 
-  return result
+    // ── Codex CLI ────────────────────────────────────────────────────────────
+    if (options.codexCli) {
+      try {
+        const settings = loadCodexHooks()
+        if (!settings.hooks) {
+          settings.hooks = {}
+        }
+
+        let changed = false
+
+        for (const event of HOOK_EVENTS) {
+          const petState = HOOK_EVENT_MAP[event]
+          if (!petState) continue
+
+          const command = stateCommand(petState, currentHookRuntime())
+          if (isHookInstalled(settings, event, command)) {
+            result.skipped.push(`codex-cli:${event}`)
+            continue
+          }
+
+          if (!settings.hooks[event]) {
+            settings.hooks[event] = []
+          }
+          settings.hooks[event].push({
+            matcher: '',
+            hooks: [{ type: 'command', command }],
+          })
+          result.installed.push(`codex-cli:${event}`)
+          changed = true
+        }
+
+        if (changed) {
+          saveCodexHooks(settings)
+        }
+      } catch (err) {
+        result.errors.push(`codex-cli: ${err instanceof Error ? err.message : String(err)}`)
+      }
+    }
+
+    return result
+  })
 }
 
 // ── getHooksStatus ─────────────────────────────────────────────────────────────
@@ -260,31 +302,30 @@ export function installHooks(options: HookInstallOptions = {}): HookInstallResul
  * Example: `{ "claude-code:PreToolUse": true, "codex-cli:PreToolUse": false, ... }`
  */
 export function getHooksStatus(options: HookInstallOptions = {}): Record<string, boolean> {
-  const status: Record<string, boolean> = {}
+  return withHookRuntime(options.runtime, () => {
+    const status: Record<string, boolean> = {}
 
-  // ── Claude Code CLI ────────────────────────────────────────────────────────
-  if (options.claudeCode !== false) {
-    const settings = loadClaudeSettings()
-    for (const event of HOOK_EVENTS) {
-      status[`claude-code:${event}`] = isClaudeHookInstalled(settings, event)
+    // ── Claude Code CLI ──────────────────────────────────────────────────────
+    if (options.claudeCode !== false) {
+      const settings = loadClaudeSettings()
+      for (const event of HOOK_EVENTS) {
+        status[`claude-code:${event}`] = isClaudeHookInstalled(settings, event)
+      }
     }
-  }
 
-  // ── Codex CLI (shell rc) ───────────────────────────────────────────────────
-  if (options.codexCli !== false) {
-    const rcPath = options.shellRcPath ?? defaultRcPath()
-    let content = ''
-    try {
-      content = fs.readFileSync(rcPath, 'utf8')
-    } catch {
-      // File does not exist — all are absent.
+    // ── Codex CLI ────────────────────────────────────────────────────────────
+    if (options.codexCli !== false) {
+      const settings = loadCodexHooks()
+      for (const event of HOOK_EVENTS) {
+        const petState = HOOK_EVENT_MAP[event]
+        status[`codex-cli:${event}`] = Boolean(
+          petState && isHookInstalled(settings, event, stateCommand(petState, currentHookRuntime())),
+        )
+      }
     }
-    for (const event of HOOK_EVENTS) {
-      status[`codex-cli:${event}`] = isCodexRcBlockPresent(content, event)
-    }
-  }
 
-  return status
+    return status
+  })
 }
 
 // ── Tray integration helper ────────────────────────────────────────────────────
@@ -297,7 +338,7 @@ export function getHooksStatus(options: HookInstallOptions = {}): Record<string,
  * Call this only from the Electron main process (tray menu handler).
  */
 export async function installHooksWithDialog(): Promise<void> {
-  const result = installHooks({ claudeCode: true, codexCli: true })
+  const result = installHooks({ claudeCode: true, codexCli: true, runtime: 'windows' })
 
   // Dynamic require — safe to call only when Electron is loaded.
   // eslint-disable-next-line @typescript-eslint/no-require-imports
