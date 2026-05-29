@@ -1,0 +1,31 @@
+# The package.json "files" allowlist is the source of truth for npm publishes.
+# Keep this denylist as a guardrail for local packing experiments without the allowlist.
+
+.agents/
+.claude/
+.codex/
+.git/
+.github/
+node_modules/
+dist/
+coverage/
+.vite/
+
+src/
+petdex-bridge/src/
+petdex-bridge/target/
+tests/
+
+docs/workboard.json
+docs/workboard.md
+docs/workboard.schema.json
+docs/INDEX.md
+docs/windowstesting.md
+handoff.md
+AGENTS.md
+CLAUDE.md
+
+*.log
+*.tmp
+.env
+.env.*

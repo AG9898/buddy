@@ -680,7 +680,7 @@
       "id": "REL-01",
       "title": "Align npm package identity and publish metadata",
       "description": "Rename the npm package metadata for the first public release to cli-buddy while preserving the installed buddy command. Add release-safe package metadata including engines, license handling, repository links, publish scripts or prepack behavior, and a curated files/.npmignore policy so npm pack includes only intended runtime, docs, packaged pets, and release assets.",
-      "status": "todo",
+      "status": "done",
       "priority": "critical",
       "group_id": "REL",
       "depends_on": [],

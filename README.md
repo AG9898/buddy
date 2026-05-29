@@ -249,8 +249,18 @@ npm install
 npm run dev          # Electron + Vite dev server with hot reload
 npm test             # Vitest unit tests
 npm run lint         # ESLint + svelte-check + tsc --noEmit
+npm run build:app    # build Electron bundles and out/cli/index.js
+npm pack --dry-run   # inspect the npm release tarball
 npm run build:win:local  # local smoke build, skips code signing
 ```
+
+### Package contents
+
+The public npm package is named `cli-buddy`, but it installs the `buddy` command.
+`npm pack` runs `npm run build:app` through `prepack` and publishes only the built
+runtime output, bundled pets, icon/build metadata, README/LICENSE, and selected
+release docs. Agent skill folders, source-only planning files, tests, local caches,
+and workboard files are excluded by the package allowlist and `.npmignore` guardrail.
 
 ### WSL bridge (optional)
 

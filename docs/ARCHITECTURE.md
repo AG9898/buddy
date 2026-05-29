@@ -55,10 +55,11 @@ selection UX, and CLI lifecycle semantics live in [`CLI.md`](CLI.md).
 ### Package and release layout
 
 The first public npm package name is `cli-buddy`, but the installed binary remains `buddy`.
-The package must be curated for npm: it should ship only the runtime files required for the
-CLI-launched Electron app, packaged pets, documented release files, and any required WSL
-bridge artifact. Agent skill folders, local build caches, and source-only planning files
-must not be published accidentally.
+The package is curated through the `package.json` `files` allowlist plus an `.npmignore`
+guardrail. `npm pack` runs `npm run build:app` through `prepack`, then ships only built
+runtime output (`out/`), packaged pets, the Windows icon/build metadata, README/LICENSE,
+and selected public docs. Agent skill folders, source-only planning files, workboard
+metadata, tests, local build caches, and Rust source are excluded from the npm tarball.
 
 ### Electron Main Process (`src/main/`)
 

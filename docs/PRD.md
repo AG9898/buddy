@@ -27,6 +27,7 @@ buddy is an npm-distributed developer tool that renders a floating, always-on-to
 ### Phase 1 — MVP
 
 - Distributed as the `cli-buddy` npm package (`npm install -g cli-buddy`); primary install path is from either a Windows terminal or a WSL terminal
+- npm release metadata and tarball contents are curated: the package keeps the installed `buddy` command, includes MIT license and repository metadata, builds with `prepack`, and excludes agent skill folders, workboard files, local caches, source-only planning files, and tests from `npm pack`
 - CLI entry point (`buddy`) with subcommands: `start`, `stop`, `hooks install`, `state <name>`, `doctor`
 - CLI behavior is terminal-first: concise styled output when supported, plain fallback in non-TTY contexts, actionable errors, and command details documented in [`CLI.md`](CLI.md)
 - When installed in WSL: `buddy hooks install` sets up `.zshrc`/`.bashrc` shell hooks and uses WSL interop to launch the Windows-side Electron app; falls back with a clear message if WSL interop is unavailable
@@ -69,6 +70,7 @@ buddy is an npm-distributed developer tool that renders a floating, always-on-to
 ### Phase 1
 
 - `npm install -g cli-buddy` succeeds from both a Windows terminal and a WSL terminal and installs the `buddy` command.
+- `npm pack --dry-run` for `cli-buddy` contains only intended runtime assets, bundled pets, README/LICENSE, build metadata, and public docs.
 - `buddy start` from a Windows terminal launches the pet window on the Windows desktop.
 - `buddy start` exits after launching the detached app, and `buddy stop` terminates it cleanly.
 - CLI output is readable in normal terminals, degrades cleanly in plain/non-TTY contexts, and avoids raw stack traces for expected user errors.

@@ -54,6 +54,9 @@ These apply across every stack in this project.
 - npm package contents must be curated with `files` or `.npmignore`. Do not publish agent
   skill directories (`.agents/`, `.claude/`, `.codex/`), local caches, test fixtures that are
   not needed at runtime, or source-only planning files by accident.
+- `package.json` uses a `files` allowlist as the npm publish source of truth, with
+  `.npmignore` as a denylist guardrail. Keep `prepack` running `npm run build:app` so
+  `npm pack` refreshes `out/` before building the tarball.
 - Any release-affecting package change must run `npm pack --dry-run` and inspect the
   tarball contents before publishing.
 - `src/preload/preload.ts` — single preload file; exposes only `petApi` via

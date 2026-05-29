@@ -16,6 +16,9 @@ npm test
 # Build Electron bundles and the package CLI target
 npm run build:app
 
+# Build and inspect the npm release tarball contents
+npm pack --dry-run
+
 # Run a single test file
 npm test -- src/renderer/PetSprite.test.ts
 
