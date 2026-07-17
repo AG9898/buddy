@@ -95,7 +95,7 @@ export async function runDoctor(): Promise<void> {
     runtimeOk,
     runtimeOk
       ? electronBin
-      : `Expected Electron under ${resolvePackageRoot()} -- reinstall with: npm install -g cli-buddy`,
+      : `Expected Electron under ${resolvePackageRoot()} -- reinstall with: npm install -g @ag9898/buddy`,
   )
 
   // 2. Process check
@@ -145,7 +145,7 @@ export async function runDoctor(): Promise<void> {
     success('All checks passed.')
   } else {
     const failing = [
-      !runtimeOk && 'Electron runtime missing (reinstall: npm install -g cli-buddy)',
+      !runtimeOk && 'Electron runtime missing (reinstall: npm install -g @ag9898/buddy)',
       !processRunning && 'process not running (run: buddy start)',
       !sidecarOk && 'sidecar not responding (ensure buddy app is running)',
       !tokenOk && 'token missing (start buddy once to generate it)',

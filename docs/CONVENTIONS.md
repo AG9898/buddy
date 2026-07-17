@@ -47,7 +47,7 @@ These apply across every stack in this project.
 - `vite.cli.config.ts` owns the package CLI bundle. Keep `package.json` `bin.buddy`
   pointed at the emitted `out/cli/index.js`, and keep `npm run build:app` producing that
   file on both Windows PowerShell and WSL.
-- The npm package name is `cli-buddy`; the installed command remains `buddy`. Keep docs,
+- The npm package name is `@ag9898/buddy`; the installed command remains `buddy`. Keep docs,
   package metadata, badges, and publish checks aligned to that split.
 - Release packaging uses `electron-builder`. Do not reintroduce electron-forge language or
   scripts without a new decision record.

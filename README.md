@@ -11,10 +11,10 @@
 
 **A floating desktop pet for Windows that reacts to your AI coding assistant in real time.**
 
-[![npm version](https://img.shields.io/npm/v/cli-buddy?color=f97316&labelColor=1a1a1a)](https://www.npmjs.com/package/cli-buddy)
-[![license](https://img.shields.io/npm/l/cli-buddy?color=f97316&labelColor=1a1a1a)](./LICENSE)
-[![platform](https://img.shields.io/badge/platform-Windows-f97316?labelColor=1a1a1a)](https://www.npmjs.com/package/cli-buddy)
-[![node](https://img.shields.io/node/v/cli-buddy?color=f97316&labelColor=1a1a1a)](https://nodejs.org)
+[![npm version](https://img.shields.io/npm/v/%40ag9898%2Fbuddy?color=f97316&labelColor=1a1a1a)](https://www.npmjs.com/package/@ag9898/buddy)
+[![license](https://img.shields.io/npm/l/%40ag9898%2Fbuddy?color=f97316&labelColor=1a1a1a)](./LICENSE)
+[![platform](https://img.shields.io/badge/platform-Windows-f97316?labelColor=1a1a1a)](https://www.npmjs.com/package/@ag9898/buddy)
+[![node](https://img.shields.io/node/v/%40ag9898%2Fbuddy?color=f97316&labelColor=1a1a1a)](https://nodejs.org)
 
 </div>
 
@@ -22,7 +22,7 @@
 
 buddy renders a transparent, always-on-top pixel-art character directly on your Windows desktop. It listens to hook events from **Claude Code** and **Codex CLI** and animates the pet as your agent works — running when tools fire, jumping when you send a prompt, waiting for permissions, and waving when the session ends.
 
-No login. No cloud. No installer GUI. Just `npm install -g cli-buddy` and the `buddy` CLI.
+No login. No cloud. No installer GUI. Just `npm install -g @ag9898/buddy` and the `buddy` CLI.
 The npm package includes the built app and installs the Electron runtime dependency that
 `buddy start` uses, so a global install does not need a source checkout.
 
@@ -49,7 +49,7 @@ The npm package includes the built app and installs the Electron runtime depende
 | Requirement | Notes |
 |---|---|
 | **Windows 10 or 11** | The Electron overlay is Windows-only |
-| **Node.js 18+** | Required for `npm install -g cli-buddy` |
+| **Node.js 18+** | Required for `npm install -g @ag9898/buddy` |
 | **Claude Code** or **Codex CLI** | At least one required for hook integration |
 | **WSL** _(optional)_ | Only needed for WSL-side hook events via `petdex-bridge` |
 | **Codex CLI** _(optional)_ | Only needed for `buddy hatch` pet generation |
@@ -61,7 +61,7 @@ The npm package includes the built app and installs the Electron runtime depende
 ### Windows (PowerShell / Command Prompt)
 
 ```sh
-npm install -g cli-buddy
+npm install -g @ag9898/buddy
 buddy start
 ```
 
@@ -70,7 +70,7 @@ The pet window appears on your desktop. `buddy start` launches the app detached 
 ### WSL
 
 ```sh
-npm install -g cli-buddy
+npm install -g @ag9898/buddy
 buddy start          # uses WSL interop to launch the Windows Electron app
 buddy hooks install  # wires Claude Code and Codex CLI hooks for WSL
 ```
@@ -106,7 +106,7 @@ If a symlink is not practical, copy the Windows `runtime/update-token` file into
 
 ```sh
 # 1 — install
-npm install -g cli-buddy
+npm install -g @ag9898/buddy
 
 # 2 — launch the pet window
 buddy start
@@ -178,7 +178,7 @@ buddy discovers pets from three locations:
 | Source | Path | Notes |
 |---|---|---|
 | buddy-managed | `%USERPROFILE%\.petdex-win\pets` on Windows, `$HOME/.petdex-win/pets` in WSL | Created by `buddy hatch`. Override with `BUDDY_SPRITES_DIR`; use a WSL symlink/copy or `BUDDY_DATA_DIR` so WSL sees the Windows-owned directory. |
-| packaged | `<cli-buddy package>\pets` | Built-in read-only pets shipped with buddy: `default` and `penguin`. |
+| packaged | `<@ag9898/buddy package>\pets` | Built-in read-only pets shipped with buddy: `default` and `penguin`. |
 | Codex-compatible | `%USERPROFILE%\.codex\pets` | Read-only asset folders — buddy never writes Codex state. |
 
 A valid pet folder contains a `pet.json` state machine and a `spritesheet.webp` (8 × 9 grid).
@@ -296,13 +296,13 @@ npm run build:win:local  # local smoke build, skips code signing
 
 ### Package contents
 
-The public npm package is named `cli-buddy`, but it installs the `buddy` command.
+The public npm package is named `@ag9898/buddy`, but it installs the `buddy` command.
 `npm pack` runs `npm run build:app` through `prepack` and publishes only the built
 runtime output, bundled pets, icon/build metadata, README/LICENSE/CHANGELOG, and selected
 release docs. Agent skill folders, source-only planning files, tests, local caches,
 and workboard files are excluded by the package allowlist and `.npmignore` guardrail.
 Electron is installed as an optional production dependency of the package, which gives
-`buddy start` a runtime executable after `npm install -g cli-buddy` without shipping
+`buddy start` a runtime executable after `npm install -g @ag9898/buddy` without shipping
 source-only dev dependencies.
 
 ### WSL bridge (optional)
@@ -378,7 +378,7 @@ Full details: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
 buddy doctor   # checks process, sidecar, token, and hook status in one pass
 ```
 `buddy doctor` also verifies that the Electron runtime dependency is present. If that
-check fails, reinstall with `npm install -g cli-buddy`.
+check fails, reinstall with `npm install -g @ag9898/buddy`.
 
 **Hooks aren't triggering animations**
 Re-run `buddy hooks install`, restart your shell, and confirm your AI CLI fires hooks.

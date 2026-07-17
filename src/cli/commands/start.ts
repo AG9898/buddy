@@ -30,7 +30,7 @@ function startOnWindows(): void {
       'Could not locate the Electron runtime for buddy.',
       [
         'Ensure the package was installed with production dependencies:',
-        '  npm install -g cli-buddy',
+        '  npm install -g @ag9898/buddy',
         `Package root checked: ${packageRoot}`,
       ].join('\n'),
     )
@@ -92,7 +92,7 @@ function printWSLInteropError(): void {
       '       echo 1 > /proc/sys/fs/binfmt_misc/WSLInterop',
       '     Or set [interop] enabled=true in /etc/wsl.conf and restart WSL.',
       '  2. Ensure buddy is installed on the Windows side:',
-      '       npm install -g cli-buddy   (in a Windows terminal, not WSL)',
+      '       npm install -g @ag9898/buddy   (in a Windows terminal, not WSL)',
       '  3. Then retry:  buddy start',
     ].join('\n'),
   )

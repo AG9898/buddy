@@ -12,13 +12,13 @@
 
 ## Objective
 
-buddy is an npm-distributed developer tool that renders a floating, always-on-top, transparent pixel-art pet character on the Windows desktop that reacts to AI coding assistant activity in real time. It is for developers running the Codex CLI or Claude Code CLI on Windows or Windows+WSL who want ambient visual feedback about what their AI agent is doing. It solves the gap left by Petdex — which only ships macOS binaries — giving Windows developers the same live pet overlay experience. Because its audience lives in terminals and agentic coding environments, buddy is distributed as the `cli-buddy` npm package and configured entirely from the command line, with no separate GUI installer. Supported AI assistants are CLI tools only — no desktop application versions.
+buddy is an npm-distributed developer tool that renders a floating, always-on-top, transparent pixel-art pet character on the Windows desktop that reacts to AI coding assistant activity in real time. It is for developers running the Codex CLI or Claude Code CLI on Windows or Windows+WSL who want ambient visual feedback about what their AI agent is doing. It solves the gap left by Petdex — which only ships macOS binaries — giving Windows developers the same live pet overlay experience. Because its audience lives in terminals and agentic coding environments, buddy is distributed as the `@ag9898/buddy` npm package and configured entirely from the command line, with no separate GUI installer. Supported AI assistants are CLI tools only — no desktop application versions.
 
 ---
 
 ## Users
 
-- **Developer** — single local user; no login, no account, no server. Runs AI coding assistant CLIs (Codex CLI, Claude Code) on Windows or Windows+WSL. Installs buddy once per machine via `npm install -g cli-buddy` from either a Windows terminal or a WSL terminal, then interacts with it via the `buddy` CLI and shell hooks. Has full control over the pet window (show/hide/move/quit).
+- **Developer** — single local user; no login, no account, no server. Runs AI coding assistant CLIs (Codex CLI, Claude Code) on Windows or Windows+WSL. Installs buddy once per machine via `npm install -g @ag9898/buddy` from either a Windows terminal or a WSL terminal, then interacts with it via the `buddy` CLI and shell hooks. Has full control over the pet window (show/hide/move/quit).
 
 ---
 
@@ -26,7 +26,7 @@ buddy is an npm-distributed developer tool that renders a floating, always-on-to
 
 ### Phase 1 — MVP
 
-- Distributed as the `cli-buddy` npm package (`npm install -g cli-buddy`); primary install path is from either a Windows terminal or a WSL terminal
+- Distributed as the `@ag9898/buddy` npm package (`npm install -g @ag9898/buddy`); primary install path is from either a Windows terminal or a WSL terminal
 - npm release metadata and tarball contents are curated: the package keeps the installed `buddy` command, includes MIT license and repository metadata, builds with `prepack`, and excludes agent skill folders, workboard files, local caches, source-only planning files, and tests from `npm pack`
 - CLI entry point (`buddy`) with subcommands: `start`, `stop`, `hooks install`, `state <name>`, `doctor`
 - CLI behavior is terminal-first: concise styled output when supported, plain fallback in non-TTY contexts, actionable errors, and command details documented in [`CLI.md`](CLI.md)
@@ -69,8 +69,8 @@ buddy is an npm-distributed developer tool that renders a floating, always-on-to
 
 ### Phase 1
 
-- `npm install -g cli-buddy` succeeds from both a Windows terminal and a WSL terminal and installs the `buddy` command.
-- `npm pack --dry-run` for `cli-buddy` contains only intended runtime assets, bundled pets, README/LICENSE, build metadata, and public docs.
+- `npm install -g @ag9898/buddy` succeeds from both a Windows terminal and a WSL terminal and installs the `buddy` command.
+- `npm pack --dry-run` for `@ag9898/buddy` contains only intended runtime assets, bundled pets, README/LICENSE, build metadata, and public docs.
 - `buddy start` from a Windows terminal launches the pet window on the Windows desktop.
 - `buddy start` exits after launching the detached app, and `buddy stop` terminates it cleanly.
 - CLI output is readable in normal terminals, degrades cleanly in plain/non-TTY contexts, and avoids raw stack traces for expected user errors.
@@ -112,5 +112,5 @@ buddy is an npm-distributed developer tool that renders a floating, always-on-to
 - Not a real-time remote monitoring system — events are local, fire-and-forget HTTP POSTs.
 - Not a multi-user or networked application — single developer, single machine only.
 - Not a sprite editor or full art tool — sprite creation support is limited to format compatibility helpers.
-- Not an auto-updater — distribution and updates are via npm (`npm install -g cli-buddy@latest`).
+- Not an auto-updater — distribution and updates are via npm (`npm install -g @ag9898/buddy@latest`).
 - Not a replacement for the Codex CLI or Claude Code — buddy only listens to their hook events and displays a pet; it does not control or inspect the AI agents.

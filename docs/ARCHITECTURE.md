@@ -7,9 +7,9 @@
 
 ## Overview
 
-buddy is an npm-distributed developer tool that renders a floating, always-on-top, transparent pet character directly on the Windows desktop. The npm package is named `cli-buddy`, and it installs the `buddy` command. It is built on a four-component architecture: a CLI entry point (`buddy`) that handles install-time setup and runtime commands, an Electron main process managing the window and HTTP sidecar, a Svelte renderer driving pet animation, and a Rust CLI binary (petdex-bridge) that runs in WSL and bridges shell hook events from WSL agents into the Windows-side Electron process. The system is entirely local — there are no cloud services, no accounts, and no network traffic leaving the machine.
+buddy is an npm-distributed developer tool that renders a floating, always-on-top, transparent pet character directly on the Windows desktop. The npm package is named `@ag9898/buddy`, and it installs the `buddy` command. It is built on a four-component architecture: a CLI entry point (`buddy`) that handles install-time setup and runtime commands, an Electron main process managing the window and HTTP sidecar, a Svelte renderer driving pet animation, and a Rust CLI binary (petdex-bridge) that runs in WSL and bridges shell hook events from WSL agents into the Windows-side Electron process. The system is entirely local — there are no cloud services, no accounts, and no network traffic leaving the machine.
 
-buddy is installed via `npm install -g cli-buddy` from either a Windows terminal or a WSL terminal. The npm package installs the `buddy` CLI and an npm-managed Electron runtime dependency so `buddy start` can launch the built app without a source checkout or devDependencies. When installed in WSL the CLI uses the WSL interop layer to launch the Windows Electron process; when installed on Windows it launches directly.
+buddy is installed via `npm install -g @ag9898/buddy` from either a Windows terminal or a WSL terminal. The npm package installs the `buddy` CLI and an npm-managed Electron runtime dependency so `buddy start` can launch the built app without a source checkout or devDependencies. When installed in WSL the CLI uses the WSL interop layer to launch the Windows Electron process; when installed on Windows it launches directly.
 
 ---
 
@@ -57,7 +57,7 @@ selection UX, and CLI lifecycle semantics live in [`CLI.md`](CLI.md).
 
 ### Package and release layout
 
-The first public npm package name is `cli-buddy`, but the installed binary remains `buddy`.
+The public npm package name is `@ag9898/buddy`, but the installed binary remains `buddy`.
 The package is curated through the `package.json` `files` allowlist plus an `.npmignore`
 guardrail. `npm pack` runs `npm run build:app` through `prepack`, then ships only built
 runtime output (`out/`), packaged pets, the Windows icon/build metadata, README/LICENSE,
@@ -202,8 +202,8 @@ There are no buddy-owned cloud services, managed databases, auth providers, or i
 | Environment | Electron app | petdex-bridge | State file |
 |---|---|---|---|
 | Local dev | `npm run dev` — Electron + Vite dev server on localhost | `cargo build --release --target x86_64-unknown-linux-gnu`, binary copied to WSL `$PATH` | `%USERPROFILE%\.petdex-win\state.json` (created on first run) |
-| Production | `npm install -g cli-buddy` — electron-builder packages the app; the npm package ships the Electron runtime and exposes the `buddy` CLI via the `bin` field | WSL bridge install path ships the pre-built `x86_64-unknown-linux-gnu` binary | Same path — persisted across updates |
-| WSL-only install | `npm install -g cli-buddy` in WSL — CLI detects WSL, installs shell hooks, and invokes the Windows-side `buddy.exe` via WSL interop to launch the GUI | Same as above | Same path |
+| Production | `npm install -g @ag9898/buddy` — electron-builder packages the app; the npm package ships the Electron runtime and exposes the `buddy` CLI via the `bin` field | WSL bridge install path ships the pre-built `x86_64-unknown-linux-gnu` binary | Same path — persisted across updates |
+| WSL-only install | `npm install -g @ag9898/buddy` in WSL — CLI detects WSL, installs shell hooks, and invokes the Windows-side `buddy.exe` via WSL interop to launch the GUI | Same as above | Same path |
 
 See [`ENV_VARS.md`](ENV_VARS.md) for the canonical variable and secret matrix per environment.
 

@@ -23,7 +23,7 @@ describe('runtime path helpers', () => {
     const root = makeTempDir()
     const cliDir = path.join(root, 'out', 'cli')
     fs.mkdirSync(cliDir, { recursive: true })
-    fs.writeFileSync(path.join(root, 'package.json'), '{"name":"cli-buddy"}')
+    fs.writeFileSync(path.join(root, 'package.json'), '{"name":"@ag9898/buddy"}')
 
     expect(resolvePackageRoot(cliDir)).toBe(root)
     expect(resolveElectronAppPath(root)).toBe(root)
@@ -31,7 +31,7 @@ describe('runtime path helpers', () => {
 
   it('returns null when Electron is absent from the package root', () => {
     const root = makeTempDir()
-    fs.writeFileSync(path.join(root, 'package.json'), '{"name":"cli-buddy"}')
+    fs.writeFileSync(path.join(root, 'package.json'), '{"name":"@ag9898/buddy"}')
 
     expect(resolveElectronBin(root)).toBeNull()
   })

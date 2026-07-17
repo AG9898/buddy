@@ -21,7 +21,7 @@ npm pack --dry-run
 
 # Smoke-test the packed package as an installed dependency
 npm pack
-npm install --omit=dev --prefix <temp-dir> ./cli-buddy-0.1.0.tgz
+npm install --omit=dev --prefix <temp-dir> ./ag9898-buddy-1.0.1.tgz
 
 # Run a single test file
 npm test -- src/renderer/PetSprite.test.ts
@@ -91,13 +91,13 @@ entry point with `node out/cli/index.js --help` and command-specific help such a
 
 ## Release Smoke Matrix
 
-Before publishing `cli-buddy`, verify the release candidate on a clean Windows machine and
+Before publishing `@ag9898/buddy`, verify the release candidate on a clean Windows machine and
 one WSL distribution:
 
 | Area | Check |
 |---|---|
 | npm package | `npm pack --dry-run` contains only intended runtime/docs assets and excludes agent skill folders and source-only working files. |
-| install | `npm install -g cli-buddy` installs the `buddy` command and the npm-managed Electron runtime dependency used by `buddy start`. |
+| install | `npm install -g @ag9898/buddy` installs the `buddy` command and the npm-managed Electron runtime dependency used by `buddy start`. |
 | launch | `buddy start` launches the Windows Electron app and returns control to the terminal. |
 | rendering | The default packaged pet renders, animates, drags, resizes visually, and survives restart. |
 | selected pets | `buddy pets list`, `buddy pets use <id>`, restart, main-process active-pet fallback diagnostics, and selected-pet render are verified from Windows; WSL path-sharing behavior is verified separately. |

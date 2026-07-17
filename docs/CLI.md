@@ -5,7 +5,7 @@ adding, renaming, removing, or changing any command under `src/cli/`.
 
 buddy is a terminal-first desktop pet app. The CLI should be concise, predictable, and
 usable from Windows PowerShell, Command Prompt, WSL shells, non-TTY scripts, and CI.
-The npm package is named `cli-buddy`, but the installed command remains `buddy`.
+The npm package is named `@ag9898/buddy`, but the installed command remains `buddy`.
 
 ---
 
@@ -32,7 +32,7 @@ The npm package is named `cli-buddy`, but the installed command remains `buddy`.
 Electron process owns the BrowserWindow, local sidecar, tray, state persistence, and all
 long-running work. The CLI must not keep a long-running server process alive.
 
-In a published npm install, `buddy start` resolves the `cli-buddy` package root and the
+In a published npm install, `buddy start` resolves the `@ag9898/buddy` package root and the
 npm-installed Electron runtime, then launches Electron with the package root as the app
 path. It must not rely on devDependencies or the current working directory being a source
 checkout.
@@ -44,7 +44,7 @@ the pet.
 When run from WSL, `buddy start` uses WSL interop to invoke the Windows-side app. If
 interop is unavailable, print a clear actionable error and exit non-zero.
 
-Install examples should use `npm install -g cli-buddy`. User-facing command examples
+Install examples should use `npm install -g @ag9898/buddy`. User-facing command examples
 should continue to use `buddy ...`.
 
 ---

@@ -64,11 +64,11 @@ What existing code or docs does this affect?>
 
 **Resolved:** 2026-05-28
 
-**Decision:** Publish the first public npm release under the package name `cli-buddy` while keeping the installed command name as `buddy`.
+**Decision:** Publish the public npm release under the scoped package name `@ag9898/buddy` while keeping the installed command name as `buddy`.
 
-**Why:** The unscoped npm package name `buddy` is already taken. `cli-buddy` was available during release planning and keeps the package discoverable while preserving the shorter `buddy` command users run after installation.
+**Why:** The unscoped npm name `cli-buddy` is blocked by npm's similarity policy. The `@ag9898` scope establishes package ownership while preserving the shorter `buddy` command users run after installation.
 
-**Alternatives rejected:** `terminal-buddy` is already taken on npm. Renaming the command to `cli-buddy` was rejected because the existing CLI, docs, hook commands, and user workflow are simpler with `buddy`.
+**Alternatives rejected:** `terminal-buddy` is already taken on npm. Renaming the command to `@ag9898/buddy` was rejected because the existing CLI, docs, hook commands, and user workflow are simpler with `buddy`.
 
 **Affects:** [PRD.md](PRD.md), [ARCHITECTURE.md](ARCHITECTURE.md), [CLI.md](CLI.md), [README.md](../README.md), [workboard.json](workboard.json)
 
@@ -78,7 +78,7 @@ What existing code or docs does this affect?>
 
 **Resolved:** 2026-05-28
 
-**Decision:** The `cli-buddy` npm package should install a usable CLI-launched Windows Electron app directly. Users install with `npm install -g cli-buddy` and run `buddy start`; no separate GUI installer step is required for the normal path.
+**Decision:** The `@ag9898/buddy` npm package should install a usable CLI-launched Windows Electron app directly. Users install with `npm install -g @ag9898/buddy` and run `buddy start`; no separate GUI installer step is required for the normal path.
 
 **Why:** The target users are developers and can follow terminal instructions, but the first-run path should still be as seamless as practical. Keeping npm as the distribution channel and `buddy` as the command matches the product's terminal-first shape.
 
