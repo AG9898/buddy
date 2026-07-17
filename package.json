@@ -1,6 +1,6 @@
 {
   "name": "cli-buddy",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Windows floating desktop pet for Codex CLI and Claude Code",
   "main": "out/main/main.js",
   "bin": {
@@ -68,6 +68,9 @@
     "x64"
   ],
   "private": false,
+  "publishConfig": {
+    "access": "public"
+  },
   "files": [
     "out/**/*",
     "pets/**/*",
@@ -79,6 +82,7 @@
     "docs/ARCHITECTURE.md",
     "docs/PRD.md",
     "docs/CONVENTIONS.md",
-    "docs/DECISIONS.md"
+    "docs/DECISIONS.md",
+    "CHANGELOG.md"
   ]
 }

@@ -148,7 +148,7 @@ buddy supports three pet sources:
 | Source | Default path | Notes |
 |---|---|---|
 | buddy-managed pets | `%USERPROFILE%\.petdex-win\pets` on Windows, `$HOME/.petdex-win/pets` in WSL | Primary location for pets created by `buddy hatch`; rooted under `BUDDY_DATA_DIR` when that override is set. |
-| packaged pets | `<buddy package>\pets` | Built-in read-only pets shipped with buddy, including `default`. |
+| packaged pets | `<buddy package>\pets` | Built-in read-only pets shipped with buddy: `default` and `penguin`. |
 | Codex-compatible pets | `%USERPROFILE%\.codex\pets` | Read as asset folders only. buddy must not read or write Codex internal state. |
 
 A valid pet folder contains:

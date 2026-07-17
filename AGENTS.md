@@ -271,6 +271,9 @@ Do not reorganize or rewrite existing entries — append only.
 ### 2026-05-22 — electron must be in devDependencies for electron-builder
 electron-builder rejects builds if `electron` is listed under `dependencies` instead of `devDependencies`. The original package.json had it under `dependencies`, causing a hard build failure. Move it to `devDependencies` to fix this.
 
+### 2026-07-17 — hatch-pet scripts require Pillow
+`prepare_pet_run.py` imports `PIL`, so image-generation runs need Pillow installed in the active Python environment. Install it with `python -m pip install --user Pillow` before preparing a hatch-pet run when `ModuleNotFoundError: PIL` occurs.
+
 ### 2026-05-22 — npm run build fails on locked-down Windows machines (no Developer Mode)
 `electron-builder` downloads `winCodeSign` which contains symlinks; creating symlinks requires Administrator or Developer Mode. Use `npm run build:win:local` (added to package.json) which passes `--config.win.signAndEditExecutable=false --publish never` to skip the code-signing helper. This is safe for smoke builds but must not be used for release packaging.
 
@@ -309,3 +312,6 @@ Current Codex CLI hook configuration uses `~/.codex/hooks.json`; the old shell r
 
 ### 2026-05-29 - Windows path separators break cross-platform unit tests
 Unit tests that compare file paths using template literal strings (e.g. `${MOCK_HOME}/.codex/hooks.json`) fail on Windows because `path.join` produces backslash separators while the string literal uses forward slashes. Always use `path.join(MOCK_HOME, '.codex', 'hooks.json')` for path assertions in tests. Additionally, `USERPROFILE` env var on Windows overrides the mocked `os.homedir()` when `buddyDataDir` resolves paths; tests must clear `process.env.USERPROFILE` in `beforeEach` and restore it in `afterEach` so the mocked home is used.
+
+### 2026-07-17 - WSL-to-Windows loopback requires mirrored networking
+On this host, default WSL2 NAT mode cannot reach buddy's Windows-only `127.0.0.1:7777` sidecar from Linux, even though the Windows health endpoint works. Add `[wsl2]` / `networkingMode=mirrored` to `%USERPROFILE%\.wslconfig`, run `wsl --shutdown`, then verify with `curl http://127.0.0.1:7777/health` and `petdex-bridge state running` from WSL.

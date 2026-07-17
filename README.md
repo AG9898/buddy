@@ -178,10 +178,23 @@ buddy discovers pets from three locations:
 | Source | Path | Notes |
 |---|---|---|
 | buddy-managed | `%USERPROFILE%\.petdex-win\pets` on Windows, `$HOME/.petdex-win/pets` in WSL | Created by `buddy hatch`. Override with `BUDDY_SPRITES_DIR`; use a WSL symlink/copy or `BUDDY_DATA_DIR` so WSL sees the Windows-owned directory. |
-| packaged | `<cli-buddy package>\pets` | Built-in read-only pets shipped with buddy, including `default`. |
+| packaged | `<cli-buddy package>\pets` | Built-in read-only pets shipped with buddy: `default` and `penguin`. |
 | Codex-compatible | `%USERPROFILE%\.codex\pets` | Read-only asset folders — buddy never writes Codex state. |
 
 A valid pet folder contains a `pet.json` state machine and a `spritesheet.webp` (8 × 9 grid).
+
+### Included pets
+
+The npm package ships with two ready-to-use pets:
+
+- `default` — the original bundled companion.
+- `penguin` — an animated penguin with idle, running, waiting, jumping, waving, failed, and review states.
+
+Select either at any time:
+
+```sh
+buddy pets use penguin
+```
 
 ### Generating a pet
 
@@ -285,7 +298,7 @@ npm run build:win:local  # local smoke build, skips code signing
 
 The public npm package is named `cli-buddy`, but it installs the `buddy` command.
 `npm pack` runs `npm run build:app` through `prepack` and publishes only the built
-runtime output, bundled pets, icon/build metadata, README/LICENSE, and selected
+runtime output, bundled pets, icon/build metadata, README/LICENSE/CHANGELOG, and selected
 release docs. Agent skill folders, source-only planning files, tests, local caches,
 and workboard files are excluded by the package allowlist and `.npmignore` guardrail.
 Electron is installed as an optional production dependency of the package, which gives
@@ -312,6 +325,7 @@ src/
   shared/         IPC channel constants (imported by main / preload / tests)
 petdex-bridge/    Rust WSL bridge for shell hook events
 pets/default/     Bundled default pet (pet.json + spritesheet.webp)
+pets/penguin/     Bundled penguin pet (pet.json + spritesheet.webp)
 docs/             Architecture, CLI contract, env vars, decisions, workboard
 ```
 
