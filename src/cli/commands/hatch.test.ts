@@ -120,6 +120,25 @@ afterEach(() => {
   vi.unstubAllEnvs()
 })
 
+describe('hatch destination helpers', () => {
+  it('derives a stable folder-safe pet id from the prompt', async () => {
+    const { petIdFromPrompt } = await import('./hatch.js')
+    expect(petIdFromPrompt('A Tiny Café Dragon!!!')).toBe('a-tiny-cafe-dragon')
+  })
+
+  it('rejects unsafe pet ids before using them in a path', async () => {
+    const { validatePetId } = await import('./hatch.js')
+    expect(() => validatePetId('../default')).toThrow('Pet id must be')
+    expect(() => validatePetId('')).toThrow('Pet id must be')
+  })
+
+  it('places default hatches under the buddy-managed data directory', async () => {
+    vi.stubEnv('BUDDY_DATA_DIR', 'C:\\buddy-data')
+    const { buddyManagedPetOutputDir } = await import('./hatch.js')
+    expect(buddyManagedPetOutputDir('jade-wisp')).toBe('C:\\buddy-data\\pets\\jade-wisp')
+  })
+})
+
 /* ── Tests ──────────────────────────────────────────────────────────────── */
 
 describe('runHatch — normal mode', () => {

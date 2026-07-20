@@ -315,3 +315,15 @@ Unit tests that compare file paths using template literal strings (e.g. `${MOCK_
 
 ### 2026-07-17 - WSL-to-Windows loopback requires mirrored networking
 On this host, default WSL2 NAT mode cannot reach buddy's Windows-only `127.0.0.1:7777` sidecar from Linux, even though the Windows health endpoint works. Add `[wsl2]` / `networkingMode=mirrored` to `%USERPROFILE%\.wslconfig`, run `wsl --shutdown`, then verify with `curl http://127.0.0.1:7777/health` and `petdex-bridge state running` from WSL.
+
+### 2026-07-17 - Hatch-pet chroma fringe needs post-processing QA
+Frame extraction can pass deterministic validation while leaving a visible chroma-key color fringe. When final visual QA catches this, use the imagegen `remove_chroma_key.py` helper with soft matte, despill, and a small edge contract before re-extracting frames; regenerate only rows whose motion semantics genuinely fail visual review.
+
+### 2026-07-20 - Generated row poses must be disconnected components
+For component-based frame extraction, a strip needs one fully separated connected silhouette per required frame. A row can look visually spaced yet have tail or whisker pixels touching a neighboring pose; regenerate that row with a wide uninterrupted chroma-key gap rather than accepting slot-slicing fallback.
+
+### 2026-07-20 - Hatch-pet must honor the run-selected chroma key and preserve source motion
+`prepare_pet_run.py` can select green rather than magenta based on the reference, so workers and repair prompts must use the chroma key written in `pet_request.json`, never a hardcoded color. When component extraction re-centers an intentionally vertical animation such as jumping, use the QA-driven `stable-slots` mode before regenerating an otherwise valid row.
+
+### 2026-07-20 - User hatches must not mutate bundled assets
+`buddy hatch` defaults to a validated pet-id folder under the buddy-managed data directory, not `pets/default`. The shared `build/icon.ico` is application branding and must remain untouched by any pet hatch; replacing a bundled preset is an explicit maintainer-only workflow.

@@ -512,7 +512,7 @@ def row_prompt(
 
 Use the attached canonical base for identity. Use the attached layout guide only for slot count, spacing, centering, and padding; do not draw the guide.
 
-Output exactly {frames} full-body frames in one left-to-right row on flat pure {chroma_name} {chroma_key}. Treat the row as {frames} invisible equal-width slots: one centered complete pose per slot, evenly spaced, with no overlap, clipping, empty slots, labels, or borders.
+Output exactly {frames} full-body frames in one left-to-right row on flat pure {chroma_name} {chroma_key}. Treat the row as {frames} invisible equal-width slots: one centered complete pose per slot, evenly spaced, with no overlap, clipping, empty slots, labels, or borders. Each pose must be one connected sprite silhouette: every tail, whisker, horn, limb, prop, or allowed effect touches its own pet. Leave a wide uninterrupted {chroma_key} gap between neighboring poses; no pixel from one slot may touch or cross into another slot.
 
 Identity: same pet in every frame: {pet_notes}. Preserve silhouette, face, proportions, markings, palette, material, style, and props.
 Style: {style_contract}
@@ -523,7 +523,7 @@ State action: {state_prompt}
 State requirements:
 {state_requirements}
 
-Clean extraction: crisp opaque edges, safe padding, no scenery, text, guide marks, checkerboard, shadows, glows, motion blur, speed lines, dust, detached effects, stray pixels, or chroma-key colors inside the pet."""
+Clean extraction: crisp opaque edges, safe padding, no scenery, text, guide marks, checkerboard, shadows, glows, motion blur, speed lines, dust, detached effects, stray pixels, or chroma-key colors inside the pet. Do not add a new prop, glow, orb, symbol, or decorative effect to explain this state."""
 
 
 def retry_row_prompt(
@@ -545,7 +545,7 @@ Action: {state_prompt}
 State requirements:
 {state_requirements}
 
-One centered complete pose per invisible slot. No text, boxes, guide marks, scenery, shadows, glows, motion blur, speed lines, dust, detached effects, stray pixels, or {chroma_key} colors in the pet."""
+One centered complete pose per invisible slot. Each pose is exactly one connected sprite silhouette; all tail, whisker, horn, limb, prop, and allowed-effect pixels must touch that pose, with a wide uninterrupted {chroma_key} gap between neighboring slots. No text, boxes, guide marks, scenery, shadows, glows, motion blur, speed lines, dust, detached effects, stray pixels, new props, decorative effects, or {chroma_key} colors in the pet."""
 
 
 def make_jobs(

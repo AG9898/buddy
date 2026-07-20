@@ -20,7 +20,13 @@ import { runStop } from './commands/stop.js'
 import { runHooksInstall } from './commands/hooks.js'
 import { runState } from './commands/state.js'
 import { runDoctor } from './commands/doctor.js'
-import { runHatch } from './commands/hatch.js'
+import {
+  buddyManagedPetOutputDir,
+  packagedPresetOutputDir,
+  petIdFromPrompt,
+  runHatch,
+  validatePetId,
+} from './commands/hatch.js'
 import { runPetsList, runPetsShow, runPetsUse } from './commands/pets.js'
 import { runSize } from './commands/size.js'
 import { printBanner } from './output.js'
@@ -121,16 +127,38 @@ program
   )
   .option(
     '--output <dir>',
-    'Output directory for pet assets (pet.json + spritesheet.webp)',
-    'pets/default',
+    'Explicit output directory for pet assets (pet.json + spritesheet.webp)',
+  )
+  .option('--id <id>', 'Name the buddy-managed pet (defaults to a name derived from the prompt)')
+  .option(
+    '--package-preset <id>',
+    'Maintainer-only: write to this source checkout’s bundled pets/<id> preset',
   )
   .option(
     '--verbose',
     'Show raw Codex subprocess output for troubleshooting (also enabled by BUDDY_LOG_LEVEL=debug)',
     false,
   )
-  .action(async (prompt: string, options: { output: string; verbose: boolean }) => {
-    await runHatch(prompt, options.output, options.verbose).catch((err: unknown) => {
+  .action(async (prompt: string, options: { output?: string; id?: string; packagePreset?: string; verbose: boolean }) => {
+    await (async () => {
+      if (options.output && options.id) {
+        throw new Error('Use either --output or --id; --id names only the default buddy-managed destination.')
+      }
+      if (options.output && options.packagePreset) {
+        throw new Error('Use either --output or --package-preset, not both.')
+      }
+      if (options.id && options.packagePreset) {
+        throw new Error('Use either --id or --package-preset, not both.')
+      }
+
+      const outputDir = options.output
+        ? options.output
+        : options.packagePreset
+          ? packagedPresetOutputDir(options.packagePreset)
+          : buddyManagedPetOutputDir(options.id ? validatePetId(options.id) : petIdFromPrompt(prompt))
+
+      await runHatch(prompt, outputDir, options.verbose)
+    })().catch((err: unknown) => {
       const { error } = require('./output.js') as typeof import('./output.js')
       error(err instanceof Error ? err.message : String(err))
       process.exit(1)

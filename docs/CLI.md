@@ -18,7 +18,7 @@ The npm package is named `@ag9898/buddy`, but the installed command remains `bud
 | `buddy state <name>` | Send a pet state change to the local sidecar. |
 | `buddy hooks install [--rc <path>]` | Install Claude Code and Codex CLI hook entries. |
 | `buddy doctor` | Print a health checklist for process, sidecar, token, and hooks. |
-| `buddy hatch <prompt> [--output <dir>] [--verbose]` | Generate pet assets by delegating image work to Codex CLI, then package buddy assets. |
+| `buddy hatch <prompt> [--id <id> | --output <dir> | --package-preset <id>] [--verbose]` | Generate a personal pet by default; bundled presets require explicit maintainer opt-in. |
 | `buddy pets list` | List valid buddy-managed, packaged, and Codex-compatible pets. |
 | `buddy pets show` | Print the currently selected pet and its source path. |
 | `buddy pets use <id>` | Validate and persist the active pet selection. |
@@ -132,12 +132,22 @@ troubleshooting.
 
 ```
 buddy hatch "a small orange cat"
+buddy hatch "a small orange cat" --id marmalade
 buddy hatch "a small orange cat" --verbose
-buddy hatch "a small orange cat" --output pets/my-cat
+buddy hatch "a small orange cat" --output C:\\art\\my-cat
+buddy hatch "a small orange cat" --package-preset penguin
 ```
 
 Codex CLI failures produce a concise actionable error in normal mode. The `--verbose` hint
 is included in the failure message when no subprocess output was captured.
+
+Without a destination option, `buddy hatch` derives a short lowercase id from the prompt
+and writes to `<buddy data dir>\\pets\\<id>` (normally
+`%USERPROFILE%\\.petdex-win\\pets\\<id>`). This keeps generated pets personal to the current
+user and makes them immediately discoverable by `buddy pets`. Use `--id <id>` to choose the
+folder name. `--output <dir>` is an explicit custom destination. `--package-preset <id>` is
+for maintainers working in a source checkout who intentionally want to replace a bundled
+`pets/<id>` asset; packaged pets are otherwise read-only for end users.
 
 ---
 

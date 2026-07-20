@@ -10,8 +10,10 @@
 
 import { spawn, spawnSync } from 'child_process'
 import fs from 'fs'
+import os from 'os'
 import path from 'path'
 import { fileURLToPath } from 'url'
+import { buddyManagedPetsDir } from '../../shared/buddy-paths.js'
 import { heading, status, success, warn, label, closeSeparator, dim } from '../output.js'
 
 const __filename = fileURLToPath(import.meta.url)
@@ -19,6 +21,7 @@ const __dirname = path.dirname(__filename)
 
 const DEFAULT_CODEX_COMMAND = 'codex'
 const CODEX_COMMAND_ENV = 'BUDDY_CODEX_COMMAND'
+const PET_ID_PATTERN = /^[a-z0-9][a-z0-9-]{0,47}$/
 
 function isVerbose(): boolean {
   return (
@@ -39,6 +42,41 @@ function repoRoot(): string {
     // Fall through to process cwd.
   }
   return process.cwd()
+}
+
+/** Turn a hatch description into a stable folder-safe id. */
+export function petIdFromPrompt(prompt: string): string {
+  const normalized = prompt
+    .normalize('NFKD')
+    .replace(/[^\x00-\x7F]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 48)
+    .replace(/-+$/g, '')
+
+  return normalized || 'custom-pet'
+}
+
+/** Validate user-controlled pet ids before using them as a directory segment. */
+export function validatePetId(id: string): string {
+  const normalized = id.trim().toLowerCase()
+  if (!PET_ID_PATTERN.test(normalized)) {
+    throw new Error(
+      'Pet id must be 1–48 lowercase letters, numbers, or hyphens, and must start with a letter or number.',
+    )
+  }
+  return normalized
+}
+
+/** Default destination for a user-created pet. */
+export function buddyManagedPetOutputDir(id: string): string {
+  return path.join(buddyManagedPetsDir(process.env, os.homedir()), validatePetId(id))
+}
+
+/** Explicit maintainer-only destination for updating a bundled preset in a source checkout. */
+export function packagedPresetOutputDir(id: string): string {
+  return path.join(repoRoot(), 'pets', validatePetId(id))
 }
 
 function resolveSkillDir(root: string): string {
@@ -80,7 +118,6 @@ function buildCodexPrompt(prompt: string, root: string, skillDir: string, output
   const absoluteOutputDir = path.resolve(root, outputDir)
   const spritesheetPath = path.join(absoluteOutputDir, 'spritesheet.webp')
   const petJsonPath = path.join(absoluteOutputDir, 'pet.json')
-  const iconPath = path.join(root, 'build/icon.ico')
 
   return `Use the hatch-pet skill to generate buddy pet assets.
 
@@ -93,12 +130,10 @@ Runtime constraints:
 - Generate visuals through Codex $imagegen. Do not call Anthropic SDKs or ask buddy for image-provider secrets.
 - Keep deterministic packaging in the hatch-pet scripts.
 - Use ${path.join(skillDir, 'scripts/package_for_buddy.py')} for buddy packaging.
-- Use ${path.join(skillDir, 'scripts/make_icon.py')} to create the Windows icon from the canonical base image.
 - Write pet assets to: ${absoluteOutputDir}
 - Required final files:
   - ${spritesheetPath}
   - ${petJsonPath}
-  - ${iconPath}
 - Stream concise progress and stop with a clear error if any required output cannot be produced.
 `
 }
@@ -251,7 +286,18 @@ export async function runHatch(prompt: string, outputDir: string, verbose = fals
   label('Pet id', petId)
   label('Assets', absoluteOutputDir)
 
-  if (outputDir !== 'pets/default') {
+  const relativeToManagedPets = path.relative(
+    buddyManagedPetsDir(process.env, os.homedir()),
+    absoluteOutputDir,
+  )
+  const isBuddyManagedPet =
+    relativeToManagedPets !== '' &&
+    !relativeToManagedPets.startsWith('..') &&
+    !path.isAbsolute(relativeToManagedPets)
+
+  if (isBuddyManagedPet) {
+    process.stdout.write(`  buddy pets use ${petId}\n`)
+  } else if (outputDir !== 'pets/default') {
     warn(`To activate this pet, copy or move it to a buddy-managed pets directory, then run:`)
     process.stdout.write(`  buddy pets use ${petId}\n`)
   } else {

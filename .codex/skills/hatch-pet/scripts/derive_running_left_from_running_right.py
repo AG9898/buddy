@@ -10,6 +10,8 @@ from pathlib import Path
 
 from PIL import Image, ImageOps
 
+from validate_row_strip import validate_row_from_run
+
 RUNNING_FRAME_COUNT = 8
 
 
@@ -112,6 +114,25 @@ def main() -> None:
         mirrored = mirror_strip_preserving_frame_order(image)
         mirrored.save(output)
 
+    preflight = validate_row_from_run(run_dir, "running-left")
+    preflight_path = run_dir / "qa" / "row-preflight" / "running-left.json"
+    preflight_path.parent.mkdir(parents=True, exist_ok=True)
+    preflight_path.write_text(json.dumps(preflight, indent=2) + "\n", encoding="utf-8")
+    if not preflight["ok"]:
+        print(
+            json.dumps(
+                {
+                    "ok": False,
+                    "job_id": "running-left",
+                    "output": str(output),
+                    "preflight": str(preflight_path),
+                    "errors": preflight["errors"],
+                },
+                indent=2,
+            )
+        )
+        raise SystemExit("mirrored running-left failed row preflight; generate it normally instead")
+
     left_job["status"] = "complete"
     left_job["source_path"] = manifest_relative(source, run_dir)
     left_job["derived_from"] = "running-right"
@@ -138,6 +159,7 @@ def main() -> None:
                 "job_id": "running-left",
                 "derived_from": "running-right",
                 "output": str(output),
+                "preflight": str(preflight_path),
                 "decision_note": args.decision_note.strip(),
                 "transform": "framewise-horizontal-mirror-preserving-order",
             },

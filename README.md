@@ -135,7 +135,7 @@ buddy <command> [options]
 | `buddy state <name>` | Manually push a state (`idle`, `running`, `waiting`, …). |
 | `buddy hooks install` | Write Claude Code + Codex CLI hook entries. |
 | `buddy doctor` | Health check: process, sidecar, token, and hook status. |
-| `buddy hatch <prompt>` | Generate a new pet via Codex CLI image generation. |
+| `buddy hatch <prompt>` | Generate a personal pet via Codex CLI image generation. |
 | `buddy pets list` | List all valid buddy-managed and Codex-compatible pets. |
 | `buddy pets show` | Print the currently active pet and its path. |
 | `buddy pets use <id>` | Select and persist an active pet by ID. |
@@ -144,7 +144,9 @@ buddy <command> [options]
 
 | Flag | Command | Description |
 |---|---|---|
-| `--output <dir>` | `hatch` | Custom output directory for the generated pet. |
+| `--id <id>` | `hatch` | Name the generated buddy-managed pet (otherwise derived from the prompt). |
+| `--output <dir>` | `hatch` | Explicit custom output directory for the generated pet. |
+| `--package-preset <id>` | `hatch` | Maintainer-only: replace a bundled source-checkout preset. |
 | `--verbose` | `hatch` | Show raw Codex subprocess output. |
 | `--rc <path>` | `hooks install` | Deprecated compatibility flag; ignored. |
 
@@ -202,11 +204,17 @@ buddy pets use penguin
 
 ```sh
 buddy hatch "a small orange cat"
-buddy hatch "a small orange cat" --output pets/my-cat
+buddy hatch "a small orange cat" --id marmalade
+buddy hatch "a small orange cat" --output C:\\art\\my-cat
 buddy hatch "a small orange cat" --verbose
 ```
 
-Codex CLI must be installed and signed in (`codex login`) before hatching. Use `BUDDY_CODEX_COMMAND` if Codex lives at a non-standard path.
+By default, a hatch creates a personal pet in `%USERPROFILE%\\.petdex-win\\pets\\<derived-id>`,
+so it is available to `buddy pets` without changing the npm package. Use `--id` to choose
+that folder name. `--package-preset <id>` is intentionally explicit and only for maintainers
+who are replacing a bundled `pets/<id>` asset in a source checkout. Codex CLI must be
+installed and signed in (`codex login`) before hatching. Use `BUDDY_CODEX_COMMAND` if Codex
+lives at a non-standard path.
 
 ### Browsing and selecting pets
 

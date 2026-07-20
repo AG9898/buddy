@@ -25,7 +25,7 @@ Do not call the Image API, image CLI, or any other image-generation path directl
 
 When invoking `$imagegen`, pass the generated pet prompt as the authoritative visual spec. Pet prompts should stay concise, state-specific, sprite-production oriented, and grounded in the listed input images. Keep longer policy and QA rules in this skill and the deterministic review scripts rather than expanding them into every image prompt. Do not wrap prompts in the generic `$imagegen` shared prompt schema.
 
-Use this skill's scripts for deterministic image work only: preparing layout guides and prompts, mirroring approved `running-left`, extracting frames, validating rows, composing the final atlas, and creating contact-sheet plus motion-preview QA media. Parent-owned shell/`jq` steps handle manifest updates, packaging, and cleanup.
+Use this skill's scripts for deterministic image work only: preparing layout guides and prompts, preflighting generated row strips, mirroring approved `running-left`, extracting and cleaning frames, validating rows, composing the final atlas, and creating contact-sheet plus motion-preview QA media. Parent-owned shell/`jq` steps handle manifest updates, packaging, and cleanup.
 
 ## Storage Controls
 
@@ -94,7 +94,7 @@ The parent should save the markdown brief before preparing the run, then pass it
 
 For a normal pet run, expect up to 10 visual generation jobs: 1 base pet plus 9 row-strip jobs. The Codex app contract currently uses all 9 states: `idle`, `running-right`, `running-left`, `waving`, `jumping`, `failed`, `waiting`, `running`, and `review`. The only deterministic visual derivation is `running-left`, which may be produced by mirroring `running-right` only after `running-right` has been generated, visually inspected, and explicitly approved as safe to mirror. If mirroring is not appropriate, generate `running-left` as a normal grounded `$imagegen` row.
 
-After selecting a visual output, the parent agent copies that exact image into the job's `decoded/` path and marks the job complete in `imagegen-jobs.json`. Do not write helper scripts that populate row outputs. The deterministic Python scripts may only process already-generated visual outputs.
+After selecting a visual output, the parent agent copies that exact image into the job's `decoded/` path, runs row preflight, and only then marks the job complete in `imagegen-jobs.json`. Do not write helper scripts that populate row outputs. The deterministic Python scripts may only process already-generated visual outputs.
 
 Only the base job may be prompt-only. Every row-strip job generated through `$imagegen` must use the input images listed in `imagegen-jobs.json`, including the canonical base reference created after the selected base output is copied. Treat any row generation without attached grounding images as invalid.
 
@@ -227,6 +227,16 @@ cp "$SOURCE" "$RUN_DIR/$OUTPUT_REL"
 if [ "$JOB_ID" = "base" ]; then mkdir -p "$RUN_DIR/references"; cp "$RUN_DIR/$OUTPUT_REL" "$RUN_DIR/references/canonical-base.png"; fi
 ```
 
+For every row-strip job, preflight the copied strip before changing its manifest status. A failed preflight means the row is rejected: keep the source for repair context, do not mark it complete, and regenerate only that row.
+
+```bash
+if [ "$JOB_ID" != "base" ]; then
+  python "$SKILL_DIR/scripts/validate_row_strip.py" \
+    --run-dir "$RUN_DIR" \
+    --row-id "$JOB_ID"
+fi
+```
+
 ```bash
 UPDATED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 TMP_MANIFEST=$(mktemp)
@@ -255,7 +265,7 @@ python "$SKILL_DIR/scripts/derive_running_left_from_running_right.py" \
   --decision-note "<why mirroring preserves this pet's identity>"
 ```
 
-That script mirrors each generated frame slot in place so the leftward row preserves the rightward row's temporal order. Do not replace it with a whole-strip mirror that reverses animation timing.
+That script mirrors each generated frame slot in place so the leftward row preserves the rightward row's temporal order. It also runs the same row preflight before changing the manifest; if it fails, generate `running-left` normally instead of accepting a broken derivation. Do not replace it with a whole-strip mirror that reverses animation timing.
 
 6. When all jobs are complete, run the image-processing scripts directly:
 
@@ -270,6 +280,14 @@ python "$SKILL_DIR/scripts/extract_strip_frames.py" \
   --output-dir "$RUN_DIR/frames" \
   --states all \
   --method auto
+```
+
+Clean chroma fringe only after frame extraction. Do not clean whole source strips: that can alter connected-component detection and cause valid frames to become unextractable. The cleaner uses the imagegen chroma helper on each already-extracted frame, then normalizes fully transparent RGB so atlas validation remains strict.
+
+```bash
+python "$SKILL_DIR/scripts/clean_extracted_frames.py" \
+  --frames-root "$RUN_DIR/frames" \
+  --json-out "$RUN_DIR/qa/frame-cleanup.json"
 ```
 
 ```bash
@@ -304,7 +322,7 @@ python "$SKILL_DIR/scripts/render_animation_previews.py" \
   --output-dir "$RUN_DIR/qa/previews"
 ```
 
-If the preview GIFs show size popping or baseline jumps caused by per-frame fit-to-cell extraction, and the original row strip itself had stable scale and placement, rerun frame extraction with the explicit row-stability mode and then re-run inspection, atlas composition, validation, contact sheet generation, and previews:
+If the preview GIFs show size popping, baseline jumps, or a source row's intentional vertical motion being erased by per-frame fit-to-cell extraction, and the original row strip itself has the correct scale and placement, rerun frame extraction with the explicit row-stability mode and then re-run inspection, atlas composition, validation, contact sheet generation, and previews:
 
 ```bash
 python "$SKILL_DIR/scripts/extract_strip_frames.py" \
@@ -322,7 +340,7 @@ python "$SKILL_DIR/scripts/inspect_frames.py" \
   --allow-stable-slots
 ```
 
-Use `stable-slots` as a deliberate QA-driven correction, not the default. It should reduce extraction-induced motion pops without hiding clipped wide poses or bad source strips.
+Use `stable-slots` as a deliberate QA-driven correction, not the default. It should preserve row-level baseline and vertical-position semantics without hiding clipped wide poses or bad source strips.
 
 After the animation previews pass visual QA, generate `build/icon.ico` from the canonical base:
 
@@ -457,8 +475,9 @@ Row worker responsibilities:
 - handle exactly one row job
 - read the row prompt and use all listed input images
 - use `$imagegen` only; do not draw, edit, tile, or synthesize sprites locally
-- perform a quick visual sanity check for frame count, identity, chroma background, spacing, clipping, and detached effects
+- perform a quick visual sanity check for frame count, identity, chroma background, spacing, clipping, disconnected fragments, and detached effects
 - enforce the row prompt's transparency and effects rules, including no detached effects, no wave marks for `waving`, no speed lines or dust for directional running rows, no literal foot-running for the non-directional `running` row, and only attached opaque sprite-like tears/smoke/stars when allowed by the state prompt
+- reject an output rather than selecting it when frames touch, a silhouette is clipped, a forbidden prop/effect appears, or a stated no-effect rule is violated; never report a rejected feature as acceptable
 - return only `selected_source=/absolute/path/to/selected-output.png` and `qa_note=<one sentence>`
 
 Final visual QA worker responsibilities:
@@ -511,7 +530,7 @@ Input images:
 
 Use $imagegen only. Read the row prompt and attach every listed input image. If imagegen returns Bad Request, retry once with the retry prompt and the same input images.
 
-Before returning, visually check: exact frame count, same pet identity as canonical base, flat chroma background, complete separated unclipped poses, and no detached effects or guide marks. The prompt's transparency and effects rules are mandatory: no detached effects, no wave marks for `waving`, no speed lines or dust for directional running rows, no literal foot-running for the non-directional `running` row, and only attached opaque sprite-like tears/smoke/stars when allowed by the state prompt.
+Before returning, visually check: exact frame count, same pet identity as canonical base, flat chroma background, one connected silhouette per frame, wide uninterrupted chroma-key gaps between frames, complete separated unclipped poses, and no detached effects or guide marks. Reject the output if any check fails. The prompt's transparency and effects rules are mandatory: no detached effects, no wave marks for `waving`, no speed lines or dust for directional running rows, no literal foot-running for the non-directional `running` row, and only attached opaque sprite-like tears/smoke/stars when allowed by the state prompt. Do not accept a new prop, glow, orb, sparkle, or decorative effect when the state prompt forbids it.
 
 Do not edit manifests, copy into decoded, mark jobs complete, mirror rows, run image-processing scripts, repair, package, or open unrelated files.
 Do not include Markdown image previews, base64, or extra attachments in the final response.
@@ -548,9 +567,9 @@ repair_notes=<short row-specific notes, or none>
 
 ## Repair Workflow
 
-If frame inspection or final visual QA fails, read `qa/review.json`, regenerate the smallest failing scope, copy the replacement row into the same decoded output path, and keep that job marked complete with the new `source_path` and `completed_at`. Repair the failed row, not the whole sheet.
+If row preflight, frame inspection, or final visual QA fails, read its JSON report, regenerate the smallest failing scope, copy the replacement row into the same decoded output path, rerun row preflight, and only then keep that job marked complete with the new `source_path` and `completed_at`. Repair the failed row, not the whole sheet.
 
-For identity repairs, use the canonical base image, original references, contact sheet, and exact row failure note as grounding context. Give the row worker the existing row prompt plus a compact repair note from `qa/review.json`; preserve the canonical pet identity and chosen style.
+For identity or visual repairs, use the canonical base image, original references, the failed row strip when available, the contact sheet, and the exact failure note as grounding context. Give the row worker the existing row prompt plus a compact repair note that names the failed frames and forbidden artifact; preserve the canonical pet identity and chosen style. For component/preflight failures, explicitly require one connected silhouette per frame and a wide clean chroma-key gap between neighboring slots.
 
 For extraction-induced motion popping, do not regenerate imagery first. If the source strip already preserves row-level scale and baseline, rerun the deterministic pipeline with `--method stable-slots`, inspect with `--allow-stable-slots`, then re-check the preview GIFs. Regenerate the row only when the original strip itself is clipped, unstable, or semantically wrong.
 
@@ -569,7 +588,9 @@ For extraction-induced motion popping, do not regenerate imagery first. If the s
 - Do not derive or reuse `waiting`, `running`, `failed`, `review`, `jumping`, or `waving` from another state; each has distinct app semantics and must be generated as its own row.
 - Never substitute locally drawn, tiled, transformed, or code-generated row strips for missing `$imagegen` outputs.
 - Only mark a visual job complete after its selected output has been copied into the decoded output path.
+- For every row strip, run `validate_row_strip.py` after copying and before marking it complete; reject rows whose disconnected silhouette count, safe edge padding, or inter-frame chroma-key gaps fail preflight.
 - Do not rely on generated images for exact atlas geometry; use this skill's deterministic image scripts.
+- Remove chroma fringe only from extracted frames through `clean_extracted_frames.py`, never by cleaning a whole row strip before component extraction; normalize fully transparent RGB before atlas composition.
 - Use the chroma key stored in `pet_request.json`; do not force a fixed green screen.
 - Keep the pet's silhouette, face, materials, palette, style, and props consistent across all rows.
 - Treat visual identity or style drift as a blocker even when `qa/review.json` and `final/validation.json` have no errors.
@@ -583,6 +604,7 @@ For extraction-induced motion popping, do not regenerate imagery first. If the s
 - Final atlas is PNG or WebP, `1536x1872`, transparent-capable, and based on `192x208` cells.
 - Used cells are non-empty and unused cells are fully transparent.
 - Atlas follows the row/frame counts in `references/animation-rows.md`.
+- Every accepted generated row has a passing `qa/row-preflight/<row>.json` report before extraction.
 - Contact sheet and per-row motion previews have been produced and inspected by a lightweight visual QA worker.
 - `qa/review.json` has no errors.
 - Row-by-row review confirms the animation cycles are complete enough for the Codex app.
