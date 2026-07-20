@@ -901,7 +901,7 @@
       "id": "FEAT-17",
       "title": "Make the CLI entry point testable and self-consistent",
       "description": "Extract Commander program construction from the executable entry module so tests can instantiate and parse the CLI without consuming process.argv at import time. Source the displayed version from package metadata, add a useful bare-buddy landing/help surface, group commands by workflow, and keep subcommand descriptions concise. This task establishes command structure only; operational status data and global result rendering are handled by later tasks.",
-      "status": "todo",
+      "status": "done",
       "priority": "high",
       "group_id": "FEAT",
       "depends_on": [

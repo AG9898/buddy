@@ -93,14 +93,19 @@ const BUDDY_LOGO = `    ____            __    __
                         /____/`
 
 /**
+ * Build the Buddy ASCII logo banner as a string.
+ * Useful where the banner must be returned rather than written (e.g. Commander help text).
+ */
+export function bannerText(): string {
+  return `\n${orange(BUDDY_LOGO)}\n${dim('  Windows floating desktop pet')}\n`
+}
+
+/**
  * Render the Buddy ASCII logo banner to stdout.
  * Call this on primary CLI entry / help surfaces.
  */
 export function printBanner(): void {
-  process.stdout.write('\n')
-  process.stdout.write(orange(BUDDY_LOGO) + '\n')
-  process.stdout.write(dim('  Windows floating desktop pet') + '\n')
-  process.stdout.write('\n')
+  process.stdout.write(bannerText() + '\n')
 }
 
 /* ── Status line helpers ─────────────────────────────────────────────────────

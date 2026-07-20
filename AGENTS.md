@@ -62,7 +62,8 @@ buddy/
   electron-builder.yml  — Windows installer/packager config
   src/
     cli/
-      index.ts         — npm bin entry: start/stop/hooks/state/doctor/hatch
+      index.ts         — npm bin entry: thin parse/error boundary only
+      program.ts       — createProgram(): Commander command tree, grouped help, package version
       commands/        — CLI command implementations; hatch delegates imagegen work to Codex CLI
     main/
       main.ts           — Electron entry: app lifecycle, tray, startup restore
@@ -327,6 +328,9 @@ For component-based frame extraction, a strip needs one fully separated connecte
 
 ### 2026-07-20 - Hardcoded drive-letter paths in tests fail on Linux agents
 `hatch.test.ts` stubbed `BUDDY_DATA_DIR=C:\buddy-data` and asserted a fully backslashed result, which passed on Windows but failed on Linux because `path.join` only normalizes the separators it adds. Build both the stubbed input and the expected value from `path.join`/`path.sep` so a single expectation holds on every platform; this complements the 2026-05-29 separator entry, which covered assertions but not drive-letter roots.
+
+### 2026-07-20 - A root Commander action disables built-in unknown-command errors
+Giving the root program an action handler (so bare `buddy` can print a landing surface) makes Commander pass unmatched arguments to that handler instead of raising `commander.unknownCommand`. `src/cli/program.ts` re-reports them through Commander's own `unknownCommand()` reporter so "did you mean" suggestions and exit codes survive; keep that guard if the root action changes.
 
 ### 2026-07-20 - User hatches must not mutate bundled assets
 `buddy hatch` defaults to a validated pet-id folder under the buddy-managed data directory, not `pets/default`. The shared `build/icon.ico` is application branding and must remain untouched by any pet hatch; replacing a bundled preset is an explicit maintainer-only workflow.

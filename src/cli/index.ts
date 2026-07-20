@@ -1,214 +1,22 @@
 #!/usr/bin/env node
 /**
- * buddy CLI entry point.
+ * buddy CLI executable entry point.
  *
- * Subcommands:
- *   buddy start                  — launch the Electron pet window
- *   buddy stop                   — terminate the running Electron pet window
- *   buddy hooks install [--rc]   — write Claude Code / Codex CLI hook entries
- *   buddy state <name>           — POST a state change to the running sidecar
- *   buddy doctor                 — print a pass/fail health checklist
- *   buddy hatch <prompt>         — delegate custom pet asset generation to Codex
+ * This module is intentionally thin: it builds the Commander program from
+ * program.ts, parses process.argv, and converts thrown expected errors into a
+ * concise terminal message plus a non-zero exit code. All command structure
+ * lives in program.ts so tests can construct and parse the CLI without
+ * consuming process.argv at import time.
  *
- * Environment detection (isWSL) is handled per-command.
  * No Electron imports anywhere in src/cli/ — safe to run in WSL node.
  */
 
-import { Command, type Command as CommandType, type HelpContext } from 'commander'
-import { runStart } from './commands/start.js'
-import { runStop } from './commands/stop.js'
-import { runHooksInstall } from './commands/hooks.js'
-import { runState } from './commands/state.js'
-import { runDoctor } from './commands/doctor.js'
-import {
-  buddyManagedPetOutputDir,
-  packagedPresetOutputDir,
-  petIdFromPrompt,
-  runHatch,
-  validatePetId,
-} from './commands/hatch.js'
-import { runPetsList, runPetsShow, runPetsUse } from './commands/pets.js'
-import { runSize } from './commands/size.js'
-import { printBanner } from './output.js'
+import { createProgram } from './program.js'
+import { error } from './output.js'
 
-const program = new Command()
-
-program
-  .name('buddy')
-  .description('Windows floating desktop pet CLI')
-  .version('0.1.0')
-
-// Print the banner before the help text on `buddy --help`
-program.on('--help', () => {
-  // Banner already printed before this callback fires; nothing extra needed.
-})
-
-// Override outputHelp to prepend the banner.
-const originalOutputHelp = program.outputHelp.bind(program)
-
-function outputHelpWithBanner(context?: HelpContext): void
-function outputHelpWithBanner(cb?: (str: string) => string): void
-function outputHelpWithBanner(arg?: HelpContext | ((str: string) => string)): void {
-  printBanner()
-  if (typeof arg === 'function') {
-    originalOutputHelp(arg)
-  } else {
-    originalOutputHelp(arg)
-  }
-}
-program.outputHelp = outputHelpWithBanner
-
-// ── buddy start ───────────────────────────────────────────────────────────────
-program
-  .command('start')
-  .description(
-    'Launch the buddy pet window. On Windows spawns the Electron app; ' +
-      'in WSL invokes buddy.exe via WSL interop.',
-  )
-  .action(() => {
-    runStart()
+createProgram()
+  .parseAsync(process.argv)
+  .catch((err: unknown) => {
+    error(err instanceof Error ? err.message : String(err))
+    process.exitCode = 1
   })
-
-// ── buddy stop ────────────────────────────────────────────────────────────────
-program
-  .command('stop')
-  .description('Terminate the running buddy pet window.')
-  .action(() => {
-    runStop()
-  })
-
-// ── buddy hooks ───────────────────────────────────────────────────────────────
-const hooks = program.command('hooks').description('Manage buddy shell hooks.')
-
-hooks
-  .command('install')
-  .description(
-    'Write Claude Code and Codex CLI hook entries. ' +
-      'On Windows they call buddy state; in WSL they call petdex-bridge state.',
-  )
-  .option('--rc <path>', 'Deprecated; retained for older scripts and ignored')
-  .action(function (this: CommandType) {
-    const opts = this.opts() as { rc?: string }
-    runHooksInstall(opts.rc)
-  })
-
-// ── buddy state ───────────────────────────────────────────────────────────────
-program
-  .command('state <name>')
-  .description(
-    'POST a pet state change to the running sidecar. ' +
-      'Valid states: idle, running, waiting, jumping, waving, failed, review.',
-  )
-  .action((name: string) => {
-    runState(name)
-  })
-
-// ── buddy doctor ──────────────────────────────────────────────────────────────
-program
-  .command('doctor')
-  .description(
-    'Print a pass/fail checklist: process running, sidecar health, ' +
-      'token file present, hooks installed.',
-  )
-  .action(() => {
-    runDoctor().catch((err: unknown) => {
-      const { error } = require('./output.js') as typeof import('./output.js')
-      error(err instanceof Error ? err.message : String(err))
-      process.exit(1)
-    })
-  })
-
-// ── buddy hatch ───────────────────────────────────────────────────────────────
-program
-  .command('hatch <prompt>')
-  .description(
-    'Generate custom pet assets from a text description by delegating to Codex CLI. ' +
-      'Codex provides $imagegen; buddy packages the hatch-pet outputs into spritesheet assets.',
-  )
-  .option(
-    '--output <dir>',
-    'Explicit output directory for pet assets (pet.json + spritesheet.webp)',
-  )
-  .option('--id <id>', 'Name the buddy-managed pet (defaults to a name derived from the prompt)')
-  .option(
-    '--package-preset <id>',
-    'Maintainer-only: write to this source checkout’s bundled pets/<id> preset',
-  )
-  .option(
-    '--verbose',
-    'Show raw Codex subprocess output for troubleshooting (also enabled by BUDDY_LOG_LEVEL=debug)',
-    false,
-  )
-  .action(async (prompt: string, options: { output?: string; id?: string; packagePreset?: string; verbose: boolean }) => {
-    await (async () => {
-      if (options.output && options.id) {
-        throw new Error('Use either --output or --id; --id names only the default buddy-managed destination.')
-      }
-      if (options.output && options.packagePreset) {
-        throw new Error('Use either --output or --package-preset, not both.')
-      }
-      if (options.id && options.packagePreset) {
-        throw new Error('Use either --id or --package-preset, not both.')
-      }
-
-      const outputDir = options.output
-        ? options.output
-        : options.packagePreset
-          ? packagedPresetOutputDir(options.packagePreset)
-          : buddyManagedPetOutputDir(options.id ? validatePetId(options.id) : petIdFromPrompt(prompt))
-
-      await runHatch(prompt, outputDir, options.verbose)
-    })().catch((err: unknown) => {
-      const { error } = require('./output.js') as typeof import('./output.js')
-      error(err instanceof Error ? err.message : String(err))
-      process.exit(1)
-    })
-  })
-
-// ── buddy size ────────────────────────────────────────────────────────────────
-program
-  .command('size <scale-or-width>')
-  .description(
-    'Resize the buddy pet window from the terminal. ' +
-      'Accepts a scale factor (e.g., 1.5 or 2x) or explicit WxH dimensions (e.g., 400x300). ' +
-      'Uses the same bounds validation and persistence model as visual resize.',
-  )
-  .action((sizeArg: string) => {
-    runSize(sizeArg)
-  })
-
-// ── buddy pets ────────────────────────────────────────────────────────────────
-const pets = program
-  .command('pets')
-  .description(
-    'Enumerate and select pets. ' +
-      'Pets can be buddy-managed (%USERPROFILE%\\.petdex-win\\pets), ' +
-      'packaged with buddy, or Codex-compatible (%USERPROFILE%\\.codex\\pets).',
-  )
-  .action(() => {
-    // Show help when `buddy pets` is run with no subcommand.
-    pets.help()
-  })
-
-pets
-  .command('list')
-  .description('List valid buddy-managed, packaged, and Codex-compatible pets.')
-  .action(() => {
-    runPetsList()
-  })
-
-pets
-  .command('show')
-  .description('Print the currently selected pet and its source path.')
-  .action(() => {
-    runPetsShow()
-  })
-
-pets
-  .command('use <id>')
-  .description('Validate and persist a pet selection.')
-  .action((id: string) => {
-    runPetsUse(id)
-  })
-
-program.parse(process.argv)

@@ -13,6 +13,8 @@ The npm package is named `@ag9898/buddy`, but the installed command remains `bud
 
 | Command | Purpose |
 |---|---|
+| `buddy` | Landing surface: banner (TTY only) plus workflow-grouped help and examples. |
+| `buddy --version` | Print the installed version, sourced from `package.json`. |
 | `buddy start` | Launch the Electron pet app detached and return control to the terminal. |
 | `buddy stop` | Terminate the running Electron pet app. |
 | `buddy state <name>` | Send a pet state change to the local sidecar. |
@@ -37,17 +39,40 @@ The planned command surface adds:
 
 | Command | Purpose |
 |---|---|
-| `buddy` | Show a compact interactive overview with version, app state, active pet, window size, hook summary, and suggested next commands. |
+| `buddy` | Extend the shipped landing surface with app state, active pet, window size, hook summary, and suggested next commands. |
 | `buddy status` | Print the same operational summary without the large banner. |
 | `buddy pets current` | Canonical name for the current-pet view; `buddy pets show` remains a compatibility alias. |
 | `buddy hooks status` | Report Claude Code and Codex CLI hook coverage without changing configuration. |
 | `buddy hooks uninstall` | Remove only buddy-owned hook entries after explicit command invocation, preserving unrelated configuration. |
 
-Existing commands retain their current names. Help output groups them by workflow: app
-lifecycle, pet management, integrations, and diagnostics. Root and subcommand help use
-short summaries plus concrete examples instead of embedding implementation detail in the
-command list. The version displayed by `buddy --version` must come from package metadata so
-it cannot drift from `package.json`.
+Existing commands retain their current names.
+
+---
+
+## Command Structure and Help Surfaces
+
+Command construction lives in `src/cli/program.ts` and is exported as `createProgram()`.
+`src/cli/index.ts` is a thin executable boundary: it builds the program, parses
+`process.argv`, and converts a thrown expected error into one concise message plus a
+non-zero exit code. Command modules throw instead of calling `process.exit()`, and no
+module parses `process.argv` at import time, so tests can construct the program and parse
+explicit argument arrays.
+
+Root help groups commands by workflow — app lifecycle, pet management, integrations, and
+diagnostics — using short summaries plus concrete examples instead of embedding
+implementation detail in the command list. Subcommands keep Commander's default help
+layout and add their own examples section.
+
+Bare `buddy` prints the same grouped help surface and exits `0`. The banner renders only on
+root help and only when stdout is a TTY, so redirected output and CI stay deterministic and
+the banner is never printed twice on one help surface.
+
+The version displayed by `buddy --version` is read from `package.json` at runtime through
+`resolveCliVersion()`, which resolves the package root from both a source checkout and the
+built `out/cli/` bundle. There is no duplicated version literal in the CLI source.
+
+Unknown commands report `unknown command '<name>'` with a "did you mean" suggestion, and
+missing arguments or unknown options exit non-zero with Commander's standard messages.
 
 ---
 
