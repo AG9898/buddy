@@ -1,7 +1,7 @@
 {
   "$schema": "./workboard.schema.json",
   "schema_version": "1.0.0",
-  "last_updated": "2026-05-28",
+  "last_updated": "2026-07-20",
   "tasks": [
     {
       "id": "FEAT-01",
@@ -895,6 +895,610 @@
         "npm run build:app",
         "npm pack --dry-run",
         "npm run build"
+      ]
+    },
+    {
+      "id": "FEAT-17",
+      "title": "Make the CLI entry point testable and self-consistent",
+      "description": "Extract Commander program construction from the executable entry module so tests can instantiate and parse the CLI without consuming process.argv at import time. Source the displayed version from package metadata, add a useful bare-buddy landing/help surface, group commands by workflow, and keep subcommand descriptions concise. This task establishes command structure only; operational status data and global result rendering are handled by later tasks.",
+      "status": "todo",
+      "priority": "high",
+      "group_id": "FEAT",
+      "depends_on": [
+        "FEAT-10",
+        "FEAT-34"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "CLI program construction is exported for tests and the executable entry module remains a thin parse/error boundary",
+        "buddy --version matches package.json without a duplicated version literal",
+        "Bare buddy and root/nested help show grouped concise commands and examples without double-printing the banner",
+        "Focused tests cover bare invocation, version, root help, nested help, and typo/argument errors"
+      ],
+      "docs": [
+        "docs/CLI.md",
+        "docs/TESTING.md"
+      ],
+      "files": [
+        "src/cli/index.ts",
+        "src/cli/program.ts",
+        "src/cli/program.test.ts",
+        "package.json"
+      ],
+      "commands": [
+        "npm run lint",
+        "npm test",
+        "npm run build:app"
+      ]
+    },
+    {
+      "id": "FEAT-18",
+      "title": "Add global CLI output modes and typed result rendering",
+      "description": "Extend the shared CLI output layer with a per-invocation output context, typed command results, typed expected errors, and renderers for human, quiet, verbose, JSON, and no-color modes. Register --verbose, --quiet, --json, and --no-color globally, reject incompatible quiet/verbose usage, and centralize stdout, stderr, and process.exitCode handling at the entry boundary. Command-family migration is intentionally left to follow-up tasks.",
+      "status": "todo",
+      "priority": "high",
+      "group_id": "FEAT",
+      "depends_on": [
+        "FEAT-17"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "All four global output options are inherited by nested commands and incompatible combinations fail cleanly",
+        "The shared layer renders typed successes and expected failures without command implementations calling process.exit",
+        "JSON mode emits one parseable result on stdout with diagnostics isolated to stderr",
+        "TTY, redirected, quiet, verbose, JSON, NO_COLOR, and --no-color behavior have focused tests"
+      ],
+      "docs": [
+        "docs/CLI.md",
+        "docs/CONVENTIONS.md",
+        "docs/TESTING.md"
+      ],
+      "files": [
+        "src/cli/output.ts",
+        "src/cli/output.test.ts",
+        "src/cli/program.ts",
+        "src/cli/result.ts"
+      ],
+      "commands": [
+        "npm run lint",
+        "npm test"
+      ]
+    },
+    {
+      "id": "FEAT-19",
+      "title": "Normalize state and size sidecar command UX",
+      "description": "Introduce a small shared token-authenticated sidecar client for CLI requests, then migrate buddy state and buddy size to typed results and the global output modes. Preserve their existing payloads, validation, recovery hints, and exit behavior while removing duplicated token and HTTP error formatting. Do not add new sidecar endpoints or state-name discovery in this task.",
+      "status": "todo",
+      "priority": "high",
+      "group_id": "FEAT",
+      "depends_on": [
+        "FEAT-18"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "State and size share token loading, HTTP response parsing, timeout, and connection-error handling",
+        "Both commands honor human, quiet, verbose, JSON, and no-color modes",
+        "Expected failures return typed errors and set exit status only at the CLI entry boundary",
+        "Existing state and size behavior remains covered without process.exit mocks"
+      ],
+      "docs": [
+        "docs/CLI.md",
+        "docs/CONVENTIONS.md",
+        "docs/TESTING.md"
+      ],
+      "files": [
+        "src/cli/sidecar-client.ts",
+        "src/cli/commands/state.ts",
+        "src/cli/commands/state.test.ts",
+        "src/cli/commands/size.ts",
+        "src/cli/commands/size.test.ts"
+      ],
+      "commands": [
+        "npm run lint",
+        "npm test"
+      ]
+    },
+    {
+      "id": "FEAT-20",
+      "title": "Unify doctor and hook-install terminal output",
+      "description": "Migrate buddy doctor and buddy hooks install onto the shared typed-result renderer, replacing direct console writes and process exits while preserving hook configuration semantics. Human output should use the common check, heading, and hint vocabulary; quiet and JSON output should expose the same diagnostic facts without decoration. Hook status and uninstall subcommands remain out of scope.",
+      "status": "todo",
+      "priority": "medium",
+      "group_id": "FEAT",
+      "depends_on": [
+        "FEAT-18"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "Doctor and hook install use no direct console.log, console.error, or process.exit calls",
+        "Human output consistently distinguishes pass, warning, and failure with actionable next commands",
+        "Quiet and JSON modes return the full check/install result without banners or separators",
+        "Focused tests cover complete success, partial hook coverage, idempotent install, and expected failure"
+      ],
+      "docs": [
+        "docs/CLI.md",
+        "docs/CONVENTIONS.md",
+        "docs/TESTING.md"
+      ],
+      "files": [
+        "src/cli/commands/doctor.ts",
+        "src/cli/commands/doctor.test.ts",
+        "src/cli/commands/hooks.ts",
+        "src/cli/commands/hooks.test.ts"
+      ],
+      "commands": [
+        "npm run lint",
+        "npm test"
+      ]
+    },
+    {
+      "id": "FEAT-21",
+      "title": "Unify pet command output and add pets current alias",
+      "description": "Migrate pets list, current/show, and use onto the typed CLI result renderer, keeping discovery and state persistence behavior unchanged. Add buddy pets current as the canonical current-selection command while retaining pets show as a documented compatibility alias. Live application of a selection is explicitly deferred to the dedicated live-selection tasks.",
+      "status": "todo",
+      "priority": "medium",
+      "group_id": "FEAT",
+      "depends_on": [
+        "FEAT-18"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "Pets list, current/show, and use honor all global output modes through the shared renderer",
+        "pets current and pets show return equivalent selection data and help marks show as an alias",
+        "Human selection output accurately states that the saved pet applies on next start until live reload ships",
+        "Existing discovery, invalid-folder, and no-Codex-write guarantees remain covered"
+      ],
+      "docs": [
+        "docs/CLI.md",
+        "docs/TESTING.md"
+      ],
+      "files": [
+        "src/cli/program.ts",
+        "src/cli/commands/pets.ts",
+        "src/cli/commands/pets.test.ts"
+      ],
+      "commands": [
+        "npm run lint",
+        "npm test"
+      ]
+    },
+    {
+      "id": "FEAT-22",
+      "title": "Add buddy status and the operational root overview",
+      "description": "Consume the bounded operational snapshot from FEAT-33, combine it with existing hook detection, and expose it through buddy status. Upgrade bare buddy from its initial landing surface to an interactive overview with version, app state, active pet, window size, hook summary, and suggested commands; non-TTY and JSON forms remain compact and deterministic. Sidecar endpoint implementation is out of scope.",
+      "status": "todo",
+      "priority": "high",
+      "group_id": "FEAT",
+      "depends_on": [
+        "FEAT-18",
+        "FEAT-33"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "buddy status reports running state, active pet, window dimensions, and hook coverage with useful stopped-app degradation",
+        "Bare buddy renders the documented interactive overview while redirected and JSON output omit the banner",
+        "CLI tests cover running, stopped, missing-token, partial-hooks, TTY, and JSON paths",
+        "The command does not expose token values, arbitrary filesystem contents, or assistant configuration"
+      ],
+      "docs": [
+        "docs/CLI.md",
+        "docs/ARCHITECTURE.md",
+        "docs/TESTING.md"
+      ],
+      "files": [
+        "src/cli/commands/status.ts",
+        "src/cli/commands/status.test.ts",
+        "src/cli/program.ts",
+        "src/cli/sidecar-client.ts"
+      ],
+      "commands": [
+        "npm run lint",
+        "npm test"
+      ]
+    },
+    {
+      "id": "FEAT-23",
+      "title": "Report CLI startup outcomes reliably",
+      "description": "Change buddy start to report success only after the Electron child emits a successful spawn and migrate Windows and WSL startup onto the typed result renderer. Missing runtimes, spawn errors, and WSL interop failures must return actionable expected errors without a premature success line. Shutdown behavior is handled independently by FEAT-31.",
+      "status": "todo",
+      "priority": "critical",
+      "group_id": "FEAT",
+      "depends_on": [
+        "FEAT-19"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "Start reports success only after spawn and returns an actionable typed failure when launch fails",
+        "Windows and WSL startup honor human, quiet, verbose, JSON, and no-color output modes",
+        "Detached launch behavior and prompt return remain unchanged after successful spawn",
+        "Unit tests cover Windows and WSL success, missing runtime, child error, and non-zero interop exit"
+      ],
+      "docs": [
+        "docs/CLI.md",
+        "docs/ARCHITECTURE.md",
+        "docs/CONVENTIONS.md",
+        "docs/TESTING.md"
+      ],
+      "files": [
+        "src/cli/commands/start.ts",
+        "src/cli/commands/start.test.ts"
+      ],
+      "commands": [
+        "npm run lint",
+        "npm test"
+      ]
+    },
+    {
+      "id": "FEAT-24",
+      "title": "Add validated Electron live pet selection control",
+      "description": "Implement the Electron-owned selection service and token-authenticated sidecar request for live pet changes. Validate and persist the requested id through the canonical state path, resolve its manifest and spritesheet safely, and return the bounded active-pet payload needed by the renderer follow-up. Renderer hot-reload and CLI command changes are explicitly excluded.",
+      "status": "todo",
+      "priority": "high",
+      "group_id": "FEAT",
+      "depends_on": [
+        "FEAT-15",
+        "FEAT-34"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "The live-selection control rejects unauthenticated, missing, invalid, and path-escaping pet requests",
+        "A valid request persists the selection through the canonical state store and resolves only validated assets",
+        "The control returns only the validated active manifest, source label, and renderer-safe spritesheet URL",
+        "Main and sidecar tests cover successful selection and safe failure paths"
+      ],
+      "docs": [
+        "docs/ARCHITECTURE.md",
+        "docs/CLI.md",
+        "docs/TESTING.md"
+      ],
+      "files": [
+        "src/main/sidecar.ts",
+        "src/main/main.ts",
+        "src/main/pet-assets.ts",
+        "src/main/pet-assets.test.ts"
+      ],
+      "commands": [
+        "npm run lint",
+        "npm test"
+      ]
+    },
+    {
+      "id": "FEAT-25",
+      "title": "Apply CLI pet selection live when buddy is running",
+      "description": "After local pet validation, have buddy pets use request the Electron live-selection control and render an accurate typed result. A running app should confirm immediate application; a stopped or unreachable app should retain the saved selection and clearly state that it will apply on next start. Do not duplicate Electron asset validation in the CLI.",
+      "status": "todo",
+      "priority": "high",
+      "group_id": "FEAT",
+      "depends_on": [
+        "FEAT-19",
+        "FEAT-21",
+        "FEAT-32"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "pets use reports immediate application when the authenticated live-selection request succeeds",
+        "A stopped or unreachable app keeps the validated saved selection and reports next-start behavior without failing the command",
+        "A sidecar validation rejection returns an actionable failure without claiming that the pet is active",
+        "Human, quiet, verbose, and JSON paths are covered for live, deferred, and rejected outcomes"
+      ],
+      "docs": [
+        "docs/CLI.md",
+        "docs/TESTING.md"
+      ],
+      "files": [
+        "src/cli/commands/pets.ts",
+        "src/cli/commands/pets.test.ts",
+        "src/cli/sidecar-client.ts"
+      ],
+      "commands": [
+        "npm run lint",
+        "npm test"
+      ]
+    },
+    {
+      "id": "FEAT-26",
+      "title": "Complete the hook CLI lifecycle",
+      "description": "Add buddy hooks status and buddy hooks uninstall using the existing hook ownership and detection model. Uninstall removes only buddy-owned Claude Code and Codex CLI entries, preserves unrelated configuration byte-for-byte where practical, is idempotent, and runs only when the user explicitly invokes it. Keep doctor read-only and reuse shared status data rather than duplicating detection logic.",
+      "status": "todo",
+      "priority": "medium",
+      "group_id": "FEAT",
+      "depends_on": [
+        "FEAT-20"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "hooks status reports per-assistant and per-event coverage without modifying configuration",
+        "hooks uninstall removes only buddy-owned entries and preserves unrelated Claude Code and Codex CLI settings",
+        "Repeated uninstall is a successful no-op and doctor remains read-only",
+        "Windows and WSL command targets, partial configuration, malformed JSON, and output modes have focused tests"
+      ],
+      "docs": [
+        "docs/CLI.md",
+        "docs/ARCHITECTURE.md",
+        "docs/TESTING.md"
+      ],
+      "files": [
+        "src/main/hooks-install.ts",
+        "src/main/hooks-install.test.ts",
+        "src/cli/commands/hooks.ts",
+        "src/cli/commands/hooks.test.ts",
+        "src/cli/program.ts"
+      ],
+      "commands": [
+        "npm run lint",
+        "npm test"
+      ]
+    },
+    {
+      "id": "FEAT-27",
+      "title": "Validate CLI state names with useful suggestions",
+      "description": "Resolve valid state names from the active pet manifest when available, fall back to the packaged default manifest, and validate buddy state input before making an HTTP request. Invalid input should list valid names and provide a close-match suggestion without changing the hook event contract or the Rust bridge in this task.",
+      "status": "todo",
+      "priority": "medium",
+      "group_id": "FEAT",
+      "depends_on": [
+        "FEAT-19",
+        "FEAT-21"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "State validation uses the resolved active pet manifest and a packaged-default fallback",
+        "Invalid state names do not call the sidecar and return valid choices plus a close-match suggestion when available",
+        "Valid custom state names from a selected pet are accepted",
+        "Human and JSON success/failure paths have focused tests"
+      ],
+      "docs": [
+        "docs/CLI.md",
+        "docs/TESTING.md"
+      ],
+      "files": [
+        "src/cli/commands/state.ts",
+        "src/cli/commands/state.test.ts",
+        "src/cli/pets.ts"
+      ],
+      "commands": [
+        "npm run lint",
+        "npm test"
+      ]
+    },
+    {
+      "id": "FEAT-28",
+      "title": "Add staged TTY-aware hatch progress",
+      "description": "Migrate buddy hatch to the global output context and present its existing workflow as stable numbered stages with elapsed time. Use an in-place spinner only for interactive TTY output, keep redirected/quiet/JSON output deterministic, and preserve normal suppression plus verbose passthrough of Codex subprocess output. Overwrite policy and interrupt cleanup are handled separately.",
+      "status": "todo",
+      "priority": "medium",
+      "group_id": "FEAT",
+      "depends_on": [
+        "FEAT-18"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "Interactive hatch output shows stable numbered stages and elapsed time with no transcript dump",
+        "Spinner updates occur only in TTY human mode and leave a clean final line",
+        "Quiet and redirected output are stable, while JSON emits one final structured result",
+        "Verbose mode still exposes Codex subprocess detail and all output modes have focused tests"
+      ],
+      "docs": [
+        "docs/CLI.md",
+        "docs/TESTING.md"
+      ],
+      "files": [
+        "src/cli/commands/hatch.ts",
+        "src/cli/commands/hatch.test.ts",
+        "src/cli/output.ts"
+      ],
+      "commands": [
+        "npm run lint",
+        "npm test"
+      ]
+    },
+    {
+      "id": "FEAT-29",
+      "title": "Make hatch overwrite and cancellation safe",
+      "description": "Add destination preflight and interruption handling to buddy hatch. Existing content requires explicit TTY confirmation or --yes, automated non-TTY runs fail safely without --yes, and Ctrl+C terminates the child Codex process before cleaning only hatch-pet paths explicitly classified as disposable. Preserve completed pet assets and never use broad recursive cleanup.",
+      "status": "todo",
+      "priority": "high",
+      "group_id": "FEAT",
+      "depends_on": [
+        "FEAT-28"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "Existing destination content is never overwritten without interactive confirmation or --yes",
+        "Non-TTY overwrite attempts without --yes fail before Codex is launched",
+        "Ctrl+C terminates the child process and removes only cleanup-script-approved disposable paths",
+        "Completed assets survive cancellation cleanup and confirmation/cancellation paths have focused tests"
+      ],
+      "docs": [
+        "docs/CLI.md",
+        "docs/TESTING.md",
+        "AGENTS.md"
+      ],
+      "files": [
+        "src/cli/program.ts",
+        "src/cli/commands/hatch.ts",
+        "src/cli/commands/hatch.test.ts",
+        ".codex/skills/hatch-pet/scripts/cleanup_run.py"
+      ],
+      "commands": [
+        "npm run lint",
+        "npm test"
+      ]
+    },
+    {
+      "id": "FEAT-30",
+      "title": "Complete the CLI UX contract and package smoke matrix",
+      "description": "Run a final focused integration pass after the CLI refresh tasks land: verify every public command against the shared output modes, close command-help and built-entry coverage gaps, remove planned qualifiers from docs for shipped behavior, and smoke-test the packaged CLI. Fix only small integration inconsistencies; record any newly discovered feature-sized work as separate tasks rather than expanding this task.",
+      "status": "todo",
+      "priority": "high",
+      "group_id": "FEAT",
+      "depends_on": [
+        "FEAT-22",
+        "FEAT-23",
+        "FEAT-25",
+        "FEAT-26",
+        "FEAT-27",
+        "FEAT-29",
+        "FEAT-31"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "Every public command has contract coverage for human output plus each supported global mode",
+        "Bare invocation, root/nested help, version, typo handling, stdout/stderr separation, and exit codes pass through the built CLI",
+        "npm package smoke output confirms the installed buddy command reports the package version and renders plain output correctly",
+        "CLI, architecture, conventions, testing, and product docs describe shipped behavior without stale planned markers"
+      ],
+      "docs": [
+        "docs/CLI.md",
+        "docs/ARCHITECTURE.md",
+        "docs/CONVENTIONS.md",
+        "docs/PRD.md",
+        "docs/TESTING.md"
+      ],
+      "files": [
+        "src/cli/program.test.ts",
+        "src/cli/output.test.ts",
+        "vite.cli.config.ts",
+        "package.json"
+      ],
+      "commands": [
+        "npm run lint",
+        "npm test",
+        "npm run build:app",
+        "NO_COLOR=1 node out/cli/index.js --help",
+        "NO_COLOR=1 node out/cli/index.js --version",
+        "npm pack --dry-run"
+      ]
+    },
+    {
+      "id": "FEAT-31",
+      "title": "Add graceful authenticated CLI shutdown",
+      "description": "Replace buddy stop image-name termination with a token-authenticated graceful sidecar shutdown that lets Electron persist final state before exit. Treat an already-stopped app as an idempotent human success/warning, and permit only a verified buddy-owned process-id fallback if graceful shutdown cannot be used. Startup behavior is out of scope.",
+      "status": "todo",
+      "priority": "critical",
+      "group_id": "FEAT",
+      "depends_on": [
+        "FEAT-19",
+        "FEAT-33"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "The sidecar rejects unauthenticated shutdown and accepts a valid token exactly once",
+        "Graceful shutdown persists final app state before Electron exits",
+        "Stop never issues unscoped buddy.exe or electron.exe taskkill commands and never terminates unrelated applications",
+        "Windows, WSL, already-stopped, authorization, and output-mode paths have focused tests"
+      ],
+      "docs": [
+        "docs/CLI.md",
+        "docs/ARCHITECTURE.md",
+        "docs/CONVENTIONS.md",
+        "docs/TESTING.md"
+      ],
+      "files": [
+        "src/cli/commands/stop.ts",
+        "src/cli/commands/stop.test.ts",
+        "src/main/sidecar.ts",
+        "src/main/sidecar.test.ts",
+        "src/main/main.ts"
+      ],
+      "commands": [
+        "npm run lint",
+        "npm test"
+      ]
+    },
+    {
+      "id": "FEAT-32",
+      "title": "Hot-reload selected pet assets in the renderer",
+      "description": "Wire the validated selection result from FEAT-24 through shared IPC and preload so the running Svelte renderer replaces its active manifest and spritesheet without recreating the BrowserWindow. Preserve current animation fallback, click-through behavior, renderer-ready sequencing, and the non-focusable showInactive lifecycle. CLI request and persistence behavior are out of scope.",
+      "status": "todo",
+      "priority": "high",
+      "group_id": "FEAT",
+      "depends_on": [
+        "FEAT-24"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "A validated main-process selection event replaces the renderer manifest and spritesheet without window recreation",
+        "The renderer enters the new manifest's persisted or idle fallback state safely",
+        "Live reload does not focus, show, move, or change click-through behavior of the pet window",
+        "Shared IPC, preload, App, and sprite-state tests cover reload and listener cleanup"
+      ],
+      "docs": [
+        "docs/ARCHITECTURE.md",
+        "docs/CLI.md",
+        "docs/TESTING.md"
+      ],
+      "files": [
+        "src/shared/ipc-channels.ts",
+        "src/preload/preload.ts",
+        "src/renderer/App.svelte",
+        "src/renderer/App.test.ts",
+        "src/renderer/PetSprite.svelte"
+      ],
+      "commands": [
+        "npm run lint",
+        "npm test"
+      ]
+    },
+    {
+      "id": "FEAT-33",
+      "title": "Expose a bounded authenticated sidecar status snapshot",
+      "description": "Add the Electron-owned backend for operational CLI status: a token-authenticated sidecar response containing only app visibility/running state, resolved active pet identity, and current window dimensions. Keep GET /health minimal and unauthenticated, avoid hook or assistant configuration reads in the route, and reuse canonical state and pet-resolution helpers.",
+      "status": "todo",
+      "priority": "high",
+      "group_id": "FEAT",
+      "depends_on": [
+        "FEAT-24"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "Operational status requires the update token while GET /health remains minimal and unauthenticated",
+        "The response contains only app visibility, active pet id/name/source, and current width/height",
+        "Status reads canonical Electron state without exposing paths, tokens, or assistant configuration",
+        "Sidecar tests cover authorized, unauthorized, hidden-window, fallback-pet, and bounds responses"
+      ],
+      "docs": [
+        "docs/ARCHITECTURE.md",
+        "docs/CLI.md",
+        "docs/TESTING.md"
+      ],
+      "files": [
+        "src/main/sidecar.ts",
+        "src/main/sidecar.test.ts",
+        "src/main/state-store.ts",
+        "src/main/pet-assets.ts"
+      ],
+      "commands": [
+        "npm run lint",
+        "npm test"
+      ]
+    },
+    {
+      "id": "FEAT-34",
+      "title": "Restore the cross-platform hatch destination test baseline",
+      "description": "Repair the existing hatch destination helper test so path expectations are constructed with Node path utilities instead of hardcoded Windows separators while running on Linux. Confirm whether behavior is already correct before changing production code; this task should remain a focused test-baseline repair and must not expand into hatch UX implementation.",
+      "status": "todo",
+      "priority": "critical",
+      "group_id": "FEAT",
+      "depends_on": [
+        "FEAT-11"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "The hatch destination expectation uses platform-aware path construction and passes on Linux and Windows",
+        "No production path behavior changes unless a separately demonstrated defect requires it",
+        "The full npm test and lint suites pass"
+      ],
+      "docs": [
+        "docs/TESTING.md",
+        "AGENTS.md"
+      ],
+      "files": [
+        "src/cli/commands/hatch.test.ts"
+      ],
+      "commands": [
+        "npm run lint",
+        "npm test"
       ]
     }
   ]

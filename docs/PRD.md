@@ -51,6 +51,16 @@ buddy is an npm-distributed developer tool that renders a floating, always-on-to
 - Sprite creation tooling supporting buddy's pet.json sprite sheet format
 - Multi-monitor and per-resolution DPI support (separate bounds per display config)
 - Custom pet loading and selection from `%USERPROFILE%\.petdex-win\pets`, packaged buddy pets, and common Codex-compatible pet folders such as `%USERPROFILE%\.codex\pets`
+- CLI UX refresh with a useful bare `buddy` overview, `buddy status`, concise grouped help,
+  package-derived version output, and consistent output across all command families
+- Global human/automation modes: verbose, quiet, JSON, and explicit no-color output with
+  deterministic stdout/stderr behavior
+- Complete hook lifecycle commands (`install`, `status`, `uninstall`) that preserve
+  unrelated Claude Code and Codex CLI configuration
+- Safe lifecycle control through a verified buddy process or token-authenticated sidecar;
+  buddy must never terminate unrelated Electron applications
+- Immediate active-pet reload when the Windows app is running, with accurate saved-for-next-
+  start feedback when it is not
 
 ### Out of Scope
 
@@ -87,6 +97,14 @@ buddy is an npm-distributed developer tool that renders a floating, always-on-to
 - Per-resolution window bounds are stored and restored correctly when switching between monitor configurations.
 - Users can visually resize the pet window, the sprite scales without clipping, and the resized bounds persist across restart.
 - Users can list and select valid buddy-managed, packaged, and Codex-compatible pets without buddy modifying Codex internal state.
+- Bare `buddy` and `buddy status` report version, app state, active pet, window size, and
+  hook summary with readable TTY and plain non-TTY output.
+- Every CLI command honors the documented global output modes, and JSON stdout remains
+  machine-parseable on both success and expected failure paths.
+- Start reports success only after spawn succeeds, and stop cannot terminate unrelated
+  Electron processes.
+- Selecting a pet applies immediately when the app is running or clearly reports that the
+  saved selection will apply on next start.
 
 ---
 

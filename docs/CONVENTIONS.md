@@ -87,8 +87,20 @@ These apply across every stack in this project.
 - Default CLI output should be concise and human-readable.
 - Use styled/color output only when supported, and keep plain ASCII output clean for
   non-TTY contexts and CI.
+- All commands use the shared CLI output/result layer. Do not call `console.log` or
+  `console.error` directly from command implementations.
+- Command implementations return typed results or throw typed expected errors. Only the CLI
+  entry layer renders results, assigns `process.exitCode`, or handles unexpected stacks.
+- Treat `--verbose`, `--quiet`, `--json`, and `--no-color` as global output modes. JSON
+  stdout contains only the documented result object; diagnostics always go to stderr.
+- The large Buddy banner and animated progress are interactive-TTY affordances. Suppress
+  them for redirected output, CI, quiet mode, and JSON mode.
+- Source the CLI version from package metadata rather than duplicating a version literal in
+  the command entry point.
 - Expected user errors should be actionable messages with non-zero exit codes, not raw
   stack traces.
+- Lifecycle commands must verify the buddy process they control. Never use an unscoped
+  `taskkill /IM electron.exe` fallback.
 - `buddy hatch` must not dump raw Codex/imagegen subprocess output during normal runs.
   Show summarized progress by default and reserve subprocess detail for verbose/debug
   behavior or logs.

@@ -147,6 +147,12 @@ output when supported, expected error messages and exit codes, hatch progress ou
 does not dump raw subprocess logs, pet discovery/selection behavior, and runtime path
 resolution for installed npm package layouts.
 
+**Planned CLI UX contract coverage:** A testable command factory will cover bare `buddy`,
+root and nested help, package-derived version output, global output modes, stdout/stderr
+separation, stable JSON results, typo/argument errors, and command exit codes. Lifecycle
+coverage must prove that spawn failures are not reported as success and that stop targets
+only a verified buddy process.
+
 **Not covered (yet):** Visual regression, multi-monitor DPI scaling, packaged installer
 smoke test, Windows-native hook execution, WSL bridge execution, resize pointer-event
 integration (requires Electron E2E).
@@ -154,8 +160,6 @@ integration (requires Electron E2E).
 ---
 
 ## Test File Inventory
-
-*(No test files yet — fill in as the suite grows.)*
 
 | File | Domain | What It Covers |
 |---|---|---|
@@ -186,6 +190,13 @@ integration (requires Electron E2E).
 - Any change to an IPC channel name must include an updated assertion in the E2E test for
   that channel.
 - CLI output changes should assert both human-readable content and expected exit codes.
+- CLI entry-point changes should exercise a constructed Commander program directly and the
+  built `out/cli/index.js` smoke path; tests must not import an entry module that parses
+  `process.argv` at module load.
+- Global output-mode tests should cover TTY/plain, `--no-color`, quiet, verbose, and JSON
+  behavior. JSON tests must parse stdout and assert that diagnostics did not contaminate it.
+- Prefer setting `process.exitCode` at the entry boundary over calling `process.exit()` in
+  command implementations so expected failures can be tested as returned results.
 - Hatch workflow tests should verify normal output is summarized and verbose/debug output
   is opt-in.
 - Pet discovery tests should cover buddy-managed pets, packaged pets, Codex-compatible pets,

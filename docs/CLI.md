@@ -26,6 +26,31 @@ The npm package is named `@ag9898/buddy`, but the installed command remains `bud
 
 ---
 
+## Accepted CLI UX Refresh (Planned)
+
+The next CLI iteration improves discoverability, output consistency, automation support,
+and lifecycle safety without removing the existing top-level commands. Until the matching
+workboard tasks are complete, this section is a forward-looking contract rather than a
+description of shipped behavior.
+
+The planned command surface adds:
+
+| Command | Purpose |
+|---|---|
+| `buddy` | Show a compact interactive overview with version, app state, active pet, window size, hook summary, and suggested next commands. |
+| `buddy status` | Print the same operational summary without the large banner. |
+| `buddy pets current` | Canonical name for the current-pet view; `buddy pets show` remains a compatibility alias. |
+| `buddy hooks status` | Report Claude Code and Codex CLI hook coverage without changing configuration. |
+| `buddy hooks uninstall` | Remove only buddy-owned hook entries after explicit command invocation, preserving unrelated configuration. |
+
+Existing commands retain their current names. Help output groups them by workflow: app
+lifecycle, pet management, integrations, and diagnostics. Root and subcommand help use
+short summaries plus concrete examples instead of embedding implementation detail in the
+command list. The version displayed by `buddy --version` must come from package metadata so
+it cannot drift from `package.json`.
+
+---
+
 ## Lifecycle Behavior
 
 `buddy start` launches the Windows Electron app in the background and exits promptly. The
@@ -39,7 +64,13 @@ checkout.
 
 `buddy stop` is the process termination command. The app may still expose hide/show from
 the tray or future CLI commands, but `stop` means "quit the Electron app", not merely hide
-the pet.
+the pet. The planned implementation requests a graceful, token-authenticated shutdown from
+the running sidecar. A fallback may target a verified buddy process id, but must never kill
+every process named `electron.exe`.
+
+`buddy start` reports success only after the child process has spawned successfully. A
+missing or unlaunchable runtime produces a concise error and non-zero exit instead of a
+premature success message.
 
 When run from WSL, `buddy start` uses WSL interop to invoke the Windows-side app. If
 interop is unavailable, print a clear actionable error and exit non-zero.
@@ -62,9 +93,24 @@ Default output should be high signal:
 - Do not print raw stack traces for expected user errors such as "app not running",
   "token missing", "Codex CLI not found", or "invalid pet folder".
 - Include the next command when there is an obvious recovery step.
+- Reserve orange for Buddy branding, headings, and active selections; use green for
+  success, yellow for degraded states, red for failures, and dim text for secondary detail.
+- Keep normal success output to one concise result plus an optional next-command hint.
+- Do not render the large banner, animated progress, or decorative separators when stdout
+  is redirected or the command is running in a non-TTY environment.
 
-Structured command output is not required for MVP. If JSON output is added later, gate it
-behind an explicit option such as `--json` and keep normal output human-focused.
+The planned global output options are:
+
+| Option | Behavior |
+|---|---|
+| `--verbose` | Include subprocess, path, and diagnostic detail where available. |
+| `--quiet` | Suppress non-essential progress and hints while preserving requested data and errors. |
+| `--json` | Emit one stable JSON result to stdout and send diagnostics to stderr. |
+| `--no-color` | Disable ANSI styling explicitly, equivalent to the established `NO_COLOR` behavior. |
+
+Normal output remains human-focused. Commands must not mix banners, progress lines, or
+human prose into JSON stdout. Machine-readable result shapes and exit codes are part of the
+public CLI contract once introduced and require compatibility tests.
 
 The canonical Buddy text logo is:
 
@@ -89,9 +135,10 @@ Normal mode is concise. Commands should show enough progress for the user to und
 what is happening without dumping implementation details.
 
 Verbose/debug output may include subprocess commands, raw child-process output, stack
-traces, and detailed paths. Prefer one explicit switch across commands, such as
-`--verbose`, before adding command-specific debug flags. If environment-driven debug
-output is added, document it in [`ENV_VARS.md`](ENV_VARS.md).
+traces, and detailed paths. `--verbose` is a global option inherited by subcommands;
+command-specific debug flags should not be added. `--quiet` and `--verbose` are mutually
+exclusive. If environment-driven debug output changes, document it in
+[`ENV_VARS.md`](ENV_VARS.md).
 
 ---
 
@@ -113,6 +160,12 @@ hooks no longer use shell rc environment-variable exports.
 After installing Codex hooks, users may need to open `/hooks` inside Codex CLI to review
 and trust the new command hooks before Codex will execute them.
 
+The planned `buddy hooks status` command reuses the same detection logic as `buddy doctor`.
+The planned `buddy hooks uninstall` command removes only entries owned by buddy, is
+idempotent, preserves unrelated JSON content, and reports exactly which entries were
+removed or already absent. Invoking `uninstall` is the explicit authorization to modify
+the hook configuration; it must not be performed automatically by `doctor`.
+
 ## Hatch Workflow Output
 
 `buddy hatch` is a user command, not a transcript dump. It delegates the visual generation
@@ -125,6 +178,13 @@ the user's terminal should see a streamlined progress flow:
 4. Show compact progress for deterministic sprite packaging and validation.
 5. Print the generated pet id/path and the command to select it when selection commands
    exist.
+
+The planned interactive presentation renders these as stable numbered stages, includes
+elapsed time for long-running work, and uses an in-place spinner only when stdout is a TTY.
+Plain, quiet, and JSON modes must remain deterministic. Ctrl+C should terminate the child
+Codex process and clean only known disposable run artifacts. Existing destination content
+must not be overwritten without explicit confirmation in a TTY or `--yes` in an automated
+run.
 
 Raw Codex/imagegen output is hidden during normal runs. Pass `--verbose` (or set
 `BUDDY_LOG_LEVEL=debug` / `BUDDY_VERBOSE=1`) to expose raw subprocess output for
@@ -175,6 +235,17 @@ owned by the Electron main process, not by writing to Codex configuration files.
 `buddy pets use <id>` affects the next Electron startup or renderer reload: the main
 process resolves the selected id, validates the matching `pet.json` and spritesheet, and
 falls back to the packaged `default` pet if the stored selection no longer resolves.
+
+The planned live-selection flow sends a token-authenticated request to Electron main after
+persisting a valid selection. When the app is running, the renderer reloads the manifest and
+spritesheet immediately without stealing focus. When the app is stopped or live reload
+fails, the success message must state that the selection is saved for the next start rather
+than implying that it is already visible. `buddy pets current` becomes the canonical name
+for the current selection and `buddy pets show` remains an alias.
+
+`buddy state <name>` validates state names before sending them. Invalid names return valid
+choices and a close-match suggestion when available. State validation must use the active
+pet manifest when it is resolvable and the packaged default state set as the fallback.
 
 Windows owns selected-pet rendering. WSL hook commands may send state events and may share
 the buddy token and pet assets, but WSL must not maintain a second independent active-pet
@@ -239,6 +310,10 @@ invalid input, missing dependencies, sidecar connection failures, or failed subp
 
 Expected failure states should be clean terminal errors, not crashes.
 
+Command implementations should return typed results or throw typed expected errors; only
+the CLI entry layer converts those outcomes to terminal output and `process.exitCode`. This
+keeps command logic testable without mocking or terminating the test process.
+
 ---
 
 ## Testing Expectations
@@ -246,13 +321,18 @@ Expected failure states should be clean terminal errors, not crashes.
 CLI changes should include focused tests or smoke checks for:
 
 - `--help` output for changed commands.
+- Bare `buddy`, `buddy --version`, root help, and subcommand help behavior.
 - Non-TTY/plain output behavior when styling is disabled or unsupported.
 - Styled output behavior when styling is supported.
+- Global `--verbose`, `--quiet`, `--json`, and `--no-color` behavior, including stdout and
+  stderr separation.
 - Expected error output and exit codes.
 - `buddy hatch` progress output without raw subprocess dumps in normal mode.
 - Pet discovery from buddy-managed, packaged, and Codex-compatible directories.
 - Invalid pet folder handling.
 - Built CLI smoke tests through `node out/cli/index.js --help` after packaging changes.
+- Safe lifecycle behavior: start must not report success before spawn, and stop must never
+  terminate an unrelated Electron process.
 - Installed-package smoke tests should install the packed tarball with production
   dependencies only and verify that `require.resolve("electron", { paths: [packageRoot] })`
   succeeds for the installed package.
