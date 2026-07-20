@@ -63,7 +63,9 @@ buddy/
   src/
     cli/
       index.ts         — npm bin entry: thin parse/error boundary only
-      program.ts       — createProgram(): Commander command tree, grouped help, package version
+      program.ts       — createProgram(): Commander command tree, grouped help, global output options
+      output.ts        — per-invocation OutputContext, mode routing, typed result/failure renderers
+      result.ts        — CommandResult, CliError, JSON payload shapes, per-invocation result slot
       commands/        — CLI command implementations; hatch delegates imagegen work to Codex CLI
     main/
       main.ts           — Electron entry: app lifecycle, tray, startup restore
@@ -331,6 +333,12 @@ For component-based frame extraction, a strip needs one fully separated connecte
 
 ### 2026-07-20 - A root Commander action disables built-in unknown-command errors
 Giving the root program an action handler (so bare `buddy` can print a landing surface) makes Commander pass unmatched arguments to that handler instead of raising `commander.unknownCommand`. `src/cli/program.ts` re-reports them through Commander's own `unknownCommand()` reporter so "did you mean" suggestions and exit codes survive; keep that guard if the root action changes.
+
+### 2026-07-20 - Commander has no real global options; optsWithGlobals inverts precedence
+Ancestor options are not parsed on subcommands, so `--json`/`--quiet`/`--verbose`/`--no-color` are registered on every command in the tree by `addGlobalOutputOptionsDeep()`. Do not read them with `optsWithGlobals()`: it merges ancestors *last*, so a root default silently overwrites a flag passed on the subcommand. Resolve instead by walking the command chain and taking only values where `getOptionValueSource(key) === 'cli'`.
+
+### 2026-07-20 - Adding options to every command changes help subcommand terms
+Registering the global output flags on all commands makes Commander render subcommand terms as `use [options] <id>` instead of `use <id>`, which broke a help assertion in `program.test.ts`. Expect that string change when adding options to leaf commands, and assert on the `[options]` form.
 
 ### 2026-07-20 - User hatches must not mutate bundled assets
 `buddy hatch` defaults to a validated pet-id folder under the buddy-managed data directory, not `pets/default`. The shared `build/icon.ico` is application branding and must remain untouched by any pet hatch; replacing a bundled preset is an explicit maintainer-only workflow.

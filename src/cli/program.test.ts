@@ -14,9 +14,10 @@
 import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { CommanderError, type Command } from 'commander'
 import { createProgram, resolveCliVersion } from './program.js'
+import { getOutputContext, resetOutputContext, type OutputContext } from './output.js'
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..')
 
@@ -100,7 +101,7 @@ describe('createProgram', () => {
     expect(petsHelp.code).toBe('commander.helpDisplayed')
     expect(petsHelp.stdout).toContain('buddy pets')
     expect(petsHelp.stdout).toContain('list')
-    expect(petsHelp.stdout).toContain('use <id>')
+    expect(petsHelp.stdout).toContain('use [options] <id>')
     expect(petsHelp.stdout).toContain('Examples')
 
     const installHelp = await run(['hooks', 'install', '--help'])
@@ -137,5 +138,69 @@ describe('createProgram', () => {
     expect(result.code).toBe('commander.unknownOption')
     expect(result.exitCode).not.toBe(0)
     expect(result.stderr).toContain('--nope')
+  })
+})
+
+describe('global output options', () => {
+  beforeEach(() => {
+    resetOutputContext()
+  })
+  afterEach(() => {
+    resetOutputContext()
+  })
+
+  /** Parse argv far enough to run the preAction hook, then read the context. */
+  async function contextFor(argv: string[]): Promise<OutputContext> {
+    const write = { out: [] as string[], err: [] as string[] }
+    const program = createProgram()
+    instrument(program, write)
+    // `pets` is a group command whose action only prints help — safe to invoke.
+    await program.parseAsync(argv, { from: 'user' })
+    return getOutputContext()
+  }
+
+  it('are inherited by nested commands in both positions', async () => {
+    // Declared on the leaf command...
+    expect((await contextFor(['pets', '--json'])).json).toBe(true)
+    // ...and on the root, ahead of the subcommand.
+    expect((await contextFor(['--json', 'pets'])).json).toBe(true)
+  })
+
+  it('resolve --quiet and --verbose into the output mode', async () => {
+    expect((await contextFor(['pets'])).mode).toBe('normal')
+    expect((await contextFor(['pets', '--quiet'])).mode).toBe('quiet')
+    expect((await contextFor(['pets', '--verbose'])).mode).toBe('verbose')
+    // A flag set on the root still wins on the subcommand.
+    expect((await contextFor(['--verbose', 'pets'])).mode).toBe('verbose')
+  })
+
+  it('disables color for --no-color', async () => {
+    expect((await contextFor(['pets', '--no-color'])).color).toBe(false)
+    expect((await contextFor(['--no-color', 'pets'])).color).toBe(false)
+  })
+
+  it('rejects --quiet with --verbose on the same command', async () => {
+    const result = await run(['pets', '--quiet', '--verbose'])
+
+    expect(result.code).toBe('commander.conflictingOption')
+    expect(result.exitCode).not.toBe(0)
+    expect(result.stderr).toContain('--quiet')
+    expect(result.stderr).toContain('--verbose')
+  })
+
+  it('rejects --quiet and --verbose split across the command chain', async () => {
+    const result = await run(['--verbose', 'pets', '--quiet'])
+
+    expect(result.code).toBe('commander.conflictingOption')
+    expect(result.exitCode).not.toBe(0)
+    expect(result.stderr).toContain('cannot be used with')
+  })
+
+  it('lists the output options in root help', async () => {
+    const result = await run(['--help'])
+
+    for (const flag of ['--verbose', '--quiet', '--json', '--no-color']) {
+      expect(result.stdout).toContain(flag)
+    }
   })
 })

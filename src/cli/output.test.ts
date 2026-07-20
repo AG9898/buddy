@@ -193,3 +193,272 @@ describe('output module — separator()', () => {
     expect(sep.length).toBeGreaterThan(10)
   })
 })
+
+/* ── Output modes ───────────────────────────────────────────────────────────
+   These drive the context explicitly through injected streams instead of
+   patching process.stdout, so stdout/stderr separation is unambiguous.
+──────────────────────────────────────────────────────────────────────────── */
+
+interface Sink {
+  out: string[]
+  err: string[]
+}
+
+function sink(): Sink {
+  return { out: [], err: [] }
+}
+
+type OutputModule = typeof import('./output.js')
+
+/** Load output.js fresh and install a context writing into `s`. */
+async function withContext(
+  s: Sink,
+  options: Partial<Parameters<OutputModule['configureOutput']>[0]> = {},
+): Promise<OutputModule> {
+  const mod = await import('./output.js')
+  mod.configureOutput({
+    stdout: { write: (chunk: string) => s.out.push(chunk) },
+    stderr: { write: (chunk: string) => s.err.push(chunk) },
+    ...options,
+  })
+  return mod
+}
+
+describe('output modes', () => {
+  beforeEach(() => {
+    vi.resetModules()
+    vi.stubEnv('NO_COLOR', '1')
+  })
+  afterEach(() => {
+    vi.unstubAllEnvs()
+  })
+
+  it('normal mode writes progress, results, and hints to stdout', async () => {
+    const s = sink()
+    const o = await withContext(s)
+    o.status('Working...')
+    o.success('Done.')
+    o.hint('Try: buddy start')
+    o.detail('verbose only')
+
+    const out = s.out.join('')
+    expect(out).toContain('Working...')
+    expect(out).toContain('Done.')
+    expect(out).toContain('Try: buddy start')
+    // Verbose detail stays hidden in normal mode.
+    expect(out).not.toContain('verbose only')
+    expect(s.err.join('')).toBe('')
+  })
+
+  it('quiet mode suppresses progress and hints but keeps results', async () => {
+    const s = sink()
+    const o = await withContext(s, { mode: 'quiet' })
+    o.status('Working...')
+    o.heading('buddy doctor')
+    o.hint('Try: buddy start')
+    o.success('Done.')
+    o.label('State', 'running')
+
+    const out = s.out.join('')
+    expect(out).not.toContain('Working...')
+    expect(out).not.toContain('buddy doctor')
+    expect(out).not.toContain('Try: buddy start')
+    expect(out).toContain('Done.')
+    expect(out).toContain('running')
+  })
+
+  it('quiet mode still reports errors on stderr', async () => {
+    const s = sink()
+    const o = await withContext(s, { mode: 'quiet' })
+    o.error('Sidecar unreachable.', 'Run: buddy start')
+
+    expect(s.out.join('')).toBe('')
+    expect(s.err.join('')).toContain('Sidecar unreachable.')
+    expect(s.err.join('')).toContain('Run: buddy start')
+  })
+
+  it('verbose mode reveals detail lines', async () => {
+    const s = sink()
+    const o = await withContext(s, { mode: 'verbose' })
+    o.detail('spawning codex exec')
+
+    expect(s.out.join('')).toContain('spawning codex exec')
+  })
+
+  it('json mode emits exactly one parseable result on stdout', async () => {
+    const s = sink()
+    const o = await withContext(s, { json: true })
+    // Human helpers must not reach stdout in JSON mode.
+    o.status('Working...')
+    o.success('Done.')
+    o.heading('buddy pets')
+    o.renderResult({ command: 'pets.list', data: { pets: ['default'] }, summary: 'Done.' })
+
+    expect(s.out).toHaveLength(1)
+    const payload = JSON.parse(s.out[0] as string) as {
+      ok: boolean
+      command: string
+      data: { pets: string[] }
+    }
+    expect(payload).toEqual({ ok: true, command: 'pets.list', data: { pets: ['default'] } })
+  })
+
+  it('json mode isolates warnings and verbose diagnostics to stderr', async () => {
+    const s = sink()
+    const o = await withContext(s, { json: true, mode: 'verbose' })
+    o.warn('Token file missing.')
+    o.detail('resolved path C:\\pets')
+
+    expect(s.out.join('')).toBe('')
+    const err = s.err.join('')
+    expect(err).toContain('Token file missing.')
+    expect(err).toContain('resolved path')
+  })
+
+  it('json mode renders failures as a parseable payload with the message on stderr', async () => {
+    const s = sink()
+    const o = await withContext(s, { json: true })
+    const { CliError } = await import('./result.js')
+
+    const exitCode = o.renderFailure(
+      new CliError('Sidecar unreachable.', {
+        code: 'sidecar.unreachable',
+        hint: 'Run: buddy start',
+        exitCode: 3,
+        data: { port: 7777 },
+      }),
+      'state.set',
+    )
+
+    expect(exitCode).toBe(3)
+    expect(s.out).toHaveLength(1)
+    expect(JSON.parse(s.out[0] as string)).toEqual({
+      ok: false,
+      command: 'state.set',
+      error: {
+        code: 'sidecar.unreachable',
+        message: 'Sidecar unreachable.',
+        hint: 'Run: buddy start',
+        data: { port: 7777 },
+      },
+    })
+    expect(s.err.join('')).toContain('Sidecar unreachable.')
+  })
+
+  it('renderResult prints summary, details, and hint in human mode', async () => {
+    const s = sink()
+    const o = await withContext(s)
+    o.renderResult({
+      command: 'pets.show',
+      data: { id: 'penguin' },
+      summary: 'Selected pet: penguin',
+      details: [{ label: 'Source', value: 'pets/penguin' }],
+      hint: 'Run: buddy start',
+    })
+
+    const out = s.out.join('')
+    expect(out).toContain('Selected pet: penguin')
+    expect(out).toContain('Source')
+    expect(out).toContain('pets/penguin')
+    expect(out).toContain('Run: buddy start')
+  })
+
+  it('renderFailure defaults to exit code 1 for untyped errors', async () => {
+    const s = sink()
+    const o = await withContext(s)
+    expect(o.renderFailure(new Error('boom'))).toBe(1)
+    expect(s.err.join('')).toContain('boom')
+    // Untyped errors still render without a stack trace in normal mode.
+    expect(s.err.join('')).not.toContain('at ')
+  })
+})
+
+describe('color resolution', () => {
+  beforeEach(() => {
+    vi.resetModules()
+  })
+  afterEach(() => {
+    vi.unstubAllEnvs()
+  })
+
+  it('styles output when color is supported (FORCE_COLOR)', async () => {
+    vi.stubEnv('NO_COLOR', undefined as unknown as string)
+    vi.stubEnv('FORCE_COLOR', '1')
+    const s = sink()
+    const o = await withContext(s)
+    o.success('Done.')
+    expect(s.out.join('')).toContain('\x1b[')
+  })
+
+  it('honors NO_COLOR even when stdout is a TTY', async () => {
+    vi.stubEnv('NO_COLOR', '1')
+    const s = sink()
+    const o = await withContext(s)
+    o.success('Done.')
+    expect(s.out.join('')).not.toContain('\x1b[')
+  })
+
+  it('an explicit color:false override (--no-color) beats FORCE_COLOR', async () => {
+    vi.stubEnv('NO_COLOR', undefined as unknown as string)
+    vi.stubEnv('FORCE_COLOR', '1')
+    const s = sink()
+    const o = await withContext(s, { color: false })
+    o.success('Done.')
+    expect(s.out.join('')).not.toContain('\x1b[')
+  })
+
+  it('json mode disables color so stdout stays byte-stable', async () => {
+    vi.stubEnv('NO_COLOR', undefined as unknown as string)
+    vi.stubEnv('FORCE_COLOR', '1')
+    const s = sink()
+    const o = await withContext(s, { json: true })
+    expect(o.getOutputContext().color).toBe(false)
+    o.renderResult({ command: 'x', data: {} })
+    expect(s.out.join('')).not.toContain('\x1b[')
+  })
+
+  it('stays plain when stdout is redirected (non-TTY, no color env)', async () => {
+    vi.stubEnv('NO_COLOR', undefined as unknown as string)
+    vi.stubEnv('FORCE_COLOR', undefined as unknown as string)
+    vi.stubEnv('CI', undefined as unknown as string)
+    const isTTY = process.stdout.isTTY
+    Object.defineProperty(process.stdout, 'isTTY', { value: false, configurable: true })
+    try {
+      const s = sink()
+      const o = await withContext(s)
+      expect(o.getOutputContext().color).toBe(false)
+      o.success('Done.')
+      expect(s.out.join('')).not.toContain('\x1b[')
+    } finally {
+      Object.defineProperty(process.stdout, 'isTTY', { value: isTTY, configurable: true })
+    }
+  })
+
+  it('styles output when stdout is an interactive TTY', async () => {
+    vi.stubEnv('NO_COLOR', undefined as unknown as string)
+    vi.stubEnv('FORCE_COLOR', undefined as unknown as string)
+    vi.stubEnv('CI', undefined as unknown as string)
+    const isTTY = process.stdout.isTTY
+    Object.defineProperty(process.stdout, 'isTTY', { value: true, configurable: true })
+    try {
+      const s = sink()
+      const o = await withContext(s)
+      expect(o.getOutputContext().color).toBe(true)
+      o.success('Done.')
+      expect(s.out.join('')).toContain('\x1b[')
+    } finally {
+      Object.defineProperty(process.stdout, 'isTTY', { value: isTTY, configurable: true })
+    }
+  })
+
+  it('falls back to plain ASCII symbols when color is unavailable', async () => {
+    vi.stubEnv('NO_COLOR', '1')
+    const s = sink()
+    const o = await withContext(s)
+    o.success('Done.')
+    o.bullet('pets/default')
+    const out = s.out.join('')
+    expect(out).toContain('OK')
+    expect(out).not.toContain('✔')
+  })
+})

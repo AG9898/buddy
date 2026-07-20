@@ -935,7 +935,7 @@
       "id": "FEAT-18",
       "title": "Add global CLI output modes and typed result rendering",
       "description": "Extend the shared CLI output layer with a per-invocation output context, typed command results, typed expected errors, and renderers for human, quiet, verbose, JSON, and no-color modes. Register --verbose, --quiet, --json, and --no-color globally, reject incompatible quiet/verbose usage, and centralize stdout, stderr, and process.exitCode handling at the entry boundary. Command-family migration is intentionally left to follow-up tasks.",
-      "status": "todo",
+      "status": "done",
       "priority": "high",
       "group_id": "FEAT",
       "depends_on": [

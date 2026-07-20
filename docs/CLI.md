@@ -124,7 +124,7 @@ Default output should be high signal:
 - Do not render the large banner, animated progress, or decorative separators when stdout
   is redirected or the command is running in a non-TTY environment.
 
-The planned global output options are:
+The global output options are:
 
 | Option | Behavior |
 |---|---|
@@ -133,9 +133,27 @@ The planned global output options are:
 | `--json` | Emit one stable JSON result to stdout and send diagnostics to stderr. |
 | `--no-color` | Disable ANSI styling explicitly, equivalent to the established `NO_COLOR` behavior. |
 
+All four are inherited by nested commands and accepted in either position, so
+`buddy --json pets list` and `buddy pets list --json` are equivalent. `--quiet` with
+`--verbose` is rejected as a conflicting option, in both the same-command and split
+(`buddy --verbose pets list --quiet`) forms.
+
+Output routes by channel: errors always go to stderr; progress lines and hints are dropped
+by `--quiet`; verbose-only detail appears solely under `--verbose`. Under `--json`, human
+output never touches stdout — warnings and verbose detail are diverted to stderr, color is
+forced off so stdout stays byte-stable, and exactly one payload is written:
+
+```json
+{ "ok": true, "command": "pets.list", "data": { "pets": ["default"] } }
+{ "ok": false, "command": "state.set", "error": { "code": "sidecar.unreachable", "message": "…", "hint": "…" } }
+```
+
+A failure is still the single stdout result so scripts can branch on `ok`, while the human
+error message stays on stderr.
+
 Normal output remains human-focused. Commands must not mix banners, progress lines, or
 human prose into JSON stdout. Machine-readable result shapes and exit codes are part of the
-public CLI contract once introduced and require compatibility tests.
+public CLI contract and require compatibility tests.
 
 The canonical Buddy text logo is:
 
@@ -161,8 +179,9 @@ what is happening without dumping implementation details.
 
 Verbose/debug output may include subprocess commands, raw child-process output, stack
 traces, and detailed paths. `--verbose` is a global option inherited by subcommands;
-command-specific debug flags should not be added. `--quiet` and `--verbose` are mutually
-exclusive. If environment-driven debug output changes, document it in
+command-specific debug flags should not be added. `buddy hatch` therefore has no local
+`--verbose` flag of its own — it reads the resolved global mode. `--quiet` and `--verbose`
+are mutually exclusive. If environment-driven debug output changes, document it in
 [`ENV_VARS.md`](ENV_VARS.md).
 
 ---
@@ -335,9 +354,16 @@ invalid input, missing dependencies, sidecar connection failures, or failed subp
 
 Expected failure states should be clean terminal errors, not crashes.
 
-Command implementations should return typed results or throw typed expected errors; only
-the CLI entry layer converts those outcomes to terminal output and `process.exitCode`. This
-keeps command logic testable without mocking or terminating the test process.
+Command implementations return typed results (`CommandResult` in `src/cli/result.ts`) or
+throw typed expected errors (`CliError`, which carries a stable `code`, an optional `hint`,
+and its own `exitCode`); only the CLI entry layer (`src/cli/index.ts`) converts those
+outcomes to terminal output and `process.exitCode`. This keeps command logic testable
+without mocking streams or terminating the test process.
+
+Because a Commander action handler cannot return a value, commands publish their outcome
+with `recordResult()` and the entry boundary drains it after parsing. Migrating each
+command family onto typed results is tracked as follow-up work; commands not yet migrated
+still print through the shared output helpers.
 
 ---
 

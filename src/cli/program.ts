@@ -12,7 +12,7 @@
 import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
-import { Command, Help, type Command as CommandType } from 'commander'
+import { Command, Help, Option, type Command as CommandType } from 'commander'
 import { runStart } from './commands/start.js'
 import { runStop } from './commands/stop.js'
 import { runHooksInstall } from './commands/hooks.js'
@@ -27,7 +27,15 @@ import {
 } from './commands/hatch.js'
 import { runPetsList, runPetsShow, runPetsUse } from './commands/pets.js'
 import { runSize } from './commands/size.js'
-import { bannerText, bold, dim, orange } from './output.js'
+import {
+  bannerText,
+  bold,
+  configureOutput,
+  dim,
+  getOutputContext,
+  orange,
+  type OutputContextOptions,
+} from './output.js'
 import { resolvePackageRoot } from './runtime.js'
 
 const __filename = fileURLToPath(import.meta.url)
@@ -166,6 +174,80 @@ function failUnknownCommand(program: CommandType): void {
   })
 }
 
+/* ── Global output options ───────────────────────────────────────────────────
+   Commander does not parse ancestor options on subcommands, so the four output
+   flags are registered on every command in the tree. That makes both
+   `buddy --json pets list` and `buddy pets list --json` valid.
+───────────────────────────────────────────────────────────────────────────── */
+
+/** Register `--verbose`, `--quiet`, `--json`, and `--no-color` on one command. */
+function addGlobalOutputOptions(cmd: CommandType): void {
+  cmd
+    .addOption(
+      new Option(
+        '--verbose',
+        'Show subprocess, path, and diagnostic detail (also BUDDY_LOG_LEVEL=debug)',
+      ).conflicts('quiet'),
+    )
+    .addOption(
+      new Option('--quiet', 'Suppress progress and hints; keep results and errors').conflicts(
+        'verbose',
+      ),
+    )
+    .addOption(new Option('--json', 'Emit one JSON result on stdout; diagnostics on stderr'))
+    .addOption(new Option('--no-color', 'Disable ANSI styling (same as NO_COLOR)'))
+}
+
+/** Apply the global output options to a command and all of its descendants. */
+function addGlobalOutputOptionsDeep(cmd: CommandType): void {
+  addGlobalOutputOptions(cmd)
+  for (const sub of cmd.commands) addGlobalOutputOptionsDeep(sub)
+}
+
+/** The command plus each of its ancestors, leaf first. */
+function commandChain(cmd: CommandType): CommandType[] {
+  const chain: CommandType[] = []
+  for (let current: CommandType | null = cmd; current; current = current.parent) {
+    chain.push(current)
+  }
+  return chain
+}
+
+/**
+ * Resolve the effective output options for an invocation.
+ *
+ * Only values Commander recorded from the command line count, so a flag set
+ * anywhere in the chain wins over every command's inert default. This avoids
+ * `optsWithGlobals()`, where ancestor defaults would overwrite a flag passed on
+ * the subcommand itself.
+ */
+function resolveOutputOptions(cmd: CommandType): OutputContextOptions {
+  let verbose = false
+  let quiet = false
+  let json = false
+  let noColor = false
+
+  for (const current of commandChain(cmd)) {
+    const fromCli = (key: string): boolean => current.getOptionValueSource(key) === 'cli'
+    if (fromCli('verbose')) verbose = true
+    if (fromCli('quiet')) quiet = true
+    if (fromCli('json')) json = true
+    // `--no-color` is the only way `color` is set from the command line.
+    if (fromCli('color')) noColor = true
+  }
+
+  // Commander's own .conflicts() only covers a single command; this catches the
+  // split form, e.g. `buddy --verbose pets list --quiet`.
+  if (verbose && quiet) {
+    cmd.error("error: option '--quiet' cannot be used with option '--verbose'", {
+      code: 'commander.conflictingOption',
+    })
+  }
+
+  const mode = verbose ? 'verbose' : quiet ? 'quiet' : 'normal'
+  return noColor ? { mode, json, color: false } : { mode, json }
+}
+
 /* ── Program construction ────────────────────────────────────────────────── */
 
 /**
@@ -274,7 +356,6 @@ export function createProgram(): CommandType {
     .option('--id <id>', 'Name the buddy-managed pet (default: derived from the prompt)')
     .option('--output <dir>', 'Explicit output directory for pet.json and the spritesheet')
     .option('--package-preset <id>', 'Maintainer-only: write to this checkout’s pets/<id> preset')
-    .option('--verbose', 'Show raw Codex subprocess output (also BUDDY_LOG_LEVEL=debug)', false)
     .addHelpText(
       'after',
       examples(
@@ -286,7 +367,7 @@ export function createProgram(): CommandType {
     .action(
       async (
         prompt: string,
-        options: { output?: string; id?: string; packagePreset?: string; verbose: boolean },
+        options: { output?: string; id?: string; packagePreset?: string },
       ) => {
         if (options.output && options.id) {
           throw new Error(
@@ -308,7 +389,9 @@ export function createProgram(): CommandType {
                 options.id ? validatePetId(options.id) : petIdFromPrompt(prompt),
               )
 
-        await runHatch(prompt, outputDir, options.verbose)
+        // Verbosity now comes from the global --verbose flag resolved into the
+        // shared output context, so hatch keeps no command-specific debug flag.
+        await runHatch(prompt, outputDir, getOutputContext().mode === 'verbose')
       },
     )
 
@@ -352,6 +435,13 @@ export function createProgram(): CommandType {
     .action(async () => {
       await runDoctor()
     })
+
+  // Global output flags are added last so they appear on every command, then
+  // resolved once per invocation before any action handler runs.
+  addGlobalOutputOptionsDeep(program)
+  program.hook('preAction', (_thisCommand, actionCommand) => {
+    configureOutput(resolveOutputOptions(actionCommand))
+  })
 
   return program
 }

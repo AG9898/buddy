@@ -93,6 +93,12 @@ These apply across every stack in this project.
   entry layer renders results, assigns `process.exitCode`, or handles unexpected stacks.
 - Treat `--verbose`, `--quiet`, `--json`, and `--no-color` as global output modes. JSON
   stdout contains only the documented result object; diagnostics always go to stderr.
+- `src/cli/output.ts` owns rendering and resolves one `OutputContext` per invocation;
+  `src/cli/result.ts` owns the typed `CommandResult` / `CliError` shapes. Emit lines through
+  the helpers rather than writing to `process.stdout` directly, so mode routing applies.
+- Commander has no true global options: register shared flags on every command in the tree
+  and resolve them from `getOptionValueSource(key) === 'cli'` across the command chain.
+  Do not use `optsWithGlobals()` for this — ancestor defaults overwrite child values.
 - The large Buddy banner and animated progress are interactive-TTY affordances. Suppress
   them for redirected output, CI, quiet mode, and JSON mode.
 - Source the CLI version from package metadata rather than duplicating a version literal in

@@ -8,12 +8,65 @@
  *   - Tasteful separators and spacing
  *   - Color-safe: styled when stdout supports it, plain ASCII fallback for non-TTY/CI
  *   - No Electron imports — safe for WSL and Windows CLI environments
+ *
+ * Output modes
+ * ------------
+ * Every invocation resolves one `OutputContext` (see `configureOutput`) that
+ * carries the mode (`normal` | `quiet` | `verbose`), whether `--json` was
+ * requested, and whether color/Unicode are available. Helpers route through
+ * `emit()`, which decides per *channel* whether a line is written, suppressed,
+ * or diverted to stderr:
+ *
+ *   error       always → stderr
+ *   diagnostic  stdout; → stderr under --json
+ *   progress    suppressed by --quiet and --json
+ *   hint        suppressed by --quiet and --json
+ *   result      stdout; suppressed by --json (the JSON payload is the result)
+ *   verbose     only under --verbose
+ *
+ * Under `--json`, human output never touches stdout: `renderResult` /
+ * `renderFailure` emit exactly one parseable payload there and all diagnostics
+ * are isolated to stderr.
  */
 
-/* ── Color detection ─────────────────────────────────────────────────────────
-   We detect color support manually so this module has zero runtime dependencies
-   beyond Node builtins. Supports both stdout (display) and stderr (error output).
+import {
+  type CommandResult,
+  failurePayload,
+  successPayload,
+  toCliError,
+} from './result.js'
+
+/* ── Output context ──────────────────────────────────────────────────────────
+   Resolved once per invocation so global flags (--quiet/--verbose/--json/
+   --no-color) apply to every helper without threading options through calls.
 ───────────────────────────────────────────────────────────────────────────── */
+
+export type OutputMode = 'quiet' | 'normal' | 'verbose'
+
+/** Minimal writable surface — `process.stdout` and test doubles both satisfy it. */
+export interface OutputStream {
+  write(chunk: string): unknown
+}
+
+export interface OutputContextOptions {
+  mode?: OutputMode
+  json?: boolean
+  /** Explicit color override (`--no-color`). Omit to auto-detect from env/TTY. */
+  color?: boolean
+  /** Explicit Unicode override. Omit to auto-detect. */
+  unicode?: boolean
+  stdout?: OutputStream
+  stderr?: OutputStream
+}
+
+export interface OutputContext {
+  readonly mode: OutputMode
+  readonly json: boolean
+  readonly color: boolean
+  readonly unicode: boolean
+  readonly stdout: OutputStream
+  readonly stderr: OutputStream
+}
 
 function detectColorSupport(): boolean {
   // Honour explicit opt-out / opt-in env vars.
@@ -27,21 +80,68 @@ function detectColorSupport(): boolean {
   return process.stdout.isTTY === true
 }
 
-const COLOR_SUPPORTED = detectColorSupport()
+function detectUnicodeSupport(color: boolean): boolean {
+  if (!color) return false
+  const enc = process.env['LANG'] ?? process.env['LC_ALL'] ?? ''
+  if (enc.toLowerCase().includes('utf')) return true
+  // On Windows PowerShell with modern terminal, stdout is a TTY; assume Unicode.
+  if (process.platform === 'win32' && process.stdout.isTTY) return true
+  return process.stdout.isTTY === true
+}
+
+/**
+ * Build an output context. Color is auto-detected unless overridden, and is
+ * always disabled under `--json` so stdout stays byte-stable for parsers.
+ */
+export function createOutputContext(options: OutputContextOptions = {}): OutputContext {
+  const json = options.json === true
+  const color = json ? false : (options.color ?? detectColorSupport())
+  return {
+    mode: options.mode ?? 'normal',
+    json,
+    color,
+    unicode: options.unicode ?? detectUnicodeSupport(color),
+    stdout: options.stdout ?? process.stdout,
+    stderr: options.stderr ?? process.stderr,
+  }
+}
+
+let activeContext: OutputContext | undefined
+
+/** Current output context, lazily auto-detected on first use. */
+export function getOutputContext(): OutputContext {
+  activeContext ??= createOutputContext()
+  return activeContext
+}
+
+export function setOutputContext(context: OutputContext): OutputContext {
+  activeContext = context
+  return context
+}
+
+/** Drop the active context so the next call re-detects from env/TTY. */
+export function resetOutputContext(): void {
+  activeContext = undefined
+}
+
+/** Create and install an output context in one step. */
+export function configureOutput(options: OutputContextOptions = {}): OutputContext {
+  return setOutputContext(createOutputContext(options))
+}
 
 /* ── ANSI helpers ────────────────────────────────────────────────────────────
    Tiny inline ANSI escape wrappers — no third-party chalk/kleur dependency.
-   All wrap functions are no-ops when color is not supported.
+   All wrap functions are no-ops when the active context has color disabled.
 ───────────────────────────────────────────────────────────────────────────── */
 
 function ansi(code: string, text: string): string {
-  if (!COLOR_SUPPORTED) return text
+  if (!getOutputContext().color) return text
   return `\x1b[${code}m${text}\x1b[0m`
 }
 
 /** Warm orange accent (ANSI 256-color index 208 via extended code). */
 function orange(text: string): string {
-  if (!COLOR_SUPPORTED) return text
+  if (!getOutputContext().color) return text
   return `\x1b[38;5;208m${text}\x1b[0m`
 }
 
@@ -67,6 +167,33 @@ function red(text: string): string {
 
 function cyan(text: string): string {
   return ansi('36', text)
+}
+
+/* ── Channel routing ─────────────────────────────────────────────────────── */
+
+type Channel = 'error' | 'diagnostic' | 'progress' | 'hint' | 'result' | 'verbose'
+
+function emit(channel: Channel, text: string): void {
+  const ctx = getOutputContext()
+
+  // Errors are never suppressed and never share stdout with a JSON payload.
+  if (channel === 'error') {
+    ctx.stderr.write(text)
+    return
+  }
+
+  if (channel === 'verbose' && ctx.mode !== 'verbose') return
+
+  if (ctx.json) {
+    // Human output must not pollute the single stdout payload. Warnings and
+    // opt-in verbose detail survive as stderr diagnostics; the rest is dropped.
+    if (channel === 'diagnostic' || channel === 'verbose') ctx.stderr.write(text)
+    return
+  }
+
+  if (ctx.mode === 'quiet' && (channel === 'progress' || channel === 'hint')) return
+
+  ctx.stdout.write(text)
 }
 
 /* ── Separator ───────────────────────────────────────────────────────────────
@@ -105,40 +232,33 @@ export function bannerText(): string {
  * Call this on primary CLI entry / help surfaces.
  */
 export function printBanner(): void {
-  process.stdout.write(bannerText() + '\n')
+  emit('progress', bannerText() + '\n')
 }
 
 /* ── Status line helpers ─────────────────────────────────────────────────────
-   Each helper writes one line to stdout (info/success/warning) or stderr (error).
-   Symbols degrade gracefully: Unicode when TTY supports it, ASCII otherwise.
+   Each helper writes one line through emit(), which applies mode routing.
+   Symbols degrade gracefully: Unicode when the terminal supports it, ASCII otherwise.
 ───────────────────────────────────────────────────────────────────────────── */
 
-function supportsUnicode(): boolean {
-  if (!COLOR_SUPPORTED) return false
-  const enc = process.env['LANG'] ?? process.env['LC_ALL'] ?? ''
-  if (enc.toLowerCase().includes('utf')) return true
-  // On Windows PowerShell with modern terminal, stdout is a TTY; assume Unicode.
-  if (process.platform === 'win32' && process.stdout.isTTY) return true
-  return process.stdout.isTTY === true
+function symbols(): Record<'info' | 'success' | 'warning' | 'error' | 'bullet' | 'arrow', string> {
+  const unicode = getOutputContext().unicode
+  return {
+    info: unicode ? '◆' : '*',
+    success: unicode ? '✔' : 'OK',
+    warning: unicode ? '⚠' : '!',
+    error: unicode ? '✖' : 'ERR',
+    bullet: unicode ? '•' : '-',
+    arrow: unicode ? '→' : '->',
+  }
 }
 
-const UNICODE = supportsUnicode()
-
-const SYM = {
-  info: UNICODE ? '◆' : '*',
-  success: UNICODE ? '✔' : 'OK',
-  warning: UNICODE ? '⚠' : '!',
-  error: UNICODE ? '✖' : 'ERR',
-  bullet: UNICODE ? '•' : '-',
-  arrow: UNICODE ? '→' : '->',
-} as const
-
 /**
- * Print a neutral status / info line.
+ * Print a neutral status / progress line.
+ * Suppressed by `--quiet` and `--json`.
  * Example: ◆ Checking sidecar health…
  */
 export function status(message: string): void {
-  process.stdout.write(`${cyan(SYM.info)} ${message}\n`)
+  emit('progress', `${cyan(symbols().info)} ${message}\n`)
 }
 
 /**
@@ -146,29 +266,47 @@ export function status(message: string): void {
  * Example: ✔ buddy started.
  */
 export function success(message: string): void {
-  process.stdout.write(`${green(SYM.success)} ${bold(message)}\n`)
+  emit('result', `${green(symbols().success)} ${bold(message)}\n`)
 }
 
 /**
- * Print a warning line (stdout — not a fatal error).
+ * Print a warning line (not a fatal error).
+ * Routed to stderr under `--json` so stdout stays parseable.
  * Example: ⚠ Token file not found; some features may be unavailable.
  */
 export function warn(message: string): void {
-  process.stdout.write(`${yellow(SYM.warning)} ${message}\n`)
+  emit('diagnostic', `${yellow(symbols().warning)} ${message}\n`)
+}
+
+/**
+ * Print a next-step hint. Suppressed by `--quiet` and `--json`.
+ * Example: → Try: buddy start
+ */
+export function hint(message: string): void {
+  emit('hint', `  ${dim(symbols().arrow)} ${message}\n`)
+}
+
+/**
+ * Print a detail line that only appears under `--verbose`.
+ * Routed to stderr under `--json`.
+ */
+export function detail(message: string): void {
+  emit('verbose', `  ${dim(message)}\n`)
 }
 
 /**
  * Print an actionable error message to stderr.
- * Does not exit — caller decides on process.exit().
+ * Does not exit — the entry boundary owns `process.exitCode`.
  * Expected errors (token missing, app not running, etc.) print without stack traces.
  *
  * @param message  Human-readable summary.
- * @param hint     Optional next-step hint printed on a second line.
+ * @param errorHint  Optional next-step hint printed on a second line.
  */
-export function error(message: string, hint?: string): void {
-  process.stderr.write(`${red(SYM.error)} ${bold(message)}\n`)
-  if (hint) {
-    process.stderr.write(`  ${dim(SYM.arrow)} ${hint}\n`)
+export function error(message: string, errorHint?: string): void {
+  const sym = symbols()
+  emit('error', `${red(sym.error)} ${bold(message)}\n`)
+  if (errorHint) {
+    emit('error', `  ${dim(sym.arrow)} ${errorHint}\n`)
   }
 }
 
@@ -177,12 +315,12 @@ export function error(message: string, hint?: string): void {
  * Example:  ✔  Electron process running
  *           ✖  Sidecar not responding
  */
-export function check(label: string, ok: boolean, detail?: string): void {
-  const sym = ok ? green(SYM.success) : red(SYM.error)
-  const line = `  ${sym}  ${label}`
-  process.stdout.write(line + '\n')
-  if (detail) {
-    process.stdout.write(`       ${dim(detail)}\n`)
+export function check(label_: string, ok: boolean, detailText?: string): void {
+  const sym = symbols()
+  const mark = ok ? green(sym.success) : red(sym.error)
+  emit('result', `  ${mark}  ${label_}\n`)
+  if (detailText) {
+    emit('result', `       ${dim(detailText)}\n`)
   }
 }
 
@@ -190,9 +328,10 @@ export function check(label: string, ok: boolean, detail?: string): void {
  * Print a sub-item row under a check (indented).
  * Example:        ✔  claudeCode.UserPromptSubmit
  */
-export function subCheck(label: string, ok: boolean): void {
-  const sym = ok ? green(SYM.success) : red(SYM.error)
-  process.stdout.write(`       ${sym}  ${dim(label)}\n`)
+export function subCheck(label_: string, ok: boolean): void {
+  const sym = symbols()
+  const mark = ok ? green(sym.success) : red(sym.error)
+  emit('result', `       ${mark}  ${dim(label_)}\n`)
 }
 
 /**
@@ -200,7 +339,7 @@ export function subCheck(label: string, ok: boolean): void {
  * Example:  • pets/default
  */
 export function bullet(message: string): void {
-  process.stdout.write(`  ${orange(SYM.bullet)} ${message}\n`)
+  emit('result', `  ${orange(symbols().bullet)} ${message}\n`)
 }
 
 /**
@@ -208,24 +347,66 @@ export function bullet(message: string): void {
  * Example:  → State: running
  */
 export function label(key: string, value: string): void {
-  process.stdout.write(`  ${dim(SYM.arrow)} ${bold(key)}: ${value}\n`)
+  emit('result', `  ${dim(symbols().arrow)} ${bold(key)}: ${value}\n`)
 }
 
 /**
  * Print a section heading with a separator.
- * Example:  buddy doctor
- *           ────────────────────────────────────────────────
+ * Suppressed by `--quiet` and `--json`.
  */
 export function heading(title: string): void {
-  process.stdout.write(`\n${bold(orange(title))}\n`)
-  process.stdout.write(separator() + '\n')
+  emit('progress', `\n${bold(orange(title))}\n`)
+  emit('progress', separator() + '\n')
 }
 
 /**
- * Print a closing separator.
+ * Print a closing separator. Suppressed by `--quiet` and `--json`.
  */
 export function closeSeparator(): void {
-  process.stdout.write(separator() + '\n')
+  emit('progress', separator() + '\n')
+}
+
+/* ── Typed result rendering ──────────────────────────────────────────────────
+   The entry boundary renders typed outcomes here so command implementations
+   never write to streams directly and never call process.exit.
+───────────────────────────────────────────────────────────────────────────── */
+
+/** Render a typed success result: one JSON payload, or human summary/details. */
+export function renderResult<T>(result: CommandResult<T>): void {
+  const ctx = getOutputContext()
+
+  if (ctx.json) {
+    ctx.stdout.write(JSON.stringify(successPayload(result)) + '\n')
+    return
+  }
+
+  if (result.summary) success(result.summary)
+  for (const row of result.details ?? []) label(row.label, row.value)
+  for (const line of result.verboseDetails ?? []) detail(line)
+  if (result.hint) hint(result.hint)
+}
+
+/**
+ * Render a failed outcome and return the process exit code to apply.
+ *
+ * In JSON mode the failure payload is still the single stdout result so scripts
+ * can branch on `ok`; the human message stays on stderr.
+ */
+export function renderFailure(value: unknown, command: string | null = null): number {
+  const ctx = getOutputContext()
+  const err = toCliError(value)
+
+  if (ctx.json) {
+    ctx.stdout.write(JSON.stringify(failurePayload(err, command)) + '\n')
+  }
+
+  error(err.message, err.hint)
+
+  if (ctx.mode === 'verbose' && err.stack) {
+    emit('error', `${dim(err.stack)}\n`)
+  }
+
+  return err.exitCode
 }
 
 /* ── Re-exported theme colors (for callers that want raw styled strings) ── */
