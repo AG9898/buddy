@@ -13,6 +13,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { EventEmitter } from 'events'
+import path from 'path'
 import type { ChildProcess, SpawnOptions } from 'child_process'
 
 /* ── Hoisted mocks ─────────────────────────────────────────────────────────── */
@@ -133,9 +134,12 @@ describe('hatch destination helpers', () => {
   })
 
   it('places default hatches under the buddy-managed data directory', async () => {
-    vi.stubEnv('BUDDY_DATA_DIR', 'C:\\buddy-data')
+    // Build the expectation with path.join so separators match the host platform
+    // (backslashes on Windows, forward slashes on Linux/macOS).
+    const dataDir = path.join(path.sep, 'buddy-data')
+    vi.stubEnv('BUDDY_DATA_DIR', dataDir)
     const { buddyManagedPetOutputDir } = await import('./hatch.js')
-    expect(buddyManagedPetOutputDir('jade-wisp')).toBe('C:\\buddy-data\\pets\\jade-wisp')
+    expect(buddyManagedPetOutputDir('jade-wisp')).toBe(path.join(dataDir, 'pets', 'jade-wisp'))
   })
 })
 

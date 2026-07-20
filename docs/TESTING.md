@@ -203,6 +203,10 @@ integration (requires Electron E2E).
   invalid folders, and selected pet persistence.
 - New public functions in `sidecar.ts` or `state-store.ts` require a Vitest unit test
   before the task is marked done.
+- Filesystem path assertions must be built with `path.join`/`path.sep` rather than hardcoded
+  separators or drive-letter literals. Production helpers use `path.join`, so an expectation
+  such as `'C:\\buddy-data\\pets\\jade-wisp'` passes on Windows but fails on Linux/macOS.
+  Derive both the stubbed input and the expected value from the same `path` calls.
 
 ### Patterns
 

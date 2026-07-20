@@ -325,5 +325,8 @@ For component-based frame extraction, a strip needs one fully separated connecte
 ### 2026-07-20 - Hatch-pet must honor the run-selected chroma key and preserve source motion
 `prepare_pet_run.py` can select green rather than magenta based on the reference, so workers and repair prompts must use the chroma key written in `pet_request.json`, never a hardcoded color. When component extraction re-centers an intentionally vertical animation such as jumping, use the QA-driven `stable-slots` mode before regenerating an otherwise valid row.
 
+### 2026-07-20 - Hardcoded drive-letter paths in tests fail on Linux agents
+`hatch.test.ts` stubbed `BUDDY_DATA_DIR=C:\buddy-data` and asserted a fully backslashed result, which passed on Windows but failed on Linux because `path.join` only normalizes the separators it adds. Build both the stubbed input and the expected value from `path.join`/`path.sep` so a single expectation holds on every platform; this complements the 2026-05-29 separator entry, which covered assertions but not drive-letter roots.
+
 ### 2026-07-20 - User hatches must not mutate bundled assets
 `buddy hatch` defaults to a validated pet-id folder under the buddy-managed data directory, not `pets/default`. The shared `build/icon.ico` is application branding and must remain untouched by any pet hatch; replacing a bundled preset is an explicit maintainer-only workflow.

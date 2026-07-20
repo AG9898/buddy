@@ -1477,7 +1477,7 @@
       "id": "FEAT-34",
       "title": "Restore the cross-platform hatch destination test baseline",
       "description": "Repair the existing hatch destination helper test so path expectations are constructed with Node path utilities instead of hardcoded Windows separators while running on Linux. Confirm whether behavior is already correct before changing production code; this task should remain a focused test-baseline repair and must not expand into hatch UX implementation.",
-      "status": "todo",
+      "status": "done",
       "priority": "critical",
       "group_id": "FEAT",
       "depends_on": [
