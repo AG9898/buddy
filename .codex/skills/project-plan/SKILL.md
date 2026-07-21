@@ -1,7 +1,7 @@
 ---
 name: project-plan
 description: Planning-first workflow for new features, product changes, integrations, or refactors. Infers minimum relevant docs, asks clarifying questions, drafts a documentation proposal, then produces workboard-compatible implementation tasks once direction is accepted.
-version: 1.0.0
+version: 1.0.1
 ---
 
 # Project Plan
@@ -47,6 +47,8 @@ The proposal should describe how docs should change, not how implementation shou
 - Ask at least one real question tied to scope, UX, data shape, rollout, or constraints.
 - Prefer concise questions with concrete tradeoffs.
 - Ask additional questions when auth boundaries, schema impact, or streaming behavior might change.
+- Use `request_user_input` to present clarifying questions with 2–4 concrete option choices and a short header. Do not output questions as plain terminal text.
+- If the structured user-input tool is unavailable, fall back to numbered terminal questions.
 
 ## Task Breakdown Rules
 
