@@ -1,7 +1,7 @@
 {
   "$schema": "./workboard.schema.json",
   "schema_version": "1.0.0",
-  "last_updated": "2026-07-20",
+  "last_updated": "2026-07-21",
   "tasks": [
     {
       "id": "FEAT-01",
@@ -1339,7 +1339,8 @@
         "FEAT-26",
         "FEAT-27",
         "FEAT-29",
-        "FEAT-31"
+        "FEAT-31",
+        "FEAT-35"
       ],
       "blocked_by": [],
       "acceptance_criteria": [
@@ -1499,6 +1500,40 @@
       "commands": [
         "npm run lint",
         "npm test"
+      ]
+    },
+    {
+      "id": "FEAT-35",
+      "title": "Add an explicit npm-backed buddy update command",
+      "description": "Add buddy update as an explicit self-update command for npm-managed installations. It should invoke npm's global install of @ag9898/buddy@latest without shell interpolation, report actionable npm or permission failures through the shared output renderer, and document that it updates only when the user runs it; silent background update checks and automatic updates are out of scope.",
+      "status": "todo",
+      "priority": "medium",
+      "group_id": "FEAT",
+      "depends_on": [
+        "FEAT-18"
+      ],
+      "blocked_by": [],
+      "acceptance_criteria": [
+        "buddy update invokes the platform-appropriate npm executable to install @ag9898/buddy@latest globally without using a shell command string",
+        "Successful, unavailable-npm, permission, and non-zero npm outcomes render clear human, quiet, and JSON results with accurate exit codes",
+        "The command is documented as an explicit user-initiated update and does not perform background checks or updates",
+        "Focused command tests cover npm argument construction and expected failures, and the built CLI exposes update help"
+      ],
+      "docs": [
+        "README.md",
+        "docs/CLI.md",
+        "docs/TESTING.md"
+      ],
+      "files": [
+        "src/cli/program.ts",
+        "src/cli/commands/update.ts",
+        "src/cli/commands/update.test.ts"
+      ],
+      "commands": [
+        "npm run lint",
+        "npm test",
+        "npm run build:app",
+        "NO_COLOR=1 node out/cli/index.js update --help"
       ]
     }
   ]
