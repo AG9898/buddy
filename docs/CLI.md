@@ -95,9 +95,13 @@ checkout.
 
 `buddy stop` is the process termination command. The app may still expose hide/show from
 the tray or future CLI commands, but `stop` means "quit the Electron app", not merely hide
-the pet. The planned implementation requests a graceful, token-authenticated shutdown from
-the running sidecar. A fallback may target a verified buddy process id, but must never kill
-every process named `electron.exe`.
+the pet. It sends an empty, token-authenticated `POST /shutdown` request to the running
+sidecar. Electron persists the final state before quitting, and the sidecar accepts one valid
+shutdown request only. If the sidecar is unreachable, `stop` may force-terminate only the pid
+in Electron's runtime process record after Windows verifies that its executable and command
+line still match the buddy app. It never kills by `buddy.exe` or `electron.exe` image name,
+and an already-stopped app is a successful, idempotent result. The same `.exe` interop calls
+support that narrowly verified fallback from WSL.
 
 `buddy start` reports success only after launch has been confirmed. On Windows it waits for
 the detached Electron child to emit `spawn`, then releases that child so the terminal returns
@@ -402,7 +406,8 @@ CLI changes should include focused tests or smoke checks for:
 - Invalid pet folder handling.
 - Built CLI smoke tests through `node out/cli/index.js --help` after packaging changes.
 - Safe lifecycle behavior: start must not report success before spawn, and stop must never
-  terminate an unrelated Electron process.
+  terminate an unrelated Electron process; graceful shutdown, authorization rejection,
+  already-stopped results, and the verified PID fallback must be covered.
 - Installed-package smoke tests should install the packed tarball with production
   dependencies only and verify that `require.resolve("electron", { paths: [packageRoot] })`
   succeeds for the installed package.

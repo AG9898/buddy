@@ -3,6 +3,7 @@ import path from 'path'
 import {
   buddyDataDir,
   buddyManagedPetsDir,
+  buddyProcessPath,
   buddyRuntimeDir,
   buddyStatePath,
   buddyTokenPath,
@@ -28,12 +29,15 @@ describe('buddy path helpers', () => {
     ).toBe('/mnt/c/Users/Ada/.petdex-win')
   })
 
-  it('derives runtime, token, state, and pet paths under the same data root', () => {
+  it('derives runtime, token, process, state, and pet paths under the same data root', () => {
     const env = { BUDDY_DATA_DIR: '/shared/.petdex-win' }
 
     expect(buddyRuntimeDir(env, '/home/ada')).toBe(path.join('/shared/.petdex-win', 'runtime'))
     expect(buddyTokenPath(env, '/home/ada')).toBe(
       path.join('/shared/.petdex-win', 'runtime', 'update-token'),
+    )
+    expect(buddyProcessPath(env, '/home/ada')).toBe(
+      path.join('/shared/.petdex-win', 'runtime', 'process.json'),
     )
     expect(buddyStatePath(env, '/home/ada')).toBe(path.join('/shared/.petdex-win', 'state.json'))
     expect(buddyManagedPetsDir(env, '/home/ada')).toBe(path.join('/shared/.petdex-win', 'pets'))

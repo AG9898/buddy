@@ -345,3 +345,6 @@ Registering the global output flags on all commands makes Commander render subco
 
 ### 2026-07-23 - Live pet reload must out-rank a startup asset request
 `getActivePet()` can resolve after a live `POST /pets/use` event, so App.svelte tracks the live selection and does not let the older startup payload overwrite it. Both preload subscription methods return their exact cleanup function; App.svelte must call them on destroy to prevent listener accumulation across renderer reloads.
+
+### 2026-07-23 - Stop fallback must be a verified PID, never an image name
+`buddy stop` first uses the one-time authenticated `/shutdown` route so Electron persists state before quit. Only an unreachable sidecar may use the runtime process record, and it must validate the recorded PID's executable and app command line through Windows process metadata before issuing `taskkill /PID`; authorization failures and stale records are never kill candidates.

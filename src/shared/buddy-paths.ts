@@ -24,6 +24,14 @@ export function buddyTokenPath(env: BuddyPathEnv = process.env, homeDir = os.hom
   return path.join(buddyRuntimeDir(env, homeDir), 'update-token')
 }
 
+/**
+ * Electron-owned process identity used only for the narrow, verified stop fallback.
+ * The file contains the process id plus executable and app paths, never a token.
+ */
+export function buddyProcessPath(env: BuddyPathEnv = process.env, homeDir = os.homedir()): string {
+  return path.join(buddyRuntimeDir(env, homeDir), 'process.json')
+}
+
 export function buddyStatePath(env: BuddyPathEnv = process.env, homeDir = os.homedir()): string {
   return path.join(buddyDataDir(env, homeDir), 'state.json')
 }

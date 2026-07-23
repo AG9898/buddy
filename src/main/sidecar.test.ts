@@ -52,6 +52,15 @@ async function postPetUse(
   body: unknown,
   token?: string,
 ): Promise<{ statusCode: number; data: unknown }> {
+  return postSidecar(server, '/pets/use', body, token)
+}
+
+async function postSidecar(
+  server: http.Server,
+  requestPath: string,
+  body: unknown,
+  token?: string,
+): Promise<{ statusCode: number; data: unknown }> {
   const address = server.address()
   if (address === null || typeof address === 'string') throw new Error('sidecar did not expose a TCP port')
   const payload = JSON.stringify(body)
@@ -61,7 +70,7 @@ async function postPetUse(
       {
         host: '127.0.0.1',
         port: address.port,
-        path: '/pets/use',
+        path: requestPath,
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -120,7 +129,12 @@ async function getSidecar(
 
 async function startTestSidecar(
   windowOptions?: { visible?: boolean; width?: number; height?: number },
-): Promise<{ server: http.Server; token: string; window: BrowserWindow }> {
+): Promise<{
+  server: http.Server
+  token: string
+  window: BrowserWindow
+  requestShutdown: ReturnType<typeof vi.fn>
+}> {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'buddy-sidecar-'))
   tempDirs.push(tempDir)
   const managedPetsDir = path.join(tempDir, 'managed')
@@ -134,10 +148,11 @@ async function startTestSidecar(
   vi.stubEnv('USERPROFILE', tempDir)
 
   const window = fakeWindow(windowOptions)
-  const server = startSidecar(window)
+  const requestShutdown = vi.fn()
+  const server = startSidecar(window, { requestShutdown })
   await once(server, 'listening')
   const token = fs.readFileSync(buddyTokenPath(process.env, os.homedir()), 'utf8').trim()
-  return { server, token, window }
+  return { server, token, window, requestShutdown }
 }
 
 afterEach(() => {
@@ -199,6 +214,40 @@ describe.sequential('GET /status', () => {
           window: { width: 356, height: 320 },
         },
       })
+    } finally {
+      await closeServer(server)
+    }
+  })
+})
+
+describe.sequential('POST /shutdown', () => {
+  it('rejects an unauthenticated shutdown request', async () => {
+    const { server, requestShutdown } = await startTestSidecar()
+    try {
+      await expect(postSidecar(server, '/shutdown', {})).resolves.toEqual({
+        statusCode: 401,
+        data: { error: 'unauthorized' },
+      })
+      expect(requestShutdown).not.toHaveBeenCalled()
+    } finally {
+      await closeServer(server)
+    }
+  })
+
+  it('accepts a valid token exactly once and schedules the Electron-owned shutdown', async () => {
+    const { server, token, requestShutdown } = await startTestSidecar()
+    try {
+      await expect(postSidecar(server, '/shutdown', {}, token)).resolves.toEqual({
+        statusCode: 200,
+        data: { ok: true },
+      })
+      expect(requestShutdown).toHaveBeenCalledOnce()
+
+      await expect(postSidecar(server, '/shutdown', {}, token)).resolves.toEqual({
+        statusCode: 409,
+        data: { error: 'shutdown already requested' },
+      })
+      expect(requestShutdown).toHaveBeenCalledOnce()
     } finally {
       await closeServer(server)
     }

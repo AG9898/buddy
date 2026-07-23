@@ -1375,7 +1375,7 @@
       "id": "FEAT-31",
       "title": "Add graceful authenticated CLI shutdown",
       "description": "Replace buddy stop image-name termination with a token-authenticated graceful sidecar shutdown that lets Electron persist final state before exit. Treat an already-stopped app as an idempotent human success/warning, and permit only a verified buddy-owned process-id fallback if graceful shutdown cannot be used. Startup behavior is out of scope.",
-      "status": "todo",
+      "status": "done",
       "priority": "critical",
       "group_id": "FEAT",
       "depends_on": [

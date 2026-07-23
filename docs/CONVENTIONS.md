@@ -111,8 +111,10 @@ These apply across every stack in this project.
 - `buddy start` must return a typed `app.start` result only after the Windows Electron child
   emits `spawn`, or after WSL interop both spawns and exits zero. Command modules must not
   print a launch outcome or call `process.exit()` themselves.
-- Lifecycle commands must verify the buddy process they control. Never use an unscoped
-  `taskkill /IM electron.exe` fallback.
+- `buddy stop` must use the token-authenticated sidecar shutdown first and leave final-state
+  persistence to Electron main. A fallback is allowed only after an unreachable-sidecar error,
+  for a runtime-recorded PID whose executable and command line Windows has verified as buddy;
+  never use `/IM`, an image-name kill, or a fallback after authorization failure.
 - `buddy hatch` must not dump raw Codex/imagegen subprocess output during normal runs.
   Show summarized progress by default and reserve subprocess detail for verbose/debug
   behavior or logs.

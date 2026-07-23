@@ -84,6 +84,8 @@ function readBody(req: http.IncomingMessage): Promise<string> {
 export interface SidecarOptions {
   /** Electron-owned service for validating, persisting, and resolving a pet selection. */
   selectPet?: (id: string) => ActivePetAsset
+  /** Invoked after the one-time authenticated shutdown response has finished. */
+  requestShutdown?: () => void
 }
 
 /** Bounded operational state consumed by the later CLI status command. */
@@ -130,7 +132,10 @@ function makeHandler(
   win: BrowserWindow,
   token: string,
   selectPet: (id: string) => ActivePetAsset,
+  requestShutdown: () => void,
 ) {
+  let shutdownAccepted = false
+
   return async function handler(
     req: http.IncomingMessage,
     res: http.ServerResponse,
@@ -162,6 +167,38 @@ function makeHandler(
       }
 
       jsonReply(res, 200, statusSnapshot(win))
+      return
+    }
+
+    // POST /shutdown — token-authenticated, accepted exactly once. The main
+    // process owns persistence and Electron exit; wait until this response is
+    // finished so a successful CLI caller always receives its acknowledgement.
+    if (url === '/shutdown') {
+      if (method !== 'POST') {
+        jsonReply(res, 405, { error: 'method not allowed' })
+        return
+      }
+
+      const ct = req.headers['content-type'] ?? ''
+      if (!ct.includes('application/json')) {
+        jsonReply(res, 400, { error: 'Content-Type must be application/json' })
+        return
+      }
+
+      const incomingToken = req.headers['x-petdex-update-token'] ?? ''
+      if (incomingToken !== token) {
+        jsonReply(res, 401, { error: 'unauthorized' })
+        return
+      }
+
+      if (shutdownAccepted) {
+        jsonReply(res, 409, { error: 'shutdown already requested' })
+        return
+      }
+
+      shutdownAccepted = true
+      res.once('finish', requestShutdown)
+      jsonReply(res, 200, { ok: true })
       return
     }
 
@@ -375,7 +412,12 @@ export function startSidecar(win: BrowserWindow, options: SidecarOptions = {}): 
   const port = Number(process.env['BUDDY_PORT'] ?? 7777)
   const host = '127.0.0.1'
 
-  const handler = makeHandler(win, token, options.selectPet ?? selectActivePet)
+  const handler = makeHandler(
+    win,
+    token,
+    options.selectPet ?? selectActivePet,
+    options.requestShutdown ?? (() => undefined),
+  )
 
   const server = http.createServer((req, res) => {
     handler(req, res).catch(() => {

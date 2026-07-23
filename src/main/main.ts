@@ -4,6 +4,7 @@
 
 import { app, ipcMain, screen } from 'electron'
 import type { Rectangle } from 'electron'
+import fs from 'fs'
 import http from 'http'
 import path from 'path'
 import { createAvatarWindow } from './avatar-window'
@@ -11,6 +12,7 @@ import { createTray } from './tray'
 import { startSidecar, stopSidecar } from './sidecar'
 import { loadState, saveState, saveBounds } from './state-store'
 import { resolveActivePet, selectActivePet } from './pet-assets'
+import { buddyProcessPath } from '../shared/buddy-paths'
 import { CH_ACTIVE_PET_GET, CH_CLI_RESIZE, CH_DRAG_END, CH_RENDERER_READY, CH_RESIZE_END } from '../shared/ipc-channels'
 
 // Track whether app.quit() was triggered via the tray Quit item so the
@@ -19,6 +21,47 @@ let isQuitting = false
 
 // Reference to the sidecar server so we can stop it on quit.
 let sidecarServer: http.Server | null = null
+
+function processRecordPath(): string {
+  return buddyProcessPath(process.env, process.env['HOME'] ?? '')
+}
+
+/** Record enough immutable identity to make the forced stop fallback safe. */
+function writeProcessRecord(): void {
+  const file = processRecordPath()
+  fs.mkdirSync(path.dirname(file), { recursive: true })
+  fs.writeFileSync(
+    file,
+    JSON.stringify({
+      pid: process.pid,
+      executablePath: process.execPath,
+      appPath: app.getAppPath(),
+    }),
+    { encoding: 'utf8', mode: 0o600 },
+  )
+}
+
+function removeProcessRecord(): void {
+  try {
+    fs.unlinkSync(processRecordPath())
+  } catch (error) {
+    if (!(error instanceof Error) || !('code' in error) || error.code !== 'ENOENT') throw error
+  }
+}
+
+/** Persist the final app snapshot before asking Electron to exit. */
+function persistFinalState(win: Electron.BrowserWindow): void {
+  if (win.isDestroyed()) return
+  const currentState = loadState()
+  saveState({ ...currentState, open: win.isVisible(), bounds: win.getBounds() })
+}
+
+function requestGracefulShutdown(win: Electron.BrowserWindow): void {
+  if (isQuitting) return
+  isQuitting = true
+  persistFinalState(win)
+  app.quit()
+}
 
 function clampBoundsToDisplay(bounds: Rectangle): Rectangle {
   const display = screen.getDisplayMatching(bounds)
@@ -60,7 +103,11 @@ app.whenReady().then(() => {
   createTray(win)
 
   // 4. Start the local HTTP sidecar (validates token, forwards events to renderer).
-  sidecarServer = startSidecar(win, { selectPet: selectActivePet })
+  writeProcessRecord()
+  sidecarServer = startSidecar(win, {
+    selectPet: selectActivePet,
+    requestShutdown: () => requestGracefulShutdown(win),
+  })
 
   // 5. Wait for the renderer to signal it is mounted before showing the window.
   //    This prevents a brief blank transparent window from appearing.
@@ -128,9 +175,7 @@ app.whenReady().then(() => {
       win.hide()
     } else {
       // Quitting: persist final state including current bounds and visibility.
-      const b = win.getBounds()
-      const currentState = loadState()
-      saveState({ ...currentState, open: win.isVisible(), bounds: b })
+      persistFinalState(win)
     }
   })
 })
@@ -142,6 +187,10 @@ app.on('before-quit', () => {
     stopSidecar(sidecarServer)
     sidecarServer = null
   }
+})
+
+app.on('will-quit', () => {
+  removeProcessRecord()
 })
 
 // Keep the process alive when all windows are closed — the tray is the only exit path.

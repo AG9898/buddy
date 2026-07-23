@@ -153,8 +153,9 @@ resolution for installed npm package layouts.
 root and nested help, package-derived version output, global output modes, stdout/stderr
 separation, stable JSON results, typo/argument errors, and command exit codes. Lifecycle
 coverage proves Windows and WSL startup results are not reported before successful launch,
-including missing runtime, child errors, and non-zero WSL interop exits; stop must target only
-a verified buddy process.
+including missing runtime, child errors, and non-zero WSL interop exits. Stop coverage proves
+the authenticated graceful route, authorization rejection, already-stopped outcome, Windows and
+WSL verified-PID fallback, and output-mode rendering; it must never target an image name.
 
 **Not covered (yet):** Visual regression, multi-monitor DPI scaling, packaged installer
 smoke test, Windows-native hook execution, WSL bridge execution, resize pointer-event
@@ -168,7 +169,7 @@ integration (requires Electron E2E).
 |---|---|---|
 | `src/main/state-store.test.ts` | State persistence | loadState defaults, saveState directory creation, round-trip fidelity, saveBounds byResolution key |
 | `src/main/pet-assets.test.ts` | Active pet assets | Selected pet resolution, packaged default fallback diagnostics, persisted startup state, manifest validation, and safe live-selection persistence |
-| `src/main/sidecar.test.ts` | Sidecar controls and status | Authenticated `POST /pets/use` success payload, state persistence, invalid-selection rejection, and authenticated bounded `/status` snapshots for visible/hidden windows, active-pet fallback, and current bounds |
+| `src/main/sidecar.test.ts` | Sidecar controls and status | One-time authenticated `POST /shutdown`, authenticated `POST /pets/use` success payload, state persistence, invalid-selection rejection, and authenticated bounded `/status` snapshots for visible/hidden windows, active-pet fallback, and current bounds |
 | `src/preload/preload.test.ts` | Preload live-selection IPC | Active-pet and state listener forwarding plus exact listener cleanup |
 | `src/renderer/App.test.ts` | Renderer active-pet reload | In-place manifest/spritesheet replacement, renderer-ready sequencing, stale-startup protection, and listener cleanup |
 | `src/renderer/PetSprite.test.ts` | Renderer sprite fallback | New-manifest spritesheet replacement and missing-state idle fallback |
@@ -182,6 +183,7 @@ integration (requires Electron E2E).
 | `src/cli/commands/state.test.ts` | State command | Typed state result, POST `/state` payload/token, shared missing-token and HTTP errors, plus normal/verbose/no-color/JSON rendering |
 | `src/cli/commands/size.test.ts` | Size command | parseSizeInput scale factor/explicit WxH/invalid input, validateBounds min/max enforcement, typed validation/sidecar errors, POST `/resize` payload/token, bounded shared-client timeout, and quiet/no-color/JSON rendering |
 | `src/cli/commands/start.test.ts` | Start command | Typed Windows and WSL startup results, missing Electron runtime, child spawn errors, non-zero WSL interop exits, and shared output-mode rendering |
+| `src/cli/commands/stop.test.ts` | Stop command | Authenticated graceful shutdown, authorization rejection, idempotent already-stopped handling, Windows/WSL verified-PID fallback, and normal/quiet/verbose/JSON output |
 | `src/cli/program.test.ts` | CLI program structure | Bare invocation landing surface printed once, `--version` matching package.json, grouped root help with examples, nested `pets`/`hooks install` help, banner suppressed for non-TTY, unknown-command suggestion, missing-argument and unknown-option exit codes, global output options inherited by nested commands in either position, `--quiet`/`--verbose` conflict rejected same-command and split across the chain |
 | `src/cli/runtime.test.ts` | CLI runtime launch | package-root walking from built CLI output and missing-Electron detection for installed package layouts |
 | `petdex-bridge/src/main.rs` | WSL bridge | CLI parsing, state payload construction, loopback URL construction, token path override, and empty-state validation |

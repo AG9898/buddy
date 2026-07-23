@@ -305,8 +305,9 @@ export function createProgram(): CommandType {
   program
     .command('stop')
     .description('Stop the running buddy pet window')
-    .action(() => {
-      runStop()
+    .action(async () => {
+      recordCommand('app.stop')
+      recordResult(await runStop())
     })
 
   // ── buddy size ──────────────────────────────────────────────────────────────
