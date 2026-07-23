@@ -968,7 +968,7 @@
       "id": "FEAT-19",
       "title": "Normalize state and size sidecar command UX",
       "description": "Introduce a small shared token-authenticated sidecar client for CLI requests, then migrate buddy state and buddy size to typed results and the global output modes. Preserve their existing payloads, validation, recovery hints, and exit behavior while removing duplicated token and HTTP error formatting. Do not add new sidecar endpoints or state-name discovery in this task.",
-      "status": "todo",
+      "status": "done",
       "priority": "high",
       "group_id": "FEAT",
       "depends_on": [

@@ -96,6 +96,9 @@ These apply across every stack in this project.
 - `src/cli/output.ts` owns rendering and resolves one `OutputContext` per invocation;
   `src/cli/result.ts` owns the typed `CommandResult` / `CliError` shapes. Emit lines through
   the helpers rather than writing to `process.stdout` directly, so mode routing applies.
+- Token-authenticated CLI sidecar calls go through `src/cli/sidecar-client.ts`. Command
+  modules must not duplicate token-file reads, HTTP response parsing, request timeouts, or
+  connection-error formatting; they return typed results/errors for the entry boundary.
 - Commander has no true global options: register shared flags on every command in the tree
   and resolve them from `getOptionValueSource(key) === 'cli'` across the command chain.
   Do not use `optsWithGlobals()` for this — ancestor defaults overwrite child values.

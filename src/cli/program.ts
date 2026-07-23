@@ -36,6 +36,7 @@ import {
   orange,
   type OutputContextOptions,
 } from './output.js'
+import { recordCommand, recordResult } from './result.js'
 import { resolvePackageRoot } from './runtime.js'
 
 const __filename = fileURLToPath(import.meta.url)
@@ -312,8 +313,9 @@ export function createProgram(): CommandType {
     .command('size <scale-or-width>')
     .description('Resize the pet window by scale factor or explicit WxH')
     .addHelpText('after', examples('buddy size 1.5', 'buddy size 2x', 'buddy size 400x300'))
-    .action((sizeArg: string) => {
-      runSize(sizeArg)
+    .action(async (sizeArg: string) => {
+      recordCommand('size.set')
+      recordResult(await runSize(sizeArg))
     })
 
   // ── buddy pets ──────────────────────────────────────────────────────────────
@@ -424,8 +426,9 @@ export function createProgram(): CommandType {
         '# States: idle, running, waiting, jumping, waving, failed, review',
       ),
     )
-    .action((name: string) => {
-      runState(name)
+    .action(async (name: string) => {
+      recordCommand('state.set')
+      recordResult(await runState(name))
     })
 
   // ── buddy doctor ────────────────────────────────────────────────────────────

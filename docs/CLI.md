@@ -291,6 +291,12 @@ for the current selection and `buddy pets show` remains an alias.
 choices and a close-match suggestion when available. State validation must use the active
 pet manifest when it is resolvable and the packaged default state set as the fallback.
 
+State and size requests use the same token-authenticated local sidecar client. It loads the
+runtime token, POSTs JSON, parses JSON responses, applies a bounded timeout, and presents
+missing-token, connection, timeout, and HTTP failures as typed CLI errors. Their results
+therefore honor the shared human, quiet, verbose, JSON, and no-color output modes; only the
+CLI entry boundary renders those results and assigns a non-zero exit code for a failure.
+
 Windows owns selected-pet rendering. WSL hook commands may send state events and may share
 the buddy token and pet assets, but WSL must not maintain a second independent active-pet
 registry. The preferred WSL setup is:

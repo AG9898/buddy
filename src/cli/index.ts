@@ -17,7 +17,7 @@
 
 import { createProgram } from './program.js'
 import { renderFailure, renderResult } from './output.js'
-import { takeResult } from './result.js'
+import { takeCommand, takeResult } from './result.js'
 
 async function main(): Promise<void> {
   try {
@@ -25,7 +25,7 @@ async function main(): Promise<void> {
     const result = takeResult()
     if (result) renderResult(result)
   } catch (err) {
-    process.exitCode = renderFailure(err)
+    process.exitCode = renderFailure(err, takeCommand())
   }
 }
 

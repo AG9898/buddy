@@ -172,7 +172,8 @@ integration (requires Electron E2E).
 | `src/cli/commands/hatch.test.ts` | Hatch command | Normal mode suppresses raw subprocess output, verbose flag/env shows subprocess detail, skill-missing error, incomplete packaging error, success summary with pet id and next-step hint |
 | `src/cli/pets.test.ts` | Pet discovery | isValidPetJson schema validation, validatePetFolder for valid/missing/invalid entries, discoverPets buddy+codex sources, invalid folder reasons, buddyPetsDir/codexPetsDir path resolution and overrides |
 | `src/cli/commands/pets.test.ts` | Pets commands | pets list with source labels and active-pet marker, pets show active pet and unresolved-id warning, pets use validation and state.json persistence, no-writes-to-Codex paths, error messages and exit codes |
-| `src/cli/commands/size.test.ts` | Size command | parseSizeInput scale factor/explicit WxH/invalid input, validateBounds min/max enforcement, runSize invalid format errors, out-of-bounds errors, missing token error, POST /resize payload and token, success output, sidecar non-200 error, ECONNREFUSED error |
+| `src/cli/commands/state.test.ts` | State command | Typed state result, POST `/state` payload/token, shared missing-token and HTTP errors, plus normal/verbose/no-color/JSON rendering |
+| `src/cli/commands/size.test.ts` | Size command | parseSizeInput scale factor/explicit WxH/invalid input, validateBounds min/max enforcement, typed validation/sidecar errors, POST `/resize` payload/token, bounded shared-client timeout, and quiet/no-color/JSON rendering |
 | `src/cli/program.test.ts` | CLI program structure | Bare invocation landing surface printed once, `--version` matching package.json, grouped root help with examples, nested `pets`/`hooks install` help, banner suppressed for non-TTY, unknown-command suggestion, missing-argument and unknown-option exit codes, global output options inherited by nested commands in either position, `--quiet`/`--verbose` conflict rejected same-command and split across the chain |
 | `src/cli/runtime.test.ts` | CLI runtime launch | package-root walking from built CLI output and missing-Electron detection for installed package layouts |
 | `petdex-bridge/src/main.rs` | WSL bridge | CLI parsing, state payload construction, loopback URL construction, token path override, and empty-state validation |
@@ -196,6 +197,8 @@ integration (requires Electron E2E).
   `process.argv` at module load.
 - Global output-mode tests should cover TTY/plain, `--no-color`, quiet, verbose, and JSON
   behavior. JSON tests must parse stdout and assert that diagnostics did not contaminate it.
+- Sidecar command tests should assert returned `CommandResult` values and `CliError` failures;
+  do not mock `process.exit`, because only `src/cli/index.ts` owns the exit status.
 - Prefer setting `process.exitCode` at the entry boundary over calling `process.exit()` in
   command implementations so expected failures can be tested as returned results.
 - Hatch workflow tests should verify normal output is summarized and verbose/debug output

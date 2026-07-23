@@ -151,10 +151,17 @@ export function failurePayload(value: unknown, command: string | null = null): J
 ───────────────────────────────────────────────────────────────────────────── */
 
 let pendingResult: CommandResult | undefined
+let pendingCommand: string | undefined
+
+/** Record the command identifier before an action performs asynchronous work. */
+export function recordCommand(command: string): void {
+  pendingCommand = command
+}
 
 /** Record the typed result of the command that just ran. */
 export function recordResult<T>(result: CommandResult<T>): CommandResult<T> {
   pendingResult = result as CommandResult
+  pendingCommand = result.command
   return result
 }
 
@@ -162,10 +169,19 @@ export function recordResult<T>(result: CommandResult<T>): CommandResult<T> {
 export function takeResult(): CommandResult | undefined {
   const result = pendingResult
   pendingResult = undefined
+  pendingCommand = undefined
   return result
+}
+
+/** Take and clear the command currently executing, if one was recorded. */
+export function takeCommand(): string | null {
+  const command = pendingCommand ?? null
+  pendingCommand = undefined
+  return command
 }
 
 /** Discard any recorded result (test isolation). */
 export function clearResult(): void {
   pendingResult = undefined
+  pendingCommand = undefined
 }
