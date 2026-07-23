@@ -2,7 +2,8 @@
 
 interface PetApi {
   setState(state: string): void
-  onStateChange(cb: (payload: { state: string }) => void): void
+  onStateChange(cb: (payload: { state: string }) => void): () => void
+  onActivePetChange(cb: (payload: ActivePet) => void): () => void
   getActivePet(): Promise<{
     id: string
     source: 'buddy' | 'packaged' | 'codex'

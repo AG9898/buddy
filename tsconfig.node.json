@@ -18,6 +18,7 @@
     "src/preload/**/*.ts",
     "src/cli/**/*.ts",
     "electron.vite.config.ts",
-    "vite.cli.config.ts"
+    "vite.cli.config.ts",
+    "vitest.config.mts"
   ]
 }

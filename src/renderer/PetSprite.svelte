@@ -41,8 +41,8 @@
     }
   }
 
-  function getStateDef(stateName: string): PetStateDefinition {
-    return pet.states[stateName] ?? pet.states['idle']
+  function getStateDef(stateName: string): PetStateDefinition | undefined {
+    return pet.states[stateName] ?? pet.states['idle'] ?? Object.values(pet.states)[0]
   }
 
   function startAnimation(stateName: string): void {
@@ -50,7 +50,9 @@
     const version = animVersion
 
     const def = getStateDef(stateName)
-    const frames = def.frames
+    if (!def) return
+    const stateDef = def
+    const frames = stateDef.frames
     if (frames.length === 0) return
 
     // Show first frame immediately
@@ -65,9 +67,9 @@
         if (animVersion !== version) return
         idx++
         if (idx >= frames.length) {
-          if (def.once) {
+          if (stateDef.once) {
             // One-shot complete: jump to fallback
-            startAnimation(def.fallback ?? 'idle')
+            startAnimation(stateDef.fallback ?? 'idle')
             return
           }
           idx = 0

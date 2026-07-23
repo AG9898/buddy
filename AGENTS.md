@@ -116,7 +116,7 @@ Docs navigation: [`docs/INDEX.md`](docs/INDEX.md)
 ## Architecture
 
 - Electron main process manages a transparent, frameless, always-on-top, non-focusable `BrowserWindow`. State persists to `%USERPROFILE%\.petdex-win\state.json`.
-- Local HTTP sidecar (`sidecar.ts`) listens on `127.0.0.1:BUDDY_PORT`. Hook events arrive here from both Windows CLI and WSL petdex-bridge; its token-authenticated live pet-selection control is ready for the later CLI client wiring.
+- Local HTTP sidecar (`sidecar.ts`) listens on `127.0.0.1:BUDDY_PORT`. Hook events arrive here from both Windows CLI and WSL petdex-bridge; a validated token-authenticated live pet selection hot-reloads the renderer while CLI client wiring remains a later task.
 - Svelte renderer (`src/renderer/`) drives sprite animation via CSS `background-position` on an 8×9 spritesheet. State machine defined in `pet.json`.
 - `petdex-bridge` (Rust, `petdex-bridge/`) is a Linux binary that runs in WSL. Shell hooks call it; it POSTs events to the Windows HTTP sidecar via localhost passthrough.
 - All renderer↔main communication goes through the `petApi` contextBridge defined in `preload.ts`. IPC channel names are constants — never hardcoded strings.
@@ -342,3 +342,6 @@ Registering the global output flags on all commands makes Commander render subco
 
 ### 2026-07-20 - User hatches must not mutate bundled assets
 `buddy hatch` defaults to a validated pet-id folder under the buddy-managed data directory, not `pets/default`. The shared `build/icon.ico` is application branding and must remain untouched by any pet hatch; replacing a bundled preset is an explicit maintainer-only workflow.
+
+### 2026-07-23 - Live pet reload must out-rank a startup asset request
+`getActivePet()` can resolve after a live `POST /pets/use` event, so App.svelte tracks the live selection and does not let the older startup payload overwrite it. Both preload subscription methods return their exact cleanup function; App.svelte must call them on destroy to prevent listener accumulation across renderer reloads.

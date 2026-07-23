@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import {
+  CH_ACTIVE_PET_CHANGE,
   CH_DRAG_END,
   CH_DRAG_MOVE,
   CH_DRAG_START,
@@ -21,14 +22,39 @@ contextBridge.exposeInMainWorld('petApi', {
     ipcRenderer.send(CH_STATE_SET, state)
   },
 
-  /**
-   * Register a callback to be invoked each time the main process pushes a state change.
-   * Adds a new listener on every call - callers must manage cleanup if needed.
-   */
-  onStateChange(cb: (payload: { state: string }) => void): void {
-    ipcRenderer.on(CH_STATE_CHANGE, (_event, payload: { state: string }) => {
+  /** Register a state-change listener and return its cleanup function. */
+  onStateChange(cb: (payload: { state: string }) => void): () => void {
+    const listener = (_event: Electron.IpcRendererEvent, payload: { state: string }) => {
       cb(payload)
-    })
+    }
+    ipcRenderer.on(CH_STATE_CHANGE, listener)
+    return () => ipcRenderer.removeListener(CH_STATE_CHANGE, listener)
+  },
+
+  /** Register a validated active-pet update listener and return its cleanup function. */
+  onActivePetChange(
+    cb: (payload: {
+      id: string
+      source: 'buddy' | 'packaged' | 'codex'
+      manifest: unknown
+      spritesheetUrl: string
+      initialState: string
+    }) => void,
+  ): () => void {
+    const listener = (
+      _event: Electron.IpcRendererEvent,
+      payload: {
+        id: string
+        source: 'buddy' | 'packaged' | 'codex'
+        manifest: unknown
+        spritesheetUrl: string
+        initialState: string
+      },
+    ) => {
+      cb(payload)
+    }
+    ipcRenderer.on(CH_ACTIVE_PET_CHANGE, listener)
+    return () => ipcRenderer.removeListener(CH_ACTIVE_PET_CHANGE, listener)
   },
 
   /**

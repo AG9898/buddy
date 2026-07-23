@@ -2,6 +2,8 @@
 // imported by main, preload, and tests without executing Electron bridge code.
 export const CH_STATE_SET = 'state-set'
 export const CH_STATE_CHANGE = 'pet:state-change'
+/** Sent from Electron main after a validated live pet selection. Payload: ActivePetAsset. */
+export const CH_ACTIVE_PET_CHANGE = 'pet:active-change'
 export const CH_PTR_INTERACTIVE = 'ptr-interactive-changed'
 export const CH_DRAG_START = 'drag-start'
 export const CH_DRAG_MOVE = 'drag-move'

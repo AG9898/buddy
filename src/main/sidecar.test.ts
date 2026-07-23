@@ -6,6 +6,7 @@ import { once } from 'events'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { BrowserWindow } from 'electron'
 import { buddyTokenPath } from '../shared/buddy-paths'
+import { CH_ACTIVE_PET_CHANGE } from '../shared/ipc-channels'
 import { loadState } from './state-store'
 import { startSidecar } from './sidecar'
 
@@ -82,7 +83,7 @@ async function postPetUse(
   })
 }
 
-async function startTestSidecar(): Promise<{ server: http.Server; token: string }> {
+async function startTestSidecar(): Promise<{ server: http.Server; token: string; window: BrowserWindow }> {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'buddy-sidecar-'))
   tempDirs.push(tempDir)
   const managedPetsDir = path.join(tempDir, 'managed')
@@ -95,10 +96,11 @@ async function startTestSidecar(): Promise<{ server: http.Server; token: string 
   vi.stubEnv('BUDDY_PORT', '0')
   vi.stubEnv('USERPROFILE', tempDir)
 
-  const server = startSidecar(fakeWindow())
+  const window = fakeWindow()
+  const server = startSidecar(window)
   await once(server, 'listening')
   const token = fs.readFileSync(buddyTokenPath(process.env, os.homedir()), 'utf8').trim()
-  return { server, token }
+  return { server, token, window }
 }
 
 afterEach(() => {
@@ -112,7 +114,7 @@ afterEach(() => {
 
 describe.sequential('POST /pets/use', () => {
   it('persists a validated selection and returns only the active renderer payload', async () => {
-    const { server, token } = await startTestSidecar()
+    const { server, token, window } = await startTestSidecar()
     try {
       const response = await postPetUse(server, { id: 'custom-cat' }, token)
 
@@ -130,6 +132,10 @@ describe.sequential('POST /pets/use', () => {
       expect(pet['spritesheetUrl']).toMatch(/^file:\/\//)
       expect(pet).not.toHaveProperty('folderPath')
       expect(loadState().pet.id).toBe('custom-cat')
+      expect(window.webContents.send).toHaveBeenCalledWith(
+        CH_ACTIVE_PET_CHANGE,
+        expect.objectContaining({ id: 'custom-cat' }),
+      )
     } finally {
       await closeServer(server)
     }

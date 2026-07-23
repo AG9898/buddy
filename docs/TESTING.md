@@ -126,9 +126,11 @@ Visual install/render/hooks/WSL-bridge checks require a separate clean Windows m
 ## What Is Covered
 
 **Svelte unit tests:** PetSprite animation state machine (frame sequencing, state
-transitions, `once` + `fallback` logic), pointer interactivity detection logic (including
-`.resize-handle` region), resize lifecycle IPC calls (`resizeStart`/`resizeMove`/`resizeEnd`),
-App component IPC event handling.
+transitions, `once` + `fallback` logic), active-manifest fallback on live reload, pointer
+interactivity detection logic (including `.resize-handle` region), resize lifecycle IPC
+calls (`resizeStart`/`resizeMove`/`resizeEnd`), and App startup/live-selection IPC handling
+with listener cleanup. Svelte component tests run in jsdom through the Svelte Testing
+Library Vite plugin; they do not launch Electron.
 
 **Rust unit tests:** petdex-bridge CLI arg parsing, HTTP payload construction, loopback
 URL construction, invalid state handling, and invalid port handling. Manual bridge smoke
@@ -167,6 +169,9 @@ integration (requires Electron E2E).
 | `src/main/state-store.test.ts` | State persistence | loadState defaults, saveState directory creation, round-trip fidelity, saveBounds byResolution key |
 | `src/main/pet-assets.test.ts` | Active pet assets | Selected pet resolution, packaged default fallback diagnostics, persisted startup state, manifest validation, and safe live-selection persistence |
 | `src/main/sidecar.test.ts` | Sidecar live selection | Authenticated `POST /pets/use` success payload, state persistence, and rejection of missing, invalid, and path-escaping requests |
+| `src/preload/preload.test.ts` | Preload live-selection IPC | Active-pet and state listener forwarding plus exact listener cleanup |
+| `src/renderer/App.test.ts` | Renderer active-pet reload | In-place manifest/spritesheet replacement, renderer-ready sequencing, stale-startup protection, and listener cleanup |
+| `src/renderer/PetSprite.test.ts` | Renderer sprite fallback | New-manifest spritesheet replacement and missing-state idle fallback |
 | `src/cli/env.test.ts` | CLI environment | isWSL() detection, buddyPort() defaults and overrides, sidecarBaseUrl() |
 | `src/shared/buddy-paths.test.ts` | Shared paths | buddy data root defaults, `BUDDY_DATA_DIR` override, and derived state/token/pet paths |
 | `src/main/hooks-install.test.ts` | Hook installation | installHooks idempotency, getHooksStatus, Claude Code settings, Codex hooks.json, Windows and WSL command targets |

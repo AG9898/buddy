@@ -5,7 +5,7 @@ import http from 'http'
 import fs from 'fs'
 import crypto from 'crypto'
 import type { BrowserWindow } from 'electron'
-import { CH_STATE_CHANGE, CH_CLI_RESIZE } from '../shared/ipc-channels'
+import { CH_ACTIVE_PET_CHANGE, CH_STATE_CHANGE, CH_CLI_RESIZE } from '../shared/ipc-channels'
 import { buddyRuntimeDir, buddyTokenPath } from '../shared/buddy-paths'
 import { PetSelectionError, selectActivePet, type ActivePetAsset } from './pet-assets'
 
@@ -234,8 +234,7 @@ function makeHandler(
       return
     }
 
-    // POST /pets/use — token-authenticated live pet selection. The renderer
-    // reload event is deliberately owned by the follow-up renderer task.
+    // POST /pets/use — token-authenticated live pet selection.
     if (url === '/pets/use') {
       if (method !== 'POST') {
         jsonReply(res, 405, { error: 'method not allowed' })
@@ -282,6 +281,9 @@ function makeHandler(
 
       try {
         const pet = selectPet((parsed as Record<string, string>)['id'])
+        if (!win.isDestroyed()) {
+          win.webContents.send(CH_ACTIVE_PET_CHANGE, pet)
+        }
         jsonReply(res, 200, { ok: true, pet })
       } catch (error) {
         if (error instanceof PetSelectionError) {

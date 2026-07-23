@@ -1411,7 +1411,7 @@
       "id": "FEAT-32",
       "title": "Hot-reload selected pet assets in the renderer",
       "description": "Wire the validated selection result from FEAT-24 through shared IPC and preload so the running Svelte renderer replaces its active manifest and spritesheet without recreating the BrowserWindow. Preserve current animation fallback, click-through behavior, renderer-ready sequencing, and the non-focusable showInactive lifecycle. CLI request and persistence behavior are out of scope.",
-      "status": "todo",
+      "status": "done",
       "priority": "high",
       "group_id": "FEAT",
       "depends_on": [
