@@ -147,11 +147,12 @@ output when supported, expected error messages and exit codes, hatch progress ou
 does not dump raw subprocess logs, pet discovery/selection behavior, and runtime path
 resolution for installed npm package layouts.
 
-**Planned CLI UX contract coverage:** A testable command factory will cover bare `buddy`,
+**CLI UX contract coverage:** A testable command factory covers bare `buddy`,
 root and nested help, package-derived version output, global output modes, stdout/stderr
 separation, stable JSON results, typo/argument errors, and command exit codes. Lifecycle
-coverage must prove that spawn failures are not reported as success and that stop targets
-only a verified buddy process.
+coverage proves Windows and WSL startup results are not reported before successful launch,
+including missing runtime, child errors, and non-zero WSL interop exits; stop must target only
+a verified buddy process.
 
 **Not covered (yet):** Visual regression, multi-monitor DPI scaling, packaged installer
 smoke test, Windows-native hook execution, WSL bridge execution, resize pointer-event
@@ -174,6 +175,7 @@ integration (requires Electron E2E).
 | `src/cli/commands/pets.test.ts` | Pets commands | pets list with source labels and active-pet marker, pets show active pet and unresolved-id warning, pets use validation and state.json persistence, no-writes-to-Codex paths, error messages and exit codes |
 | `src/cli/commands/state.test.ts` | State command | Typed state result, POST `/state` payload/token, shared missing-token and HTTP errors, plus normal/verbose/no-color/JSON rendering |
 | `src/cli/commands/size.test.ts` | Size command | parseSizeInput scale factor/explicit WxH/invalid input, validateBounds min/max enforcement, typed validation/sidecar errors, POST `/resize` payload/token, bounded shared-client timeout, and quiet/no-color/JSON rendering |
+| `src/cli/commands/start.test.ts` | Start command | Typed Windows and WSL startup results, missing Electron runtime, child spawn errors, non-zero WSL interop exits, and shared output-mode rendering |
 | `src/cli/program.test.ts` | CLI program structure | Bare invocation landing surface printed once, `--version` matching package.json, grouped root help with examples, nested `pets`/`hooks install` help, banner suppressed for non-TTY, unknown-command suggestion, missing-argument and unknown-option exit codes, global output options inherited by nested commands in either position, `--quiet`/`--verbose` conflict rejected same-command and split across the chain |
 | `src/cli/runtime.test.ts` | CLI runtime launch | package-root walking from built CLI output and missing-Electron detection for installed package layouts |
 | `petdex-bridge/src/main.rs` | WSL bridge | CLI parsing, state payload construction, loopback URL construction, token path override, and empty-state validation |

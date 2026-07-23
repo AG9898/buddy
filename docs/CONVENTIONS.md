@@ -108,6 +108,9 @@ These apply across every stack in this project.
   the command entry point.
 - Expected user errors should be actionable messages with non-zero exit codes, not raw
   stack traces.
+- `buddy start` must return a typed `app.start` result only after the Windows Electron child
+  emits `spawn`, or after WSL interop both spawns and exits zero. Command modules must not
+  print a launch outcome or call `process.exit()` themselves.
 - Lifecycle commands must verify the buddy process they control. Never use an unscoped
   `taskkill /IM electron.exe` fallback.
 - `buddy hatch` must not dump raw Codex/imagegen subprocess output during normal runs.

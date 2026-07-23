@@ -93,12 +93,15 @@ the pet. The planned implementation requests a graceful, token-authenticated shu
 the running sidecar. A fallback may target a verified buddy process id, but must never kill
 every process named `electron.exe`.
 
-`buddy start` reports success only after the child process has spawned successfully. A
-missing or unlaunchable runtime produces a concise error and non-zero exit instead of a
-premature success message.
+`buddy start` reports success only after launch has been confirmed. On Windows it waits for
+the detached Electron child to emit `spawn`, then releases that child so the terminal returns
+promptly. A missing or unlaunchable runtime produces a concise typed error and non-zero exit
+instead of a premature success message. Its typed `app.start` result uses the shared human,
+quiet, verbose, JSON, and no-color rendering modes.
 
-When run from WSL, `buddy start` uses WSL interop to invoke the Windows-side app. If
-interop is unavailable, print a clear actionable error and exit non-zero.
+When run from WSL, `buddy start` uses WSL interop to invoke the Windows-side app. It waits for
+the interop child to spawn and exit zero before reporting success. Missing `cmd.exe`, spawn
+failures, and a non-zero interop exit produce clear actionable typed errors.
 
 Install examples should use `npm install -g @ag9898/buddy`. User-facing command examples
 should continue to use `buddy ...`.

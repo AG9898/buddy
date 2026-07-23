@@ -296,8 +296,9 @@ export function createProgram(): CommandType {
       'after',
       examples('buddy start', '# In WSL, start invokes the Windows app through WSL interop'),
     )
-    .action(() => {
-      runStart()
+    .action(async () => {
+      recordCommand('app.start')
+      recordResult(await runStart())
     })
 
   // ── buddy stop ──────────────────────────────────────────────────────────────

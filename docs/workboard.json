@@ -1100,7 +1100,7 @@
       "id": "FEAT-23",
       "title": "Report CLI startup outcomes reliably",
       "description": "Change buddy start to report success only after the Electron child emits a successful spawn and migrate Windows and WSL startup onto the typed result renderer. Missing runtimes, spawn errors, and WSL interop failures must return actionable expected errors without a premature success line. Shutdown behavior is handled independently by FEAT-31.",
-      "status": "todo",
+      "status": "done",
       "priority": "critical",
       "group_id": "FEAT",
       "depends_on": [

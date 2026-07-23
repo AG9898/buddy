@@ -34,8 +34,8 @@ selection UX, and CLI lifecycle semantics live in [`CLI.md`](CLI.md).
 **Owns:**
 - The npm `bin` entry point — the `buddy` command developers run in their terminal.
 - Environment detection: reads `/proc/version` to determine if running in WSL or natively on Windows.
-- On Windows: `buddy start` spawns the Electron app process detached and returns control to the terminal; `buddy stop` terminates it.
-- In WSL: `buddy start` invokes the Windows-side `buddy.exe` via WSL interop; prints a clear actionable error if interop is unavailable.
+- On Windows: `buddy start` waits for the detached Electron app child to emit `spawn`, reports a typed `app.start` result, then returns control to the terminal; `buddy stop` terminates it.
+- In WSL: `buddy start` invokes the Windows-side `buddy.exe` via WSL interop and reports success only after the interop child has spawned and exited zero; unavailable interop, spawn errors, and non-zero exits become typed actionable failures.
 - `buddy hooks install`: writes user-level hook entries for Claude Code CLI and Codex CLI. Claude Code receives entries in `~/.claude/settings.json`; Codex CLI receives entries in `~/.codex/hooks.json`. Windows hooks call `buddy state <name>`, and WSL hooks call `petdex-bridge state <name>`.
 - `buddy state <name>`: sends an HTTP POST to the running sidecar (works from both Windows and WSL via localhost passthrough).
 - `buddy size <scale-or-width>`: sends an HTTP POST to `POST /resize` on the sidecar. Accepts a scale factor (e.g., `1.5`, `2x`) or explicit WxH dimensions (e.g., `400x300`). Valid range: 80–1200 pixels per dimension. Uses the same token-authenticated flow as `buddy state`. Main process applies the new bounds via `setBounds` and persists them via `saveBounds`.
