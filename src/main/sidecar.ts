@@ -7,7 +7,14 @@ import crypto from 'crypto'
 import type { BrowserWindow } from 'electron'
 import { CH_ACTIVE_PET_CHANGE, CH_STATE_CHANGE, CH_CLI_RESIZE } from '../shared/ipc-channels'
 import { buddyRuntimeDir, buddyTokenPath } from '../shared/buddy-paths'
-import { PetSelectionError, selectActivePet, type ActivePetAsset } from './pet-assets'
+import {
+  PetSelectionError,
+  resolveActivePet,
+  selectActivePet,
+  type ActivePetAsset,
+  type PetSource,
+} from './pet-assets'
+import { loadState } from './state-store'
 
 // ── Token helpers ─────────────────────────────────────────────────────────────
 
@@ -79,6 +86,46 @@ export interface SidecarOptions {
   selectPet?: (id: string) => ActivePetAsset
 }
 
+/** Bounded operational state consumed by the later CLI status command. */
+export interface SidecarStatusSnapshot {
+  app: {
+    running: boolean
+    visible: boolean
+  }
+  pet: {
+    id: string
+    name: string
+    source: PetSource
+  }
+  window: {
+    width: number
+    height: number
+  }
+}
+
+function statusSnapshot(win: BrowserWindow): SidecarStatusSnapshot {
+  const running = !win.isDestroyed()
+  const state = loadState()
+  const bounds = running ? win.getBounds() : state.bounds
+  const activePet = resolveActivePet(state.pet)
+
+  return {
+    app: {
+      running,
+      visible: running && win.isVisible(),
+    },
+    pet: {
+      id: activePet.id,
+      name: activePet.manifest.name,
+      source: activePet.source,
+    },
+    window: {
+      width: bounds.width,
+      height: bounds.height,
+    },
+  }
+}
+
 function makeHandler(
   win: BrowserWindow,
   token: string,
@@ -98,6 +145,23 @@ function makeHandler(
         return
       }
       jsonReply(res, 200, { status: 'ok' })
+      return
+    }
+
+    // GET /status — token-authenticated bounded operational snapshot.
+    if (url === '/status') {
+      if (method !== 'GET') {
+        jsonReply(res, 405, { error: 'method not allowed' })
+        return
+      }
+
+      const incomingToken = req.headers['x-petdex-update-token'] ?? ''
+      if (incomingToken !== token) {
+        jsonReply(res, 401, { error: 'unauthorized' })
+        return
+      }
+
+      jsonReply(res, 200, statusSnapshot(win))
       return
     }
 

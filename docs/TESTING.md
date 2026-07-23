@@ -140,7 +140,7 @@ checks cover missing token and stopped-sidecar error output.
 correctly, state persists across restart, tray Show/Hide/Quit work.
 
 **Main-process unit tests:** State persistence, active-pet asset resolution and live-selection
-persistence, token-authenticated sidecar validation, and hook installation/status. Hook tests
+persistence, token-authenticated sidecar validation, bounded operational status snapshots, and hook installation/status. Hook tests
 cover Claude Code `settings.json`, Codex CLI `hooks.json`, Windows `buddy state` commands,
 WSL `petdex-bridge state` commands, idempotency, and missing-hook status.
 
@@ -168,7 +168,7 @@ integration (requires Electron E2E).
 |---|---|---|
 | `src/main/state-store.test.ts` | State persistence | loadState defaults, saveState directory creation, round-trip fidelity, saveBounds byResolution key |
 | `src/main/pet-assets.test.ts` | Active pet assets | Selected pet resolution, packaged default fallback diagnostics, persisted startup state, manifest validation, and safe live-selection persistence |
-| `src/main/sidecar.test.ts` | Sidecar live selection | Authenticated `POST /pets/use` success payload, state persistence, and rejection of missing, invalid, and path-escaping requests |
+| `src/main/sidecar.test.ts` | Sidecar controls and status | Authenticated `POST /pets/use` success payload, state persistence, invalid-selection rejection, and authenticated bounded `/status` snapshots for visible/hidden windows, active-pet fallback, and current bounds |
 | `src/preload/preload.test.ts` | Preload live-selection IPC | Active-pet and state listener forwarding plus exact listener cleanup |
 | `src/renderer/App.test.ts` | Renderer active-pet reload | In-place manifest/spritesheet replacement, renderer-ready sequencing, stale-startup protection, and listener cleanup |
 | `src/renderer/PetSprite.test.ts` | Renderer sprite fallback | New-manifest spritesheet replacement and missing-state idle fallback |

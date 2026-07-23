@@ -47,6 +47,12 @@ The planned command surface adds:
 
 Existing commands retain their current names.
 
+The forthcoming `buddy status` command consumes the Electron-owned, token-authenticated
+`GET /status` snapshot. That route exposes only whether the app is running and visible, the
+resolved active pet's id/name/source, and the current window width/height; hook coverage is
+resolved separately by the CLI. `GET /health` remains unauthenticated and is deliberately
+limited to `{ "status": "ok" }`.
+
 ---
 
 ## Command Structure and Help Surfaces

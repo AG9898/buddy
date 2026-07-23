@@ -1445,7 +1445,7 @@
       "id": "FEAT-33",
       "title": "Expose a bounded authenticated sidecar status snapshot",
       "description": "Add the Electron-owned backend for operational CLI status: a token-authenticated sidecar response containing only app visibility/running state, resolved active pet identity, and current window dimensions. Keep GET /health minimal and unauthenticated, avoid hook or assistant configuration reads in the route, and reuse canonical state and pet-resolution helpers.",
-      "status": "todo",
+      "status": "done",
       "priority": "high",
       "group_id": "FEAT",
       "depends_on": [
