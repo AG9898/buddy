@@ -21,7 +21,7 @@ npm pack --dry-run
 
 # Smoke-test the packed package as an installed dependency
 npm pack
-npm install --omit=dev --prefix <temp-dir> ./ag9898-buddy-1.0.1.tgz
+npm install --omit=dev --prefix <temp-dir> ./ag9898-buddy-<version>.tgz
 
 # Run a single test file
 npm test -- src/renderer/PetSprite.test.ts

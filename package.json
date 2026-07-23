@@ -1,6 +1,6 @@
 {
   "name": "@ag9898/buddy",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Windows floating desktop pet for Codex CLI and Claude Code",
   "main": "out/main/main.js",
   "bin": {

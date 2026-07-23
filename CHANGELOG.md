@@ -2,6 +2,12 @@
 
 All notable changes to buddy are documented in this file.
 
+## 1.0.2 — 2026-07-23
+
+- Adds authenticated live status snapshots plus graceful shutdown for `buddy status` and `buddy stop`.
+- Hot-reloads validated active-pet asset selections in the running renderer.
+- Reports the outcome of detached `buddy start` launches in the CLI.
+
 ## 1.0.1 — 2026-07-17
 
 First public npm release of `@ag9898/buddy`.
