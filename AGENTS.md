@@ -348,3 +348,6 @@ Registering the global output flags on all commands makes Commander render subco
 
 ### 2026-07-23 - Stop fallback must be a verified PID, never an image name
 `buddy stop` first uses the one-time authenticated `/shutdown` route so Electron persists state before quit. Only an unreachable sidecar may use the runtime process record, and it must validate the recorded PID's executable and app command line through Windows process metadata before issuing `taskkill /PID`; authorization failures and stale records are never kill candidates.
+
+### 2026-07-23 - npm publishing token stays local and ephemeral
+For an explicitly user-authorized npm release, read `NPM_TOKEN` from the repository-root `.env` only to configure that one `npm publish` command. `.env` is gitignored; never print, log, persist, commit, or send the token value, and keep it narrowly scoped to `@ag9898/buddy` with a short expiry or revoke it when unused.
