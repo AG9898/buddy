@@ -283,12 +283,14 @@ owned by the Electron main process, not by writing to Codex configuration files.
 process resolves the selected id, validates the matching `pet.json` and spritesheet, and
 falls back to the packaged `default` pet if the stored selection no longer resolves.
 
-The planned live-selection flow sends a token-authenticated request to Electron main after
-persisting a valid selection. When the app is running, the renderer reloads the manifest and
-spritesheet immediately without stealing focus. When the app is stopped or live reload
-fails, the success message must state that the selection is saved for the next start rather
-than implying that it is already visible. `buddy pets current` becomes the canonical name
-for the current selection and `buddy pets show` remains an alias.
+Electron now exposes a token-authenticated `POST /pets/use` control for a later CLI
+integration. It revalidates the requested id inside the Electron process, persists it
+through the canonical state store, and returns only the selected manifest, source label,
+and renderer-safe spritesheet URL. It rejects missing, invalid, and path-escaping ids;
+the id is never used as a filesystem path. Renderer hot reload and the `buddy pets use`
+request wiring remain follow-up work, so current command success continues to describe a
+selection that will apply on the next start. `buddy pets current` becomes the canonical
+name for the current selection and `buddy pets show` remains an alias.
 
 `buddy state <name>` validates state names before sending them. Invalid names return valid
 choices and a close-match suggestion when available. State validation must use the active

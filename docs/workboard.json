@@ -1132,7 +1132,7 @@
       "id": "FEAT-24",
       "title": "Add validated Electron live pet selection control",
       "description": "Implement the Electron-owned selection service and token-authenticated sidecar request for live pet changes. Validate and persist the requested id through the canonical state path, resolve its manifest and spritesheet safely, and return the bounded active-pet payload needed by the renderer follow-up. Renderer hot-reload and CLI command changes are explicitly excluded.",
-      "status": "todo",
+      "status": "done",
       "priority": "high",
       "group_id": "FEAT",
       "depends_on": [

@@ -4,9 +4,10 @@
 import http from 'http'
 import fs from 'fs'
 import crypto from 'crypto'
-import { BrowserWindow } from 'electron'
+import type { BrowserWindow } from 'electron'
 import { CH_STATE_CHANGE, CH_CLI_RESIZE } from '../shared/ipc-channels'
 import { buddyRuntimeDir, buddyTokenPath } from '../shared/buddy-paths'
+import { PetSelectionError, selectActivePet, type ActivePetAsset } from './pet-assets'
 
 // ── Token helpers ─────────────────────────────────────────────────────────────
 
@@ -73,7 +74,16 @@ function readBody(req: http.IncomingMessage): Promise<string> {
 
 // ── Request handler ───────────────────────────────────────────────────────────
 
-function makeHandler(win: BrowserWindow, token: string) {
+export interface SidecarOptions {
+  /** Electron-owned service for validating, persisting, and resolving a pet selection. */
+  selectPet?: (id: string) => ActivePetAsset
+}
+
+function makeHandler(
+  win: BrowserWindow,
+  token: string,
+  selectPet: (id: string) => ActivePetAsset,
+) {
   return async function handler(
     req: http.IncomingMessage,
     res: http.ServerResponse,
@@ -224,6 +234,65 @@ function makeHandler(win: BrowserWindow, token: string) {
       return
     }
 
+    // POST /pets/use — token-authenticated live pet selection. The renderer
+    // reload event is deliberately owned by the follow-up renderer task.
+    if (url === '/pets/use') {
+      if (method !== 'POST') {
+        jsonReply(res, 405, { error: 'method not allowed' })
+        return
+      }
+
+      const ct = req.headers['content-type'] ?? ''
+      if (!ct.includes('application/json')) {
+        jsonReply(res, 400, { error: 'Content-Type must be application/json' })
+        return
+      }
+
+      const incomingToken = req.headers['x-petdex-update-token'] ?? ''
+      if (incomingToken !== token) {
+        jsonReply(res, 401, { error: 'unauthorized' })
+        return
+      }
+
+      let rawBody: string
+      try {
+        rawBody = await readBody(req)
+      } catch {
+        jsonReply(res, 400, { error: 'request body too large or unreadable' })
+        return
+      }
+
+      let parsed: unknown
+      try {
+        parsed = JSON.parse(rawBody)
+      } catch {
+        jsonReply(res, 400, { error: 'invalid JSON' })
+        return
+      }
+
+      if (
+        typeof parsed !== 'object' ||
+        parsed === null ||
+        typeof (parsed as Record<string, unknown>)['id'] !== 'string' ||
+        (parsed as Record<string, string>)['id'] === ''
+      ) {
+        jsonReply(res, 400, { error: 'missing or invalid pet id' })
+        return
+      }
+
+      try {
+        const pet = selectPet((parsed as Record<string, string>)['id'])
+        jsonReply(res, 200, { ok: true, pet })
+      } catch (error) {
+        if (error instanceof PetSelectionError) {
+          jsonReply(res, 400, { error: error.message })
+          return
+        }
+        throw error
+      }
+      return
+    }
+
     // Everything else → 404
     jsonReply(res, 404, { error: 'not found' })
   }
@@ -235,12 +304,12 @@ function makeHandler(win: BrowserWindow, token: string) {
  * Start the local HTTP sidecar bound to 127.0.0.1 on BUDDY_PORT (default 7777).
  * Loads or creates the shared update token and begins serving requests.
  */
-export function startSidecar(win: BrowserWindow): http.Server {
+export function startSidecar(win: BrowserWindow, options: SidecarOptions = {}): http.Server {
   const token = loadOrCreateToken()
   const port = Number(process.env['BUDDY_PORT'] ?? 7777)
   const host = '127.0.0.1'
 
-  const handler = makeHandler(win, token)
+  const handler = makeHandler(win, token, options.selectPet ?? selectActivePet)
 
   const server = http.createServer((req, res) => {
     handler(req, res).catch(() => {

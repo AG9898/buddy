@@ -2,7 +2,7 @@ import fs from 'fs'
 import os from 'os'
 import path from 'path'
 import { pathToFileURL } from 'url'
-import type { PetRecord } from './state-store'
+import { loadState, saveState, type PetRecord } from './state-store'
 import { buddyManagedPetsDir } from '../shared/buddy-paths'
 
 export interface PetFrame {
@@ -44,6 +44,14 @@ export interface ActivePetAsset {
   manifest: PetJson
   spritesheetUrl: string
   initialState: string
+}
+
+/** Raised when a live pet-selection request cannot be safely fulfilled. */
+export class PetSelectionError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'PetSelectionError'
+  }
 }
 
 function buddyPetsDir(): string {
@@ -156,6 +164,54 @@ function toActivePetAsset(candidate: PetCandidate, initialState: string): Active
     spritesheetUrl: pathToFileURL(candidate.spritesheetPath).href,
     initialState: candidate.petJson.states[initialState] ? initialState : 'idle',
   }
+}
+
+function isSafeRequestedPetId(id: string): boolean {
+  return (
+    id.trim() === id &&
+    id.length > 0 &&
+    id.length <= 128 &&
+    !id.includes('\0') &&
+    !id.includes('/') &&
+    !id.includes('\\') &&
+    !path.isAbsolute(id) &&
+    !path.win32.isAbsolute(id) &&
+    id !== '.' &&
+    id !== '..'
+  )
+}
+
+/**
+ * Validate, persist, and resolve a live pet selection from Electron main.
+ *
+ * The requested id is never used as a filesystem path. It must exactly match
+ * an already validated asset candidate, and only the resulting renderer-safe
+ * active-pet payload is returned to the sidecar caller.
+ */
+export function selectActivePet(requestedId: string): ActivePetAsset {
+  if (!isSafeRequestedPetId(requestedId)) {
+    throw new PetSelectionError('Pet id must be a non-empty safe identifier.')
+  }
+
+  const candidate = scanPets().find((pet) => pet.id === requestedId)
+  if (!candidate) {
+    throw new PetSelectionError('Requested pet is missing or failed asset validation.')
+  }
+
+  const state = loadState()
+  const requestedState = typeof state.pet.state === 'string' ? state.pet.state : 'idle'
+  const activePet = toActivePetAsset(candidate, requestedState)
+
+  saveState({
+    ...state,
+    pet: {
+      ...state.pet,
+      id: candidate.id,
+      state: activePet.initialState,
+    },
+  })
+
+  return activePet
 }
 
 export function resolveActivePet(pet: PetRecord): ActivePetAsset {

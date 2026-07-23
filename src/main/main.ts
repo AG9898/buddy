@@ -10,7 +10,7 @@ import { createAvatarWindow } from './avatar-window'
 import { createTray } from './tray'
 import { startSidecar, stopSidecar } from './sidecar'
 import { loadState, saveState, saveBounds } from './state-store'
-import { resolveActivePet } from './pet-assets'
+import { resolveActivePet, selectActivePet } from './pet-assets'
 import { CH_ACTIVE_PET_GET, CH_CLI_RESIZE, CH_DRAG_END, CH_RENDERER_READY, CH_RESIZE_END } from '../shared/ipc-channels'
 
 // Track whether app.quit() was triggered via the tray Quit item so the
@@ -60,7 +60,7 @@ app.whenReady().then(() => {
   createTray(win)
 
   // 4. Start the local HTTP sidecar (validates token, forwards events to renderer).
-  sidecarServer = startSidecar(win)
+  sidecarServer = startSidecar(win, { selectPet: selectActivePet })
 
   // 5. Wait for the renderer to signal it is mounted before showing the window.
   //    This prevents a brief blank transparent window from appearing.

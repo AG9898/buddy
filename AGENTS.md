@@ -116,7 +116,7 @@ Docs navigation: [`docs/INDEX.md`](docs/INDEX.md)
 ## Architecture
 
 - Electron main process manages a transparent, frameless, always-on-top, non-focusable `BrowserWindow`. State persists to `%USERPROFILE%\.petdex-win\state.json`.
-- Local HTTP sidecar (`sidecar.ts`) listens on `127.0.0.1:BUDDY_PORT`. Hook events arrive here from both Windows CLI and WSL petdex-bridge.
+- Local HTTP sidecar (`sidecar.ts`) listens on `127.0.0.1:BUDDY_PORT`. Hook events arrive here from both Windows CLI and WSL petdex-bridge; its token-authenticated live pet-selection control is ready for the later CLI client wiring.
 - Svelte renderer (`src/renderer/`) drives sprite animation via CSS `background-position` on an 8×9 spritesheet. State machine defined in `pet.json`.
 - `petdex-bridge` (Rust, `petdex-bridge/`) is a Linux binary that runs in WSL. Shell hooks call it; it POSTs events to the Windows HTTP sidecar via localhost passthrough.
 - All renderer↔main communication goes through the `petApi` contextBridge defined in `preload.ts`. IPC channel names are constants — never hardcoded strings.

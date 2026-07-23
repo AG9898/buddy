@@ -137,10 +137,10 @@ checks cover missing token and stopped-sidecar error output.
 **Electron E2E:** Window appears at startup, pet state changes via HTTP POST animate
 correctly, state persists across restart, tray Show/Hide/Quit work.
 
-**Main-process unit tests:** State persistence, active-pet asset resolution, and hook
-installation/status. Hook tests cover Claude Code `settings.json`, Codex CLI
-`hooks.json`, Windows `buddy state` commands, WSL `petdex-bridge state` commands,
-idempotency, and missing-hook status.
+**Main-process unit tests:** State persistence, active-pet asset resolution and live-selection
+persistence, token-authenticated sidecar validation, and hook installation/status. Hook tests
+cover Claude Code `settings.json`, Codex CLI `hooks.json`, Windows `buddy state` commands,
+WSL `petdex-bridge state` commands, idempotency, and missing-hook status.
 
 **CLI tests:** Command help and changed command behavior, non-TTY/plain output, styled
 output when supported, expected error messages and exit codes, hatch progress output that
@@ -165,7 +165,8 @@ integration (requires Electron E2E).
 | File | Domain | What It Covers |
 |---|---|---|
 | `src/main/state-store.test.ts` | State persistence | loadState defaults, saveState directory creation, round-trip fidelity, saveBounds byResolution key |
-| `src/main/pet-assets.test.ts` | Active pet assets | Selected pet resolution, packaged default fallback diagnostics, persisted startup state, pet manifest validation |
+| `src/main/pet-assets.test.ts` | Active pet assets | Selected pet resolution, packaged default fallback diagnostics, persisted startup state, manifest validation, and safe live-selection persistence |
+| `src/main/sidecar.test.ts` | Sidecar live selection | Authenticated `POST /pets/use` success payload, state persistence, and rejection of missing, invalid, and path-escaping requests |
 | `src/cli/env.test.ts` | CLI environment | isWSL() detection, buddyPort() defaults and overrides, sidecarBaseUrl() |
 | `src/shared/buddy-paths.test.ts` | Shared paths | buddy data root defaults, `BUDDY_DATA_DIR` override, and derived state/token/pet paths |
 | `src/main/hooks-install.test.ts` | Hook installation | installHooks idempotency, getHooksStatus, Claude Code settings, Codex hooks.json, Windows and WSL command targets |

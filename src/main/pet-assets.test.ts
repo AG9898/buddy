@@ -2,8 +2,8 @@ import fs from 'fs'
 import os from 'os'
 import path from 'path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { resolveActivePet, isValidPetJson } from './pet-assets'
-import type { PetRecord } from './state-store'
+import { isValidPetJson, PetSelectionError, resolveActivePet, selectActivePet } from './pet-assets'
+import { loadState, type PetRecord } from './state-store'
 
 const tempDirs: string[] = []
 
@@ -138,5 +138,51 @@ describe('resolveActivePet', () => {
     const activePet = resolveActivePet(makePetRecord('escape-cat'))
 
     expect(activePet.id).toBe('default')
+  })
+})
+
+describe('selectActivePet', () => {
+  it('validates, persists, and returns only the renderer-safe active-pet payload', () => {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'buddy-pets-'))
+    tempDirs.push(tempDir)
+    const managedPetsDir = path.join(tempDir, 'managed')
+    writePet(managedPetsDir, 'custom-cat')
+    vi.stubEnv('BUDDY_SPRITES_DIR', managedPetsDir)
+    vi.stubEnv('BUDDY_DATA_DIR', path.join(tempDir, 'data'))
+    vi.stubEnv('USERPROFILE', tempDir)
+
+    const activePet = selectActivePet('custom-cat')
+
+    expect(activePet).toMatchObject({
+      id: 'custom-cat',
+      source: 'buddy',
+      manifest: { id: 'custom-cat' },
+      initialState: 'idle',
+    })
+    expect(activePet.spritesheetUrl).toMatch(/^file:\/\//)
+    expect(Object.keys(activePet).sort()).toEqual([
+      'id',
+      'initialState',
+      'manifest',
+      'source',
+      'spritesheetUrl',
+    ])
+    expect(loadState().pet.id).toBe('custom-cat')
+  })
+
+  it('rejects unknown and path-escaping requested ids without changing the persisted selection', () => {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'buddy-pets-'))
+    tempDirs.push(tempDir)
+    const managedPetsDir = path.join(tempDir, 'managed')
+    writePet(managedPetsDir, 'custom-cat')
+    vi.stubEnv('BUDDY_SPRITES_DIR', managedPetsDir)
+    vi.stubEnv('BUDDY_DATA_DIR', path.join(tempDir, 'data'))
+    vi.stubEnv('USERPROFILE', tempDir)
+
+    selectActivePet('custom-cat')
+
+    expect(() => selectActivePet('missing-pet')).toThrow(PetSelectionError)
+    expect(() => selectActivePet('../custom-cat')).toThrow(PetSelectionError)
+    expect(loadState().pet.id).toBe('custom-cat')
   })
 })
