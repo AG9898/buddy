@@ -1166,7 +1166,7 @@
       "id": "FEAT-25",
       "title": "Apply CLI pet selection live when buddy is running",
       "description": "After local pet validation, have buddy pets use request the Electron live-selection control and render an accurate typed result. A running app should confirm immediate application; a stopped or unreachable app should retain the saved selection and clearly state that it will apply on next start. Do not duplicate Electron asset validation in the CLI.",
-      "status": "todo",
+      "status": "done",
       "priority": "high",
       "group_id": "FEAT",
       "depends_on": [

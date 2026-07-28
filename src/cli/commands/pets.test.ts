@@ -8,6 +8,9 @@
  *   - runPetsCurrent() reports the active pet id, name, source, and folder
  *   - runPetsCurrent() reports "no active pet" and unresolved stored ids without failing
  *   - runPetsUse() validates, persists, and states that the pet applies on the next start
+ *   - runPetsUse() reports immediate application when the live sidecar request succeeds
+ *   - runPetsUse() keeps the saved selection when the app is stopped or unreachable
+ *   - runPetsUse() fails without claiming an active pet when the sidecar rejects the id
  *   - runPetsUse() throws typed CliErrors (code + exit 1) for empty, unknown, and invalid ids
  *   - runPetsUse() never writes to Codex state files
  *   - All three honor --json, --quiet, and --verbose through the shared renderer
@@ -23,6 +26,7 @@ import {
   resetOutputContext,
   type OutputContextOptions,
 } from '../output.js'
+import { CliError } from '../result.js'
 
 /* ── Hoisted mocks ─────────────────────────────────────────────────────────── */
 
@@ -49,6 +53,11 @@ vi.mock('fs', () => ({
   readdirSync: mockReaddirSync,
   existsSync: mockExistsSync,
 }))
+
+// The live-selection request is the only network surface of `pets use`.
+const { mockPostToSidecar } = vi.hoisted(() => ({ mockPostToSidecar: vi.fn() }))
+
+vi.mock('../sidecar-client.js', () => ({ postToSidecar: mockPostToSidecar }))
 
 /* ── Helpers ────────────────────────────────────────────────────────────────── */
 
@@ -151,6 +160,32 @@ function withBuddyPetFolders(...names: string[]): void {
   })
 }
 
+/** The running app accepts the live selection. */
+function withRunningApp(): void {
+  mockPostToSidecar.mockResolvedValue({ statusCode: 200, data: { ok: true } })
+}
+
+/** The app is stopped or otherwise unreachable; the selection is still saved. */
+function withStoppedApp(
+  code = 'sidecar.unreachable',
+  message = 'Could not connect to the buddy sidecar.',
+): void {
+  mockPostToSidecar.mockRejectedValue(
+    new CliError(message, { code, hint: 'Ensure the buddy app is running: buddy start' }),
+  )
+}
+
+/** The app answered and refused the id (Electron-side validation rejection). */
+function withRejectingApp(): void {
+  mockPostToSidecar.mockRejectedValue(
+    new CliError('Sidecar returned HTTP 400.', {
+      code: 'sidecar.http_error',
+      hint: 'pet not found',
+      data: { statusCode: 400 },
+    }),
+  )
+}
+
 /* ── Shared setup ───────────────────────────────────────────────────────────── */
 
 beforeEach(() => {
@@ -160,6 +195,7 @@ beforeEach(() => {
   vi.stubEnv('USERPROFILE', '/fake/userprofile')
 
   vi.resetAllMocks()
+  withStoppedApp() // Default: no app running unless a test says otherwise.
 })
 
 afterEach(() => {
@@ -410,7 +446,7 @@ describe('runPetsUse()', () => {
 
     const { runPetsUse } = await import('./pets.js')
     const captured = captureOutput()
-    const result = runPetsUse('test-cat')
+    const result = await runPetsUse('test-cat')
     renderResult(result)
 
     expect(mockWriteFileSync).toHaveBeenCalled()
@@ -425,22 +461,145 @@ describe('runPetsUse()', () => {
     expect(captured.stdout.join('')).toContain("Active pet set to 'test-cat'")
   })
 
-  it('states that the saved pet applies on the next start', async () => {
+  it('states that the saved pet applies on the next start when the app is stopped', async () => {
     withBuddyPetFolders('test-cat')
     withPersistedState(null, VALID_PET_JSON)
     mockExistsSync.mockReturnValue(true)
 
     const { runPetsUse } = await import('./pets.js')
     const captured = captureOutput()
-    const result = runPetsUse('test-cat')
+    const result = await runPetsUse('test-cat')
     renderResult(result)
 
     expect(result.data.applied).toBe('next-start')
+    expect(result.data.reason).toBe('sidecar.unreachable')
 
     const out = captured.stdout.join('')
     expect(out).toContain('next buddy start')
-    // Never claims the running pet changed until live selection ships.
-    expect(out).not.toContain('applied live')
+    // Never claims the running pet changed while the app is unreachable.
+    expect(out).not.toContain('running app')
+  })
+
+  it('reports immediate application when the running app accepts the selection', async () => {
+    withBuddyPetFolders('test-cat')
+    withPersistedState(null, VALID_PET_JSON)
+    mockExistsSync.mockReturnValue(true)
+    withRunningApp()
+
+    const { runPetsUse } = await import('./pets.js')
+    const captured = captureOutput()
+    const result = await runPetsUse('test-cat')
+    renderResult(result)
+
+    expect(mockPostToSidecar).toHaveBeenCalledWith('/pets/use', { id: 'test-cat' })
+    expect(result.data.applied).toBe('live')
+    expect(result.data.reason).toBeNull()
+
+    const out = captured.stdout.join('')
+    expect(out).toContain('applied to the running app')
+    expect(out).toContain('immediately')
+    expect(out).not.toContain('next buddy start')
+  })
+
+  it('still saves the selection when a missing token defers application', async () => {
+    withBuddyPetFolders('test-cat')
+    withPersistedState(null, VALID_PET_JSON)
+    mockExistsSync.mockReturnValue(true)
+    withStoppedApp('sidecar.token_missing', 'Update token not found.')
+
+    const { runPetsUse } = await import('./pets.js')
+    captureOutput()
+    const result = await runPetsUse('test-cat')
+
+    expect(result.data.applied).toBe('next-start')
+    expect(result.data.reason).toBe('sidecar.token_missing')
+
+    const callArgs = mockWriteFileSync.mock.calls[0] as [string, string, string]
+    const written = JSON.parse(callArgs[1]) as { pet: { id: string } }
+    expect(written.pet.id).toBe('test-cat')
+  })
+
+  it('fails without saving or claiming activation when the app rejects the id', async () => {
+    withBuddyPetFolders('test-cat')
+    withPersistedState(null, VALID_PET_JSON)
+    mockExistsSync.mockReturnValue(true)
+    withRejectingApp()
+
+    const { runPetsUse } = await import('./pets.js')
+    const captured = captureOutput()
+    let exitCode = 0
+    try {
+      await runPetsUse('test-cat')
+    } catch (err) {
+      exitCode = renderFailure(err, 'pets.use')
+    }
+
+    expect(exitCode).toBe(1)
+    expect(mockWriteFileSync).not.toHaveBeenCalled()
+
+    const err = captured.stderr.join('')
+    expect(err).toContain('rejected')
+    expect(err).toContain('test-cat')
+    expect(err).toContain('was not changed')
+    expect(captured.stdout.join('')).not.toContain('Active pet set')
+  })
+
+  it('emits the live and deferred outcomes through the pets.use JSON payload', async () => {
+    withBuddyPetFolders('test-cat')
+    withPersistedState(null, VALID_PET_JSON)
+    mockExistsSync.mockReturnValue(true)
+    withRunningApp()
+
+    const { runPetsUse } = await import('./pets.js')
+    const live = captureOutput({ json: true })
+    renderResult(await runPetsUse('test-cat'))
+
+    const livePayload = parsePayload(live) as {
+      command: string
+      data: { applied: string; reason: string | null; pet: { id: string } }
+    }
+    expect(livePayload.command).toBe('pets.use')
+    expect(livePayload.data).toMatchObject({ applied: 'live', reason: null })
+    expect(livePayload.data.pet.id).toBe('test-cat')
+
+    withStoppedApp()
+    const deferred = captureOutput({ json: true })
+    renderResult(await runPetsUse('test-cat'))
+
+    const deferredPayload = parsePayload(deferred) as {
+      data: { applied: string; reason: string | null }
+    }
+    expect(deferredPayload.data).toMatchObject({
+      applied: 'next-start',
+      reason: 'sidecar.unreachable',
+    })
+  })
+
+  it('emits a rejection as the single JSON stdout payload', async () => {
+    withBuddyPetFolders('test-cat')
+    withPersistedState(null, VALID_PET_JSON)
+    mockExistsSync.mockReturnValue(true)
+    withRejectingApp()
+
+    const { runPetsUse } = await import('./pets.js')
+    const captured = captureOutput({ json: true })
+    try {
+      await runPetsUse('test-cat')
+    } catch (err) {
+      renderFailure(err, 'pets.use')
+    }
+
+    const payload = parsePayload(captured) as {
+      ok: boolean
+      error: { code: string; data: { id: string; reason: string; statusCode: number } }
+    }
+    expect(payload.ok).toBe(false)
+    expect(payload.error.code).toBe('pets.live_rejected')
+    expect(payload.error.data).toMatchObject({
+      id: 'test-cat',
+      reason: 'sidecar.http_error',
+      statusCode: 400,
+    })
   })
 
   it('preserves existing state fields when persisting pet selection', async () => {
@@ -457,7 +616,7 @@ describe('runPetsUse()', () => {
 
     const { runPetsUse } = await import('./pets.js')
     captureOutput()
-    runPetsUse('test-cat')
+    await runPetsUse('test-cat')
 
     const callArgs = mockWriteFileSync.mock.calls[0] as [string, string, string]
     const written = JSON.parse(callArgs[1]) as {
@@ -485,7 +644,7 @@ describe('runPetsUse()', () => {
     const captured = captureOutput()
     let exitCode = 0
     try {
-      runPetsUse('ghost-pet')
+      await runPetsUse('ghost-pet')
     } catch (err) {
       exitCode = renderFailure(err, 'pets.use')
     }
@@ -508,7 +667,7 @@ describe('runPetsUse()', () => {
     const captured = captureOutput()
     let exitCode = 0
     try {
-      runPetsUse('bad-cat')
+      await runPetsUse('bad-cat')
     } catch (err) {
       exitCode = renderFailure(err, 'pets.use')
     }
@@ -525,7 +684,7 @@ describe('runPetsUse()', () => {
     const captured = captureOutput()
     let exitCode = 0
     try {
-      runPetsUse('')
+      await runPetsUse('')
     } catch (err) {
       exitCode = renderFailure(err, 'pets.use')
     }
@@ -544,7 +703,7 @@ describe('runPetsUse()', () => {
     const { runPetsUse } = await import('./pets.js')
     const captured = captureOutput({ json: true })
     try {
-      runPetsUse('ghost-pet')
+      await runPetsUse('ghost-pet')
     } catch (err) {
       renderFailure(err, 'pets.use')
     }
@@ -567,7 +726,7 @@ describe('runPetsUse()', () => {
 
     const { runPetsUse } = await import('./pets.js')
     captureOutput()
-    runPetsUse('test-cat')
+    await runPetsUse('test-cat')
 
     // Verify no writes went to a .codex path.
     for (const callArgs of mockWriteFileSync.mock.calls) {
@@ -583,7 +742,7 @@ describe('runPetsUse()', () => {
 
     const { runPetsUse } = await import('./pets.js')
     captureOutput()
-    runPetsUse('test-cat')
+    await runPetsUse('test-cat')
 
     const callArgs = mockWriteFileSync.mock.calls[0] as [string, string, string]
     expect(callArgs[0]).toContain('.petdex-win')
@@ -599,7 +758,7 @@ describe('runPetsUse()', () => {
 
     const { runPetsUse } = await import('./pets.js')
     captureOutput()
-    runPetsUse('test-cat')
+    await runPetsUse('test-cat')
 
     const callArgs = mockWriteFileSync.mock.calls[0] as [string, string, string]
     expect(callArgs[0]).toBe(path.join(dataDir, 'state.json'))
@@ -613,13 +772,55 @@ describe('runPetsUse()', () => {
     const { runPetsUse } = await import('./pets.js')
 
     const quiet = captureOutput({ mode: 'quiet' })
-    renderResult(runPetsUse('test-cat'))
+    renderResult(await runPetsUse('test-cat'))
     const quietOut = quiet.stdout.join('')
     expect(quietOut).toContain("Active pet set to 'test-cat'")
-    expect(quietOut).not.toContain('buddy stop, then buddy start')
+    expect(quietOut).toContain('next buddy start')
+    expect(quietOut).not.toContain('Start buddy to see it')
 
     const verbose = captureOutput({ mode: 'verbose' })
-    renderResult(runPetsUse('test-cat'))
-    expect(verbose.stdout.join('')).toContain('Selection stored in')
+    renderResult(await runPetsUse('test-cat'))
+    const verboseOut = verbose.stdout.join('')
+    expect(verboseOut).toContain('Selection stored in')
+    expect(verboseOut).toContain('Live selection skipped — sidecar.unreachable')
+  })
+
+  it('keeps the live outcome quiet-safe and verbose-aware', async () => {
+    withBuddyPetFolders('test-cat')
+    withPersistedState(null, VALID_PET_JSON)
+    mockExistsSync.mockReturnValue(true)
+    withRunningApp()
+
+    const { runPetsUse } = await import('./pets.js')
+
+    const quiet = captureOutput({ mode: 'quiet' })
+    renderResult(await runPetsUse('test-cat'))
+    const quietOut = quiet.stdout.join('')
+    expect(quietOut).toContain('applied to the running app')
+    expect(quietOut).not.toContain('buddy pets current')
+
+    const verbose = captureOutput({ mode: 'verbose' })
+    renderResult(await runPetsUse('test-cat'))
+    expect(verbose.stdout.join('')).toContain('POST /pets/use → HTTP 200')
+  })
+
+  it('renders a rejection consistently in quiet and verbose modes', async () => {
+    withBuddyPetFolders('test-cat')
+    withPersistedState(null, VALID_PET_JSON)
+    mockExistsSync.mockReturnValue(true)
+    withRejectingApp()
+
+    const { runPetsUse } = await import('./pets.js')
+
+    for (const mode of ['quiet', 'verbose'] as const) {
+      const captured = captureOutput({ mode })
+      try {
+        await runPetsUse('test-cat')
+      } catch (err) {
+        expect(renderFailure(err, 'pets.use')).toBe(1)
+      }
+      expect(captured.stderr.join('')).toContain('rejected')
+      expect(captured.stdout.join('')).not.toContain('Active pet set')
+    }
   })
 })

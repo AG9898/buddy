@@ -25,7 +25,7 @@ The npm package is named `@ag9898/buddy`, but the installed command remains `bud
 | `buddy hatch <prompt> [--id <id> | --output <dir> | --package-preset <id>] [--verbose]` | Generate a personal pet by default; bundled presets require explicit maintainer opt-in. |
 | `buddy pets list` | List valid buddy-managed, packaged, and Codex-compatible pets. |
 | `buddy pets current` | Print the currently selected pet and its source path. `buddy pets show` is a compatibility alias. |
-| `buddy pets use <id>` | Validate and persist the active pet selection. |
+| `buddy pets use <id>` | Validate the pet, apply it to a running app, and persist the active selection. |
 | `buddy size <scale-or-width>` | Resize the pet window from the terminal. Accepts a scale factor (e.g., `1.5`, `2x`) or explicit WxH dimensions (e.g., `400x300`). |
 
 ---
@@ -413,15 +413,25 @@ owned by the Electron main process, not by writing to Codex configuration files.
 process resolves the selected id, validates the matching `pet.json` and spritesheet, and
 falls back to the packaged `default` pet if the stored selection no longer resolves.
 
-Electron now exposes a token-authenticated `POST /pets/use` control for a later CLI
-integration. It revalidates the requested id inside the Electron process, persists it
-through the canonical state store, sends the bounded active-pet payload to the running
-renderer, and returns only the selected manifest, source label, and renderer-safe
-spritesheet URL. It rejects missing, invalid, and path-escaping ids; the id is never used
-as a filesystem path. The renderer swaps the pet in place without recreating, moving,
-showing, or focusing the window. The `buddy pets use` request wiring remains follow-up
-work, so command success continues to describe a selection that applies on the next start
-(`Applies: on the next buddy start`, and `"applied": "next-start"` in JSON).
+Electron exposes a token-authenticated `POST /pets/use` control. It revalidates the
+requested id inside the Electron process, persists it through the canonical state store,
+sends the bounded active-pet payload to the running renderer, and returns only the selected
+manifest, source label, and renderer-safe spritesheet URL. It rejects missing, invalid, and
+path-escaping ids; the id is never used as a filesystem path. The renderer swaps the pet in
+place without recreating, moving, showing, or focusing the window.
+
+`buddy pets use <id>` uses that control. After local discovery validation it sends the
+live-selection request through the shared sidecar client, and only then writes the buddy-owned
+selection, so one of three outcomes is reported:
+
+| Outcome | When | Result |
+|---|---|---|
+| live | The running app accepts the request | `Applies: immediately — buddy is running`, `"applied": "live"`, `"reason": null` |
+| deferred | Missing token, unreachable sidecar, timeout, or connection error | Selection is still saved; `Applies: on the next buddy start`, `"applied": "next-start"`, `"reason"` is the sidecar error code — exit code stays `0` |
+| rejected | The app answers and refuses the id | `pets.live_rejected` failure carrying the sidecar reason; nothing is saved and the output never claims the pet is active |
+
+The CLI does not re-implement Electron's asset validation: a rejection is surfaced with the
+app's own reason instead of being re-derived or ignored.
 
 `buddy pets current` is the canonical name for the current selection; `buddy pets show`
 is a Commander alias of the same command, so both spellings run identical logic, produce
@@ -437,7 +447,7 @@ entry boundary writes to a stream or sets an exit code. Their command ids are `p
 |---|---|
 | `pets.list` | `{ pets: [{ id, name, source, folder, spritesheet, active }], invalid: [{ folder, source, reason }], active }` |
 | `pets.current` | `{ active, resolved, pet }` — `pet` is `null` when nothing is selected or the stored id no longer resolves |
-| `pets.use` | `{ pet, applied: "next-start" }` |
+| `pets.use` | `{ pet, applied: "live" \| "next-start", reason }` — `reason` is `null` for a live application and the sidecar error code when application is deferred |
 
 `source` uses the same `buddy` / `packaged` / `codex` vocabulary as `buddy status`; human
 output renders it as `buddy-managed`, `packaged`, and `codex-compatible`. Normal `pets list`
@@ -446,7 +456,8 @@ folders; the per-folder reasons stay in `--verbose` and JSON so normal output st
 signal. A missing selection and an unresolvable stored id are degraded reads, not failures:
 both exit `0`, and the unresolvable case adds a warning check row explaining the packaged
 default fallback. `pets use` failures are typed errors with the codes `pets.id_required`,
-`pets.not_found`, `pets.invalid`, and `pets.save_failed`, each exiting non-zero.
+`pets.not_found`, `pets.invalid`, `pets.live_rejected`, and `pets.save_failed`, each exiting
+non-zero.
 
 `buddy state <name>` validates state names before sending them. Invalid names return valid
 choices and a close-match suggestion when available. State validation must use the active

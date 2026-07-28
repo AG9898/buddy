@@ -337,9 +337,9 @@ export function createProgram(): CommandType {
   pets
     .command('use <id>')
     .description('Validate and persist a pet selection')
-    .action((id: string) => {
+    .action(async (id: string) => {
       recordCommand('pets.use')
-      recordResult(runPetsUse(id))
+      recordResult(await runPetsUse(id))
     })
 
   // ── buddy hatch ─────────────────────────────────────────────────────────────

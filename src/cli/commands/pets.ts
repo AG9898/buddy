@@ -4,7 +4,7 @@
  * Subcommands:
  *   pets list           List valid buddy-managed, packaged, and Codex-compatible pets.
  *   pets current|show   Print the currently selected pet and its source path.
- *   pets use <id>       Validate and persist a pet selection.
+ *   pets use <id>       Validate, apply to a running app, and persist a selection.
  *
  * Every command returns a typed `CommandResult` and never writes to a stream or
  * calls `process.exit`; the CLI entry boundary renders the result through the
@@ -21,7 +21,14 @@ import os from 'os'
 import path from 'path'
 import { discoverPets, type InvalidPetEntry, type PetEntry, type PetSource } from '../pets.js'
 import { buddyStatePath } from '../../shared/buddy-paths.js'
-import { CliError, commandResult, type CommandResult, type ResultCheck } from '../result.js'
+import {
+  CliError,
+  commandResult,
+  isCliError,
+  type CommandResult,
+  type ResultCheck,
+} from '../result.js'
+import { postToSidecar } from '../sidecar-client.js'
 
 // ── State file helpers ─────────────────────────────────────────────────────────
 // Minimal read/write of the buddy state JSON.
@@ -132,12 +139,21 @@ export interface PetsCurrentData {
 }
 
 /**
- * `applied` is `next-start` until the live-selection CLI wiring ships, so the
- * payload never claims a running pet changed.
+ * How the saved selection reached the app.
+ *
+ * `live`       the running app accepted the authenticated live-selection request
+ * `next-start` the app is stopped or unreachable, so the saved pet applies later
  */
+export type PetsUseApplied = 'live' | 'next-start'
+
 export interface PetsUseData {
   readonly pet: PetSummary
-  readonly applied: 'next-start'
+  readonly applied: PetsUseApplied
+  /**
+   * Sidecar error code explaining a deferred application (for example
+   * `sidecar.unreachable`), or `null` when the selection applied live.
+   */
+  readonly reason: string | null
 }
 
 // ── Shaping helpers ────────────────────────────────────────────────────────────
@@ -286,15 +302,59 @@ export function runPetsCurrent(): CommandResult<PetsCurrentData> {
 }
 
 /**
+ * Sidecar failures that mean "the app is not reachable right now".
+ *
+ * None of them says anything about the pet itself, so the CLI keeps the saved
+ * selection and reports that it applies on the next start.
+ */
+const DEFERRED_SIDECAR_CODES: ReadonlySet<string> = new Set([
+  'sidecar.token_missing',
+  'sidecar.unreachable',
+  'sidecar.timeout',
+  'sidecar.connection_error',
+])
+
+type LiveSelectionOutcome =
+  | { readonly applied: 'live'; readonly statusCode: number }
+  | { readonly applied: 'next-start'; readonly reason: string; readonly detail: string }
+
+/**
+ * Ask the running app to apply the selection through `POST /pets/use`.
+ *
+ * Electron owns asset validation, so a rejection is surfaced as an actionable
+ * failure rather than being re-derived (or ignored) here.
+ */
+async function requestLiveSelection(petId: string): Promise<LiveSelectionOutcome> {
+  try {
+    const response = await postToSidecar<{ ok: boolean }>('/pets/use', { id: petId })
+    return { applied: 'live', statusCode: response.statusCode }
+  } catch (error) {
+    if (!isCliError(error)) throw error
+
+    if (DEFERRED_SIDECAR_CODES.has(error.code)) {
+      return { applied: 'next-start', reason: error.code, detail: error.message }
+    }
+
+    // The app answered and refused the id: never claim the pet is now active.
+    throw new CliError(`buddy is running but rejected pet '${petId}'.`, {
+      code: 'pets.live_rejected',
+      hint: `${error.hint ?? error.message} The saved pet selection was not changed.`,
+      data: { id: petId, reason: error.code, ...(error.data ?? {}) },
+      cause: error,
+    })
+  }
+}
+
+/**
  * buddy pets use <id>
  *
- * Validate the requested pet and persist the selection to buddy-owned state.
+ * Validate the requested pet locally, ask a running app to apply it live, then
+ * persist the selection to buddy-owned state.
  *
- * Applying the selection to a running app is deliberately out of scope here
- * (see the live-selection task): the result states that the saved pet takes
- * effect on the next start.
+ * A running app confirms immediate application; a stopped or unreachable app
+ * still keeps the saved selection and reports that it applies on the next start.
  */
-export function runPetsUse(id: string): CommandResult<PetsUseData> {
+export async function runPetsUse(id: string): Promise<CommandResult<PetsUseData>> {
   if (!id || id.trim() === '') {
     throw new CliError('Pet id is required.', {
       code: 'pets.id_required',
@@ -330,6 +390,9 @@ export function runPetsUse(id: string): CommandResult<PetsUseData> {
     })
   }
 
+  // Live request first: a rejection must not leave a selection behind.
+  const outcome = await requestLiveSelection(petId)
+
   try {
     saveActivePet(entry)
   } catch (err) {
@@ -353,20 +416,41 @@ export function runPetsUse(id: string): CommandResult<PetsUseData> {
           },
         ]
 
+  const baseDetails = [
+    { label: 'Name', value: pet.name },
+    { label: 'Source', value: sourceLabel(pet.source) },
+    { label: 'Folder', value: pet.folder },
+  ]
+
+  if (outcome.applied === 'live') {
+    return commandResult(
+      'pets.use',
+      { pet, applied: 'live', reason: null },
+      {
+        ...(checks.length > 0 ? { checks } : {}),
+        summary: `Active pet set to '${pet.id}' and applied to the running app.`,
+        details: [...baseDetails, { label: 'Applies', value: 'immediately — buddy is running' }],
+        hint: 'Confirm the selection any time with: buddy pets current',
+        verboseDetails: [
+          `Selection stored in ${stateFilePath()}`,
+          `POST /pets/use → HTTP ${outcome.statusCode}`,
+        ],
+      },
+    )
+  }
+
   return commandResult(
     'pets.use',
-    { pet, applied: 'next-start' },
+    { pet, applied: 'next-start', reason: outcome.reason },
     {
       ...(checks.length > 0 ? { checks } : {}),
-      summary: `Active pet set to '${pet.id}'.`,
-      details: [
-        { label: 'Name', value: pet.name },
-        { label: 'Source', value: sourceLabel(pet.source) },
-        { label: 'Folder', value: pet.folder },
-        { label: 'Applies', value: 'on the next buddy start' },
+      summary: `Active pet set to '${pet.id}'; applies on the next buddy start.`,
+      details: [...baseDetails, { label: 'Applies', value: 'on the next buddy start' }],
+      hint: 'Start buddy to see it: buddy start',
+      verboseDetails: [
+        `Selection stored in ${stateFilePath()}`,
+        `Live selection skipped — ${outcome.reason}: ${outcome.detail}`,
       ],
-      hint: 'Restart to see it: buddy stop, then buddy start',
-      verboseDetails: [`Selection stored in ${stateFilePath()}`],
     },
   )
 }

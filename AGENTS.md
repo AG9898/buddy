@@ -118,7 +118,7 @@ Docs navigation: [`docs/INDEX.md`](docs/INDEX.md)
 ## Architecture
 
 - Electron main process manages a transparent, frameless, always-on-top, non-focusable `BrowserWindow`. State persists to `%USERPROFILE%\.petdex-win\state.json`.
-- Local HTTP sidecar (`sidecar.ts`) listens on `127.0.0.1:BUDDY_PORT`. Hook events arrive here from both Windows CLI and WSL petdex-bridge; a validated token-authenticated live pet selection hot-reloads the renderer while CLI client wiring remains a later task.
+- Local HTTP sidecar (`sidecar.ts`) listens on `127.0.0.1:BUDDY_PORT`. Hook events arrive here from both Windows CLI and WSL petdex-bridge; a validated token-authenticated live pet selection hot-reloads the renderer, and `buddy pets use` sends that request before persisting its selection.
 - Svelte renderer (`src/renderer/`) drives sprite animation via CSS `background-position` on an 8×9 spritesheet. State machine defined in `pet.json`.
 - `petdex-bridge` (Rust, `petdex-bridge/`) is a Linux binary that runs in WSL. Shell hooks call it; it POSTs events to the Windows HTTP sidecar via localhost passthrough.
 - All renderer↔main communication goes through the `petApi` contextBridge defined in `preload.ts`. IPC channel names are constants — never hardcoded strings.
@@ -386,6 +386,13 @@ does not get its own entry in `cmd.commands` (so `addGlobalOutputOptionsDeep` co
 `pets current` / `pets show` would otherwise scan real pet directories and read the user's
 `state.json`. Any new command whose action performs I/O needs the same treatment before it
 is exercised from a program-level test.
+
+### 2026-07-28 - `pets use` must send the live request before it saves
+`runPetsUse` asks `POST /pets/use` first and only then writes buddy-owned state, so an app
+that refuses the id (`pets.live_rejected`) never leaves a selection behind claiming to be
+active. Only `sidecar.token_missing`, `sidecar.unreachable`, `sidecar.timeout`, and
+`sidecar.connection_error` mean "not running" and defer to the next start; every other
+sidecar failure is a rejection.
 
 ### 2026-07-28 - The root action now performs I/O, so program tests must mock it
 Bare `buddy` renders the operational overview, so `program.test.ts` mocks `./commands/status.js`; without that, every bare-invocation test would hit the real sidecar and read `~/.claude/settings.json`. Note also that the `preAction` hook calls `configureOutput()`, replacing any test-installed output stream with `process.stdout` — spy on `process.stdout.write` to assert banner behavior in program tests.
