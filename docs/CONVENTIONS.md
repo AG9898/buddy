@@ -96,6 +96,12 @@ These apply across every stack in this project.
 - `src/cli/output.ts` owns rendering and resolves one `OutputContext` per invocation;
   `src/cli/result.ts` owns the typed `CommandResult` / `CliError` shapes. Emit lines through
   the helpers rather than writing to `process.stdout` directly, so mode routing applies.
+- Diagnostic commands describe checklists as data. Put `heading` and `checks` on the
+  `CommandResult` or on the thrown `CliError` and let the entry boundary render the rows;
+  do not print a checklist from inside a command. Check rows are `pass` / `warn` / `fail`,
+  where `warn` means degraded-but-present and never changes an exit code by itself.
+- Normalize thrown values with `isCliError`/`toCliError`, never a bare `instanceof CliError`
+  check: a duplicated module instance would otherwise lose the code, hint, data, and checks.
 - Token-authenticated CLI sidecar calls go through `src/cli/sidecar-client.ts`. Command
   modules must not duplicate token-file reads, HTTP response parsing, request timeouts, or
   connection-error formatting; they return typed results/errors for the entry boundary.

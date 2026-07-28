@@ -357,5 +357,23 @@ For an explicitly user-authorized npm release, read `NPM_TOKEN` from the reposit
 ### 2026-07-28 - Command modules must not import program.ts for the version
 `buddy status` needs the package version, but importing `resolveCliVersion` from `program.ts` would create a cycle because `program.ts` imports every command module. Version resolution now lives in `src/cli/version.ts` and `program.ts` re-exports it; keep new shared CLI helpers out of `program.ts` for the same reason.
 
+### 2026-07-28 - toCliError must use the tolerant guard, not instanceof
+`toCliError()` checked `value instanceof CliError`, so an error thrown by a duplicated module
+instance (any test using `vi.resetModules()` plus dynamic import) was re-wrapped and lost its
+code, hint, data, and checks before rendering. It now uses `isCliError()`, which also matches
+by `name`; prefer that guard anywhere a thrown value is narrowed.
+
+### 2026-07-28 - `2>NUL` inside a WSL execSync command creates a literal NUL file
+The doctor process probe wrapped `tasklist` with `cmd.exe /c ... 2>NUL`, but execSync runs the
+string through `/bin/sh`, which treats `2>NUL` as a redirect and drops a junk `NUL` file into
+the working directory. `stdio: 'pipe'` already captures stderr, so never append Windows-style
+redirects to interop commands.
+
+### 2026-07-28 - Diagnostic checklists belong on the result, not in the command
+`buddy doctor` and `buddy hooks install` no longer print rows themselves: `CommandResult` and
+`CliError` both carry `heading` and `checks`, and `renderResult`/`renderFailure` draw them.
+Check rows are `pass`/`warn`/`fail`, where `warn` is degraded-but-present (partial hook
+coverage) and never relaxes an exit code on its own.
+
 ### 2026-07-28 - The root action now performs I/O, so program tests must mock it
 Bare `buddy` renders the operational overview, so `program.test.ts` mocks `./commands/status.js`; without that, every bare-invocation test would hit the real sidecar and read `~/.claude/settings.json`. Note also that the `preAction` hook calls `configureOutput()`, replacing any test-installed output stream with `process.stdout` — spy on `process.stdout.write` to assert banner behavior in program tests.

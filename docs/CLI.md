@@ -112,6 +112,60 @@ command list moved to `buddy --help`.
 
 ---
 
+## Health Checklist
+
+`buddy doctor` is the detailed diagnostic counterpart to `buddy status`. It runs five
+checks — Electron runtime resolvable, Electron process running, `GET /health` responding,
+update token file present, and hook coverage — and reports each one as a row with its
+recovery command:
+
+```text
+buddy doctor
+────────────────────────────────────────────────
+  ✔  Electron runtime available
+       C:\pkg\node_modules\electron\dist\electron.exe
+  ✖  Electron process running
+       Start the app: buddy start
+  ⚠  Hooks installed (7/10)
+       Install the missing hooks: buddy hooks install
+────────────────────────────────────────────────
+✔ All checks passed.
+```
+
+Rows use three levels: `✔` pass, `⚠` degraded-but-present, and `✖` absent or failing.
+Partial hook coverage is the degraded case. A warning is still an unhealthy check, so the
+exit code rule is unchanged: `buddy doctor` exits `0` only when every check passes, and
+otherwise exits non-zero with the `doctor.checks_failed` code and the first recovery command
+as the hint. `doctor` only reports; it never installs or repairs anything.
+
+The heading and separators are progress decoration, so `--quiet` prints the rows and the
+final line without them, and `--json` prints exactly one payload. A healthy run emits the
+`app.doctor` success payload; an unhealthy run emits the failure payload with the whole
+report under `error.data`:
+
+```json
+{
+  "ok": false,
+  "command": "app.doctor",
+  "error": {
+    "code": "doctor.checks_failed",
+    "message": "Some checks failed (3/5 passed).",
+    "hint": "Start the app: buddy start",
+    "data": {
+      "ok": false,
+      "passed": 3,
+      "total": 5,
+      "environment": "windows",
+      "checks": [
+        { "id": "process", "label": "Electron process running", "ok": false, "status": "fail" }
+      ]
+    }
+  }
+}
+```
+
+---
+
 ## Command Structure and Help Surfaces
 
 Command construction lives in `src/cli/program.ts` and is exported as `createProgram()`.
@@ -272,8 +326,17 @@ The command is idempotent and preserves unrelated hook entries in existing JSON 
 The legacy `--rc <path>` flag is accepted for older scripts but is ignored; Codex CLI
 hooks no longer use shell rc environment-variable exports.
 
+Output follows the same checklist vocabulary as `buddy doctor`: one row per assistant with
+its installed / already-present counts, then a summary line. A target whose file could not
+be written at all is a failure row; a target that wrote some entries and then failed is a
+warning row. Any failure ends the run with the `hooks.install_failed` code and a non-zero
+exit; a run that changes nothing because every entry already exists is a success
+(`All hooks are already installed.`). The `hooks.install` JSON payload carries
+`runtime`, the `installed` / `skipped` / `failed` counts, and the per-target breakdown.
+
 After installing Codex hooks, users may need to open `/hooks` inside Codex CLI to review
-and trust the new command hooks before Codex will execute them.
+and trust the new command hooks before Codex will execute them; the command prints that as
+its next-step hint whenever it writes new Codex entries.
 
 The planned `buddy hooks status` command reuses the same detection logic as `buddy doctor`.
 The planned `buddy hooks uninstall` command removes only entries owned by buddy, is
@@ -444,9 +507,11 @@ outcomes to terminal output and `process.exitCode`. This keeps command logic tes
 without mocking streams or terminating the test process.
 
 Because a Commander action handler cannot return a value, commands publish their outcome
-with `recordResult()` and the entry boundary drains it after parsing. Migrating each
-command family onto typed results is tracked as follow-up work; commands not yet migrated
-still print through the shared output helpers.
+with `recordResult()` and the entry boundary drains it after parsing. Diagnostic commands
+describe checklist rows as data (`checks` on the result or on the thrown `CliError`) so the
+entry boundary renders pass/warn/fail rows for both outcomes. Migrating each command family
+onto typed results is tracked as follow-up work; commands not yet migrated still print
+through the shared output helpers.
 
 ---
 
@@ -458,6 +523,10 @@ CLI changes should include focused tests or smoke checks for:
 - Bare `buddy`, `buddy --version`, root help, and subcommand help behavior.
 - `buddy status` running, stopped, missing-token, and partial-hook paths, plus the
   banner-on-TTY-only rule and the shared JSON payload for bare `buddy`.
+- `buddy doctor` healthy, degraded (partial hook coverage), and failing checklists, plus the
+  non-zero exit and the checks rendered before a failure message.
+- `buddy hooks install` complete install, idempotent re-run, partial per-target coverage,
+  and write failures.
 - Non-TTY/plain output behavior when styling is disabled or unsupported.
 - Styled output behavior when styling is supported.
 - Global `--verbose`, `--quiet`, `--json`, and `--no-color` behavior, including stdout and

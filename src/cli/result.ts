@@ -21,6 +21,33 @@ export interface ResultDetail {
 }
 
 /**
+ * Severity of one checklist row.
+ *
+ * `warn` is a degraded-but-present state (for example partial hook coverage);
+ * it renders distinctly from `fail` but never changes an exit code on its own.
+ */
+export type ResultCheckStatus = 'pass' | 'warn' | 'fail'
+
+/** An indented sub-row under a check, used for per-entry breakdowns. */
+export interface ResultCheckItem {
+  readonly label: string
+  readonly ok: boolean
+}
+
+/**
+ * One checklist row rendered above the summary by `renderResult` /
+ * `renderFailure`. Diagnostic commands describe their findings with these and
+ * never write the rows themselves.
+ */
+export interface ResultCheck {
+  readonly label: string
+  readonly status: ResultCheckStatus
+  /** Secondary dim line: a resolved path, a count, or the recovery command. */
+  readonly detail?: string
+  readonly items?: readonly ResultCheckItem[]
+}
+
+/**
  * The typed outcome of a successful command.
  *
  * `data` is the machine-readable payload emitted verbatim in `--json` mode, so
@@ -32,6 +59,10 @@ export interface CommandResult<T = unknown> {
   readonly command: string
   /** Machine-readable payload for `--json`. */
   readonly data: T
+  /** Section heading shown above the checklist; suppressed by quiet and JSON. */
+  readonly heading?: string
+  /** Pass/warn/fail rows rendered above the summary in human and quiet modes. */
+  readonly checks?: readonly ResultCheck[]
   /** One-line human success message. */
   readonly summary?: string
   /** `key: value` rows shown in human mode. */
@@ -64,6 +95,13 @@ export interface CliErrorOptions {
   readonly exitCode?: number
   /** Extra machine-readable context emitted in `--json` mode. */
   readonly data?: Readonly<Record<string, unknown>>
+  /** Section heading shown above the checklist; suppressed by quiet and JSON. */
+  readonly heading?: string
+  /**
+   * Checklist rows rendered before the error line, so a failed diagnostic shows
+   * exactly which checks passed instead of only the summary.
+   */
+  readonly checks?: readonly ResultCheck[]
   readonly cause?: unknown
 }
 
@@ -81,6 +119,8 @@ export class CliError extends Error {
   readonly hint: string | undefined
   readonly exitCode: number
   readonly data: Readonly<Record<string, unknown>> | undefined
+  readonly heading: string | undefined
+  readonly checks: readonly ResultCheck[] | undefined
 
   constructor(message: string, options: CliErrorOptions = {}) {
     super(message, options.cause === undefined ? undefined : { cause: options.cause })
@@ -89,6 +129,8 @@ export class CliError extends Error {
     this.hint = options.hint
     this.exitCode = options.exitCode ?? DEFAULT_ERROR_EXIT_CODE
     this.data = options.data
+    this.heading = options.heading
+    this.checks = options.checks
   }
 }
 
@@ -97,9 +139,15 @@ export function isCliError(value: unknown): value is CliError {
   return value instanceof CliError || (value instanceof Error && value.name === 'CliError')
 }
 
-/** Normalize any thrown value into a `CliError` the renderer can display. */
+/**
+ * Normalize any thrown value into a `CliError` the renderer can display.
+ *
+ * Uses the tolerant guard so an error thrown by a duplicated module instance
+ * keeps its code, hint, data, and checks instead of being re-wrapped as a bare
+ * message.
+ */
 export function toCliError(value: unknown): CliError {
-  if (value instanceof CliError) return value
+  if (isCliError(value)) return value
   if (value instanceof Error) {
     return new CliError(value.message, { cause: value })
   }

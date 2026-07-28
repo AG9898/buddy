@@ -1002,7 +1002,7 @@
       "id": "FEAT-20",
       "title": "Unify doctor and hook-install terminal output",
       "description": "Migrate buddy doctor and buddy hooks install onto the shared typed-result renderer, replacing direct console writes and process exits while preserving hook configuration semantics. Human output should use the common check, heading, and hint vocabulary; quiet and JSON output should expose the same diagnostic facts without decoration. Hook status and uninstall subcommands remain out of scope.",
-      "status": "todo",
+      "status": "done",
       "priority": "medium",
       "group_id": "FEAT",
       "depends_on": [

@@ -397,7 +397,8 @@ export function createProgram(): CommandType {
     .option('--rc <path>', 'Deprecated; retained for older scripts and ignored')
     .action(function (this: CommandType) {
       const opts = this.opts() as { rc?: string }
-      runHooksInstall(opts.rc)
+      recordCommand('hooks.install')
+      recordResult(runHooksInstall(opts.rc))
     })
 
   // ── buddy state ─────────────────────────────────────────────────────────────
@@ -430,8 +431,10 @@ export function createProgram(): CommandType {
   program
     .command('doctor')
     .description('Check process, sidecar, token, and hook health')
+    .addHelpText('after', examples('buddy doctor', 'buddy doctor --json'))
     .action(async () => {
-      await runDoctor()
+      recordCommand('app.doctor')
+      recordResult(await runDoctor())
     })
 
   // Global output flags are added last so they appear on every command, then

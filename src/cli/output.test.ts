@@ -109,6 +109,27 @@ describe('output module — plain mode (NO_COLOR)', () => {
     expect(output).toContain('Run: buddy start')
   })
 
+  it('checkRow() distinguishes pass, warning, and failure and renders sub-items', async () => {
+    const { checkRow } = await import('./output.js')
+    const { lines, restore } = captureStdout()
+    checkRow({ label: 'Runtime available', status: 'pass' })
+    checkRow({
+      label: 'Hooks installed (7/10)',
+      status: 'warn',
+      detail: 'Install the missing hooks: buddy hooks install',
+      items: [{ label: 'codex-cli:Stop', ok: false }],
+    })
+    checkRow({ label: 'Sidecar reachable', status: 'fail' })
+    restore()
+    const rows = lines.join('').split('\n')
+    expect(rows[0]).toContain('OK')
+    expect(rows[1]).toContain('!')
+    expect(rows[1]).toContain('Hooks installed (7/10)')
+    expect(lines.join('')).toContain('Install the missing hooks: buddy hooks install')
+    expect(lines.join('')).toContain('codex-cli:Stop')
+    expect(lines.join('')).toContain('ERR')
+  })
+
   it('subCheck() writes an indented row to stdout', async () => {
     const { subCheck } = await import('./output.js')
     const { lines, restore } = captureStdout()

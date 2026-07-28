@@ -31,6 +31,7 @@
 
 import {
   type CommandResult,
+  type ResultCheck,
   failurePayload,
   successPayload,
   toCliError,
@@ -316,11 +317,33 @@ export function error(message: string, errorHint?: string): void {
  *           ✖  Sidecar not responding
  */
 export function check(label_: string, ok: boolean, detailText?: string): void {
+  checkRow({
+    label: label_,
+    status: ok ? 'pass' : 'fail',
+    ...(detailText === undefined ? {} : { detail: detailText }),
+  })
+}
+
+/**
+ * Print one typed checklist row plus its sub-items.
+ *
+ * Rows use the `result` channel, so `--quiet` keeps the full checklist while
+ * `--json` drops it in favour of the single machine-readable payload.
+ */
+export function checkRow(entry: ResultCheck): void {
   const sym = symbols()
-  const mark = ok ? green(sym.success) : red(sym.error)
-  emit('result', `  ${mark}  ${label_}\n`)
-  if (detailText) {
-    emit('result', `       ${dim(detailText)}\n`)
+  const mark =
+    entry.status === 'pass'
+      ? green(sym.success)
+      : entry.status === 'warn'
+        ? yellow(sym.warning)
+        : red(sym.error)
+  emit('result', `  ${mark}  ${entry.label}\n`)
+  if (entry.detail) {
+    emit('result', `       ${dim(entry.detail)}\n`)
+  }
+  for (const item of entry.items ?? []) {
+    subCheck(item.label, item.ok)
   }
 }
 
@@ -371,6 +394,18 @@ export function closeSeparator(): void {
    never write to streams directly and never call process.exit.
 ───────────────────────────────────────────────────────────────────────────── */
 
+/**
+ * Render an optional heading + checklist section.
+ *
+ * The heading and closing separator are progress decoration, so `--quiet` keeps
+ * only the rows themselves. Callers under `--json` never reach this.
+ */
+function renderChecks(sectionHeading?: string, checks?: readonly ResultCheck[]): void {
+  if (sectionHeading) heading(sectionHeading)
+  for (const entry of checks ?? []) checkRow(entry)
+  if (checks && checks.length > 0) closeSeparator()
+}
+
 /** Render a typed success result: one JSON payload, or human summary/details. */
 export function renderResult<T>(result: CommandResult<T>): void {
   const ctx = getOutputContext()
@@ -380,6 +415,7 @@ export function renderResult<T>(result: CommandResult<T>): void {
     return
   }
 
+  renderChecks(result.heading, result.checks)
   if (result.summary) success(result.summary)
   for (const row of result.details ?? []) label(row.label, row.value)
   for (const line of result.verboseDetails ?? []) detail(line)
@@ -399,6 +435,9 @@ export function renderFailure(value: unknown, command: string | null = null): nu
 
   if (ctx.json) {
     ctx.stdout.write(JSON.stringify(failurePayload(err, command)) + '\n')
+  } else {
+    // A failed diagnostic still shows which checks passed before the message.
+    renderChecks(err.heading, err.checks)
   }
 
   error(err.message, err.hint)
