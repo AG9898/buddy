@@ -2,22 +2,43 @@
  * Unit tests for src/cli/program.ts
  *
  * Verifies:
- *   - Bare `buddy` prints the grouped landing/help surface exactly once
+ *   - Bare `buddy` records the operational overview, with the banner reserved
+ *     for interactive terminals
  *   - `buddy --version` matches package.json
  *   - Root help groups commands by workflow and lists examples
  *   - Nested help (`buddy pets --help`, `buddy hooks install --help`) works
  *   - Typo and missing-argument errors exit non-zero with actionable messages
  *
  * These tests construct the program directly; they never parse process.argv.
+ * The status collector is mocked so the root surface never performs real
+ * sidecar or hook-configuration I/O.
  */
 
 import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { CommanderError, type Command } from 'commander'
 import { createProgram, resolveCliVersion } from './program.js'
 import { getOutputContext, resetOutputContext, type OutputContext } from './output.js'
+import { takeResult, clearResult } from './result.js'
+
+const { mockRunOverview, mockRunStatus } = vi.hoisted(() => ({
+  mockRunOverview: vi.fn(),
+  mockRunStatus: vi.fn(),
+}))
+
+vi.mock('./commands/status.js', () => ({
+  runOverview: mockRunOverview,
+  runStatus: mockRunStatus,
+}))
+
+const OVERVIEW_RESULT = {
+  command: 'app.status',
+  data: { version: '1.0.2', app: { running: false, visible: false } },
+  summary: 'buddy is not running.',
+  nextSteps: ['buddy start', 'buddy --help'],
+}
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..')
 
@@ -57,19 +78,65 @@ async function run(argv: string[]): Promise<RunResult> {
 }
 
 describe('createProgram', () => {
-  it('shows the grouped landing surface for a bare invocation', async () => {
+  beforeEach(() => {
+    mockRunOverview.mockReset()
+    mockRunStatus.mockReset()
+    mockRunOverview.mockResolvedValue(OVERVIEW_RESULT)
+    mockRunStatus.mockResolvedValue({ ...OVERVIEW_RESULT, nextSteps: undefined })
+    clearResult()
+  })
+
+  afterEach(() => {
+    clearResult()
+  })
+
+  it('records the operational overview for a bare invocation', async () => {
     const result = await run([])
 
     expect(result.code).toBeNull()
-    expect(result.stdout).toContain('Usage: buddy')
-    expect(result.stdout).toContain('App lifecycle')
-    expect(result.stdout).toContain('Pet management')
-    expect(result.stdout).toContain('Integrations')
-    expect(result.stdout).toContain('Diagnostics')
-    expect(result.stdout).toContain('Examples')
-    // Help must be rendered exactly once, not doubled by a banner wrapper.
-    expect(result.stdout.match(/Usage: buddy/g)).toHaveLength(1)
+    expect(mockRunOverview).toHaveBeenCalledTimes(1)
+    expect(takeResult()).toMatchObject({ command: 'app.status' })
+    // The overview replaces the help dump; `--help` still owns the command list.
+    expect(result.stdout).not.toContain('Usage: buddy')
     expect(result.stderr).toBe('')
+  })
+
+  it('prints the banner for a bare invocation only on an interactive terminal', async () => {
+    const original = process.stdout.isTTY
+    const writes: string[] = []
+    const spy = vi.spyOn(process.stdout, 'write').mockImplementation((chunk: unknown) => {
+      writes.push(String(chunk))
+      return true
+    })
+
+    try {
+      Object.defineProperty(process.stdout, 'isTTY', { value: true, configurable: true })
+      await run(['--no-color'])
+      expect(writes.join('')).toContain('/_____/')
+
+      writes.length = 0
+      Object.defineProperty(process.stdout, 'isTTY', { value: false, configurable: true })
+      await run(['--no-color'])
+      expect(writes.join('')).not.toContain('/_____/')
+
+      // Redirected-but-TTY-forced JSON runs must stay banner-free as well.
+      writes.length = 0
+      Object.defineProperty(process.stdout, 'isTTY', { value: true, configurable: true })
+      await run(['--json'])
+      expect(writes.join('')).not.toContain('/_____/')
+    } finally {
+      spy.mockRestore()
+      Object.defineProperty(process.stdout, 'isTTY', { value: original, configurable: true })
+      resetOutputContext()
+    }
+  })
+
+  it('exposes buddy status as its own diagnostics command', async () => {
+    const result = await run(['status'])
+
+    expect(result.code).toBeNull()
+    expect(mockRunStatus).toHaveBeenCalledTimes(1)
+    expect(takeResult()).toMatchObject({ command: 'app.status' })
   })
 
   it('reports the version from package.json without a duplicated literal', async () => {
@@ -88,7 +155,11 @@ describe('createProgram', () => {
     const result = await run(['--help'])
 
     expect(result.code).toBe('commander.helpDisplayed')
-    for (const name of ['start', 'stop', 'size', 'pets', 'hatch', 'hooks', 'state', 'doctor']) {
+    expect(result.stdout).toContain('App lifecycle')
+    expect(result.stdout).toContain('Pet management')
+    expect(result.stdout).toContain('Integrations')
+    expect(result.stdout).toContain('Diagnostics')
+    for (const name of ['start', 'stop', 'size', 'pets', 'hatch', 'hooks', 'state', 'status', 'doctor']) {
       expect(result.stdout).toContain(name)
     }
     expect(result.stdout).toContain('Launch the buddy pet window')

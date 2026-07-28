@@ -384,6 +384,7 @@ export function renderResult<T>(result: CommandResult<T>): void {
   for (const row of result.details ?? []) label(row.label, row.value)
   for (const line of result.verboseDetails ?? []) detail(line)
   if (result.hint) hint(result.hint)
+  for (const step of result.nextSteps ?? []) hint(step)
 }
 
 /**

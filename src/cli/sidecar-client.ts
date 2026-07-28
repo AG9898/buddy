@@ -102,10 +102,37 @@ export async function postToSidecar<T>(
   payload: unknown,
   options: SidecarRequestOptions = {},
 ): Promise<SidecarResponse<T>> {
+  return requestSidecar<T>('POST', endpoint, JSON.stringify(payload), options)
+}
+
+/**
+ * GET a protected sidecar endpoint and parse its JSON response.
+ *
+ * Read-only callers (`buddy status`, the root overview) use this so they share
+ * the same token lookup, bounded timeout, and typed failure vocabulary as the
+ * state-changing POST path.
+ */
+export async function getFromSidecar<T>(
+  endpoint: string,
+  options: SidecarRequestOptions = {},
+): Promise<SidecarResponse<T>> {
+  return requestSidecar<T>('GET', endpoint, undefined, options)
+}
+
+async function requestSidecar<T>(
+  method: 'GET' | 'POST',
+  endpoint: string,
+  body: string | undefined,
+  options: SidecarRequestOptions = {},
+): Promise<SidecarResponse<T>> {
   const token = readSidecarToken()
-  const body = JSON.stringify(payload)
   const timeoutMs = options.timeoutMs ?? SIDECAR_TIMEOUT_MS
   const url = `${sidecarBaseUrl()}${endpoint}`
+  const headers: Record<string, string | number> = { 'X-Petdex-Update-Token': token }
+  if (body !== undefined) {
+    headers['Content-Type'] = 'application/json'
+    headers['Content-Length'] = Buffer.byteLength(body)
+  }
 
   return new Promise<SidecarResponse<T>>((resolve, reject) => {
     let settled = false
@@ -122,14 +149,7 @@ export async function postToSidecar<T>(
     try {
       request = http.request(
         url,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Content-Length': Buffer.byteLength(body),
-            'X-Petdex-Update-Token': token,
-          },
-        },
+        { method, headers },
         (response) => {
           let responseBody = ''
           response.setEncoding('utf8')
@@ -187,7 +207,7 @@ export async function postToSidecar<T>(
     request.on('error', (err) => {
       settle(() => reject(connectionError(err)))
     })
-    request.write(body)
+    if (body !== undefined) request.write(body)
     request.end()
   })
 }

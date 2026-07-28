@@ -40,6 +40,8 @@ export interface CommandResult<T = unknown> {
   readonly hint?: string
   /** Extra lines shown only under `--verbose`. */
   readonly verboseDetails?: readonly string[]
+  /** Suggested follow-up commands; rendered like hints and suppressed the same way. */
+  readonly nextSteps?: readonly string[]
 }
 
 /** Build a typed success result (thin helper for inference and readability). */

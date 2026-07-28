@@ -156,6 +156,11 @@ coverage proves Windows and WSL startup results are not reported before successf
 including missing runtime, child errors, and non-zero WSL interop exits. Stop coverage proves
 the authenticated graceful route, authorization rejection, already-stopped outcome, Windows and
 WSL verified-PID fallback, and output-mode rendering; it must never target an image name.
+Status coverage proves the running, stopped, missing-token, and partial-hook paths degrade
+without a non-zero exit, that bare `buddy` prints the banner only on an interactive terminal
+and shares the `app.status` JSON payload with `buddy status`, and that no token value, token
+path, or assistant configuration content reaches human or JSON output. Program tests mock the
+status collector so the root surface performs no real sidecar or hook-file I/O.
 
 **Not covered (yet):** Visual regression, multi-monitor DPI scaling, packaged installer
 smoke test, Windows-native hook execution, WSL bridge execution, resize pointer-event
@@ -184,7 +189,8 @@ integration (requires Electron E2E).
 | `src/cli/commands/size.test.ts` | Size command | parseSizeInput scale factor/explicit WxH/invalid input, validateBounds min/max enforcement, typed validation/sidecar errors, POST `/resize` payload/token, bounded shared-client timeout, and quiet/no-color/JSON rendering |
 | `src/cli/commands/start.test.ts` | Start command | Typed Windows and WSL startup results, missing Electron runtime, child spawn errors, non-zero WSL interop exits, and shared output-mode rendering |
 | `src/cli/commands/stop.test.ts` | Stop command | Authenticated graceful shutdown, authorization rejection, idempotent already-stopped handling, Windows/WSL verified-PID fallback, and normal/quiet/verbose/JSON output |
-| `src/cli/program.test.ts` | CLI program structure | Bare invocation landing surface printed once, `--version` matching package.json, grouped root help with examples, nested `pets`/`hooks install` help, banner suppressed for non-TTY, unknown-command suggestion, missing-argument and unknown-option exit codes, global output options inherited by nested commands in either position, `--quiet`/`--verbose` conflict rejected same-command and split across the chain |
+| `src/cli/commands/status.test.ts` | Status command and root overview | Running snapshot with pet/window/hook coverage, stopped and missing-token degradation without leaking the token path, partial-hook per-assistant counts, WSL environment, snapshot validation, normal/quiet/verbose/JSON rendering, and overview suggestions sharing the `app.status` payload |
+| `src/cli/program.test.ts` | CLI program structure | Bare invocation recording the `app.status` overview with the banner limited to interactive terminals, `status` registered under diagnostics, `--version` matching package.json, grouped root help with examples, nested `pets`/`hooks install` help, banner suppressed for non-TTY, unknown-command suggestion, missing-argument and unknown-option exit codes, global output options inherited by nested commands in either position, `--quiet`/`--verbose` conflict rejected same-command and split across the chain |
 | `src/cli/runtime.test.ts` | CLI runtime launch | package-root walking from built CLI output and missing-Electron detection for installed package layouts |
 | `petdex-bridge/src/main.rs` | WSL bridge | CLI parsing, state payload construction, loopback URL construction, token path override, and empty-state validation |
 

@@ -66,6 +66,8 @@ buddy/
       program.ts       — createProgram(): Commander command tree, grouped help, global output options
       output.ts        — per-invocation OutputContext, mode routing, typed result/failure renderers
       result.ts        — CommandResult, CliError, JSON payload shapes, per-invocation result slot
+      sidecar-client.ts — token-authenticated GET/POST client for the local sidecar
+      version.ts       — package-derived CLI version (kept out of program.ts to avoid a cycle)
       commands/        — CLI command implementations; hatch delegates imagegen work to Codex CLI
     main/
       main.ts           — Electron entry: app lifecycle, tray, startup restore
@@ -351,3 +353,9 @@ Registering the global output flags on all commands makes Commander render subco
 
 ### 2026-07-23 - npm publishing token stays local and ephemeral
 For an explicitly user-authorized npm release, read `NPM_TOKEN` from the repository-root `.env` only to configure that one `npm publish` command. `.env` is gitignored; never print, log, persist, commit, or send the token value, and keep it narrowly scoped to `@ag9898/buddy` with a short expiry or revoke it when unused.
+
+### 2026-07-28 - Command modules must not import program.ts for the version
+`buddy status` needs the package version, but importing `resolveCliVersion` from `program.ts` would create a cycle because `program.ts` imports every command module. Version resolution now lives in `src/cli/version.ts` and `program.ts` re-exports it; keep new shared CLI helpers out of `program.ts` for the same reason.
+
+### 2026-07-28 - The root action now performs I/O, so program tests must mock it
+Bare `buddy` renders the operational overview, so `program.test.ts` mocks `./commands/status.js`; without that, every bare-invocation test would hit the real sidecar and read `~/.claude/settings.json`. Note also that the `preAction` hook calls `configureOutput()`, replacing any test-installed output stream with `process.stdout` — spy on `process.stdout.write` to assert banner behavior in program tests.

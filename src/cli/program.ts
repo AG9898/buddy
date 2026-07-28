@@ -9,9 +9,6 @@
  * No Electron imports anywhere in src/cli/ — safe to run in WSL node.
  */
 
-import fs from 'fs'
-import path from 'path'
-import { fileURLToPath } from 'url'
 import { Command, Help, Option, type Command as CommandType } from 'commander'
 import { runStart } from './commands/start.js'
 import { runStop } from './commands/stop.js'
@@ -27,6 +24,7 @@ import {
 } from './commands/hatch.js'
 import { runPetsList, runPetsShow, runPetsUse } from './commands/pets.js'
 import { runSize } from './commands/size.js'
+import { runOverview, runStatus } from './commands/status.js'
 import {
   bannerText,
   bold,
@@ -34,34 +32,14 @@ import {
   dim,
   getOutputContext,
   orange,
+  printBanner,
   type OutputContextOptions,
 } from './output.js'
 import { recordCommand, recordResult } from './result.js'
-import { resolvePackageRoot } from './runtime.js'
+import { resolveCliVersion } from './version.js'
 
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = path.dirname(__filename)
-
-/* ── Version ─────────────────────────────────────────────────────────────────
-   The displayed version always comes from package metadata so it cannot drift
-   from package.json. This resolves correctly from both a source checkout
-   (src/cli/) and the built CommonJS bundle (out/cli/).
-───────────────────────────────────────────────────────────────────────────── */
-
-const FALLBACK_VERSION = '0.0.0'
-
-/** Read the buddy package version from package.json. */
-export function resolveCliVersion(startDir: string = __dirname): string {
-  try {
-    const packageJsonPath = path.join(resolvePackageRoot(startDir), 'package.json')
-    const parsed = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8')) as { version?: unknown }
-    return typeof parsed.version === 'string' && parsed.version.length > 0
-      ? parsed.version
-      : FALLBACK_VERSION
-  } catch {
-    return FALLBACK_VERSION
-  }
-}
+// Re-exported so callers and tests keep one import site for the CLI surface.
+export { resolveCliVersion }
 
 /* ── Command groups ──────────────────────────────────────────────────────────
    Root help lists commands by workflow instead of one flat alphabetical block.
@@ -76,11 +54,12 @@ const COMMAND_GROUPS: readonly CommandGroup[] = [
   { title: 'App lifecycle', commands: ['start', 'stop', 'size'] },
   { title: 'Pet management', commands: ['pets', 'hatch'] },
   { title: 'Integrations', commands: ['hooks', 'state'] },
-  { title: 'Diagnostics', commands: ['doctor'] },
+  { title: 'Diagnostics', commands: ['status', 'doctor'] },
 ]
 
 const ROOT_EXAMPLES = [
   'buddy start',
+  'buddy status',
   'buddy pets use penguin',
   'buddy hatch "a small orange cat"',
   'buddy size 1.5',
@@ -277,15 +256,19 @@ export function createProgram(): CommandType {
   // redirected output and CI stay deterministic. Nested help stays compact.
   program.addHelpText('before', () => (process.stdout.isTTY === true ? bannerText() : ''))
 
-  // Bare `buddy` is a landing surface: banner plus grouped help, printed once.
+  // Bare `buddy` is the operational overview: banner (interactive terminals
+  // only) plus the same result `buddy status` produces, with suggested next
+  // commands. Redirected and `--json` runs stay compact and deterministic.
   // A root action handler means Commander no longer rejects unmatched args on
   // its own, so unknown commands are reported explicitly here.
-  program.action(() => {
+  program.action(async () => {
     if (program.args.length > 0) {
       failUnknownCommand(program)
       return
     }
-    program.outputHelp()
+    recordCommand('app.status')
+    if (process.stdout.isTTY === true) printBanner()
+    recordResult(await runOverview())
   })
 
   // ── buddy start ─────────────────────────────────────────────────────────────
@@ -431,6 +414,16 @@ export function createProgram(): CommandType {
     .action(async (name: string) => {
       recordCommand('state.set')
       recordResult(await runState(name))
+    })
+
+  // ── buddy status ────────────────────────────────────────────────────────────
+  program
+    .command('status')
+    .description('Print app state, active pet, window size, and hook coverage')
+    .addHelpText('after', examples('buddy status', 'buddy status --json'))
+    .action(async () => {
+      recordCommand('app.status')
+      recordResult(await runStatus())
     })
 
   // ── buddy doctor ────────────────────────────────────────────────────────────

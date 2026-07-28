@@ -1066,7 +1066,7 @@
       "id": "FEAT-22",
       "title": "Add buddy status and the operational root overview",
       "description": "Consume the bounded operational snapshot from FEAT-33, combine it with existing hook detection, and expose it through buddy status. Upgrade bare buddy from its initial landing surface to an interactive overview with version, app state, active pet, window size, hook summary, and suggested commands; non-TTY and JSON forms remain compact and deterministic. Sidecar endpoint implementation is out of scope.",
-      "status": "todo",
+      "status": "done",
       "priority": "high",
       "group_id": "FEAT",
       "depends_on": [

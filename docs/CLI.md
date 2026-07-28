@@ -13,8 +13,10 @@ The npm package is named `@ag9898/buddy`, but the installed command remains `bud
 
 | Command | Purpose |
 |---|---|
-| `buddy` | Landing surface: banner (TTY only) plus workflow-grouped help and examples. |
+| `buddy` | Operational overview: banner (TTY only), current status, and suggested next commands. |
 | `buddy --version` | Print the installed version, sourced from `package.json`. |
+| `buddy --help` | Workflow-grouped command list and examples. |
+| `buddy status` | Print version, app state, active pet, window size, and hook coverage. |
 | `buddy start` | Launch the Electron pet app detached and return control to the terminal. |
 | `buddy stop` | Terminate the running Electron pet app. |
 | `buddy state <name>` | Send a pet state change to the local sidecar. |
@@ -39,19 +41,74 @@ The planned command surface adds:
 
 | Command | Purpose |
 |---|---|
-| `buddy` | Extend the shipped landing surface with app state, active pet, window size, hook summary, and suggested next commands. |
-| `buddy status` | Print the same operational summary without the large banner. |
 | `buddy pets current` | Canonical name for the current-pet view; `buddy pets show` remains a compatibility alias. |
 | `buddy hooks status` | Report Claude Code and Codex CLI hook coverage without changing configuration. |
 | `buddy hooks uninstall` | Remove only buddy-owned hook entries after explicit command invocation, preserving unrelated configuration. |
 
 Existing commands retain their current names.
 
-The forthcoming `buddy status` command consumes the Electron-owned, token-authenticated
-`GET /status` snapshot. That route exposes only whether the app is running and visible, the
-resolved active pet's id/name/source, and the current window width/height; hook coverage is
-resolved separately by the CLI. `GET /health` remains unauthenticated and is deliberately
-limited to `{ "status": "ok" }`.
+---
+
+## Operational Status and the Root Overview
+
+`buddy status` is the single operational summary. It consumes the Electron-owned,
+token-authenticated `GET /status` snapshot, which exposes only whether the app is running
+and visible, the resolved active pet's id/name/source, and the current window width/height.
+Hook coverage is resolved separately by the CLI using the same detection as `buddy doctor`.
+`GET /health` remains unauthenticated and is deliberately limited to `{ "status": "ok" }`.
+
+Status is a read-only report, so it never fails the invocation for an inactive app: a
+stopped app, a missing runtime token, an unreachable sidecar, and an unparseable response
+all degrade to a "buddy is not running" result with exit code `0`, the still-resolvable
+version and hook coverage, and an actionable hint. The result carries only the stable
+failure *code* (`sidecar.unreachable`, `sidecar.token_missing`, `sidecar.timeout`,
+`sidecar.invalid_response`). Token values, token paths, arbitrary filesystem contents, and
+assistant configuration contents are never included in human or JSON output; hooks are
+summarized as per-assistant installed/total counts only. Use `buddy doctor` when the
+detailed pass/fail checklist and non-zero exit are wanted.
+
+Human output is one summary line plus `key: value` rows:
+
+```text
+✔ buddy is running.
+  → Version: 1.0.2
+  → App: running (visible)
+  → Pet: Penguin (penguin, packaged)
+  → Window: 356x320
+  → Hooks: 10/10 installed (claude-code 5/5, codex-cli 5/5)
+```
+
+Bare `buddy` is the interactive overview: the banner (interactive terminals only), the
+same status body, and suggested next commands (`buddy start` or `buddy pets list` /
+`buddy size` / `buddy stop`, `buddy hooks install` when coverage is incomplete, and
+`buddy --help`). Suggestions render through the same hint channel, so `--quiet` drops them
+and JSON never contains them. Redirected output and `--json` omit the banner, and
+`buddy --json` emits exactly the payload `buddy status --json` emits — both use the
+`app.status` command id and the identical `data` shape:
+
+```json
+{
+  "ok": true,
+  "command": "app.status",
+  "data": {
+    "version": "1.0.2",
+    "environment": "windows",
+    "app": { "running": true, "visible": true },
+    "pet": { "id": "penguin", "name": "Penguin", "source": "packaged" },
+    "window": { "width": 356, "height": 320 },
+    "hooks": {
+      "installed": 10,
+      "total": 10,
+      "coverage": "complete",
+      "targets": { "claude-code": { "installed": 5, "total": 5 } }
+    },
+    "sidecar": { "reachable": true, "error": null }
+  }
+}
+```
+
+`pet` and `window` are `null` whenever the snapshot is unavailable. The full workflow-grouped
+command list moved to `buddy --help`.
 
 ---
 
@@ -69,9 +126,10 @@ diagnostics — using short summaries plus concrete examples instead of embeddin
 implementation detail in the command list. Subcommands keep Commander's default help
 layout and add their own examples section.
 
-Bare `buddy` prints the same grouped help surface and exits `0`. The banner renders only on
-root help and only when stdout is a TTY, so redirected output and CI stay deterministic and
-the banner is never printed twice on one help surface.
+Bare `buddy` prints the operational overview described above and exits `0`; `buddy --help`
+prints the grouped command list. The banner renders only on those two root surfaces and only
+when stdout is a TTY, so redirected output and CI stay deterministic and the banner is never
+printed twice on one surface.
 
 The version displayed by `buddy --version` is read from `package.json` at runtime through
 `resolveCliVersion()`, which resolves the package root from both a source checkout and the
@@ -309,8 +367,10 @@ choices and a close-match suggestion when available. State validation must use t
 pet manifest when it is resolvable and the packaged default state set as the fallback.
 
 State and size requests use the same token-authenticated local sidecar client. It loads the
-runtime token, POSTs JSON, parses JSON responses, applies a bounded timeout, and presents
-missing-token, connection, timeout, and HTTP failures as typed CLI errors. Their results
+runtime token, sends the request, parses JSON responses, applies a bounded timeout, and
+presents missing-token, connection, timeout, and HTTP failures as typed CLI errors. The
+client exposes both a POST helper for state-changing commands and a GET helper used by the
+read-only `buddy status` snapshot (bounded to a shorter interactive timeout). Their results
 therefore honor the shared human, quiet, verbose, JSON, and no-color output modes; only the
 CLI entry boundary renders those results and assigns a non-zero exit code for a failure.
 
@@ -396,6 +456,8 @@ CLI changes should include focused tests or smoke checks for:
 
 - `--help` output for changed commands.
 - Bare `buddy`, `buddy --version`, root help, and subcommand help behavior.
+- `buddy status` running, stopped, missing-token, and partial-hook paths, plus the
+  banner-on-TTY-only rule and the shared JSON payload for bare `buddy`.
 - Non-TTY/plain output behavior when styling is disabled or unsupported.
 - Styled output behavior when styling is supported.
 - Global `--verbose`, `--quiet`, `--json`, and `--no-color` behavior, including stdout and
