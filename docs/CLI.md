@@ -24,7 +24,7 @@ The npm package is named `@ag9898/buddy`, but the installed command remains `bud
 | `buddy doctor` | Print a health checklist for process, sidecar, token, and hooks. |
 | `buddy hatch <prompt> [--id <id> | --output <dir> | --package-preset <id>] [--verbose]` | Generate a personal pet by default; bundled presets require explicit maintainer opt-in. |
 | `buddy pets list` | List valid buddy-managed, packaged, and Codex-compatible pets. |
-| `buddy pets show` | Print the currently selected pet and its source path. |
+| `buddy pets current` | Print the currently selected pet and its source path. `buddy pets show` is a compatibility alias. |
 | `buddy pets use <id>` | Validate and persist the active pet selection. |
 | `buddy size <scale-or-width>` | Resize the pet window from the terminal. Accepts a scale factor (e.g., `1.5`, `2x`) or explicit WxH dimensions (e.g., `400x300`). |
 
@@ -41,7 +41,6 @@ The planned command surface adds:
 
 | Command | Purpose |
 |---|---|
-| `buddy pets current` | Canonical name for the current-pet view; `buddy pets show` remains a compatibility alias. |
 | `buddy hooks status` | Report Claude Code and Codex CLI hook coverage without changing configuration. |
 | `buddy hooks uninstall` | Remove only buddy-owned hook entries after explicit command invocation, preserving unrelated configuration. |
 
@@ -269,7 +268,7 @@ output never touches stdout — warnings and verbose detail are diverted to stde
 forced off so stdout stays byte-stable, and exactly one payload is written:
 
 ```json
-{ "ok": true, "command": "pets.list", "data": { "pets": ["default"] } }
+{ "ok": true, "command": "size.set", "data": { "width": 534, "height": 480 } }
 { "ok": false, "command": "state.set", "error": { "code": "sidecar.unreachable", "message": "…", "hint": "…" } }
 ```
 
@@ -421,9 +420,33 @@ renderer, and returns only the selected manifest, source label, and renderer-saf
 spritesheet URL. It rejects missing, invalid, and path-escaping ids; the id is never used
 as a filesystem path. The renderer swaps the pet in place without recreating, moving,
 showing, or focusing the window. The `buddy pets use` request wiring remains follow-up
-work, so current command success continues to describe a selection that will apply on the
-next start. `buddy pets current` becomes the canonical name for the current selection and
-`buddy pets show` remains an alias.
+work, so command success continues to describe a selection that applies on the next start
+(`Applies: on the next buddy start`, and `"applied": "next-start"` in JSON).
+
+`buddy pets current` is the canonical name for the current selection; `buddy pets show`
+is a Commander alias of the same command, so both spellings run identical logic, produce
+identical output, and emit the same `pets.current` payload. Nested help renders the pair
+as `current|show`.
+
+All three pet commands return typed results through the shared renderer, so they honor
+`--verbose`, `--quiet`, `--json`, and `--no-color` like every other command; only the CLI
+entry boundary writes to a stream or sets an exit code. Their command ids are `pets.list`,
+`pets.current`, and `pets.use`, and their `data` payloads are part of the public contract:
+
+| Command | `data` shape |
+|---|---|
+| `pets.list` | `{ pets: [{ id, name, source, folder, spritesheet, active }], invalid: [{ folder, source, reason }], active }` |
+| `pets.current` | `{ active, resolved, pet }` — `pet` is `null` when nothing is selected or the stored id no longer resolves |
+| `pets.use` | `{ pet, applied: "next-start" }` |
+
+`source` uses the same `buddy` / `packaged` / `codex` vocabulary as `buddy status`; human
+output renders it as `buddy-managed`, `packaged`, and `codex-compatible`. Normal `pets list`
+output shows one row per pet with the active marker plus a count of skipped invalid
+folders; the per-folder reasons stay in `--verbose` and JSON so normal output stays high
+signal. A missing selection and an unresolvable stored id are degraded reads, not failures:
+both exit `0`, and the unresolvable case adds a warning check row explaining the packaged
+default fallback. `pets use` failures are typed errors with the codes `pets.id_required`,
+`pets.not_found`, `pets.invalid`, and `pets.save_failed`, each exiting non-zero.
 
 `buddy state <name>` validates state names before sending them. Invalid names return valid
 choices and a close-match suggestion when available. State validation must use the active

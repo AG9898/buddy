@@ -2,9 +2,14 @@
  * buddy pets — enumerate and select pets from the buddy CLI.
  *
  * Subcommands:
- *   pets list        List valid buddy-managed, packaged, and Codex-compatible pets.
- *   pets show        Print the currently selected pet and its source path.
- *   pets use <id>    Validate and persist a pet selection.
+ *   pets list           List valid buddy-managed, packaged, and Codex-compatible pets.
+ *   pets current|show   Print the currently selected pet and its source path.
+ *   pets use <id>       Validate and persist a pet selection.
+ *
+ * Every command returns a typed `CommandResult` and never writes to a stream or
+ * calls `process.exit`; the CLI entry boundary renders the result through the
+ * shared output layer, so all three honor `--json`, `--quiet`, `--verbose`, and
+ * `--no-color` identically. Expected failures are thrown as `CliError`.
  *
  * Selection is stored in buddy-owned state (<buddy data dir>\state.json).
  * Never reads or writes Codex internal state.
@@ -14,20 +19,9 @@
 import fs from 'fs'
 import os from 'os'
 import path from 'path'
-import { discoverPets, type PetEntry } from '../pets.js'
+import { discoverPets, type InvalidPetEntry, type PetEntry, type PetSource } from '../pets.js'
 import { buddyStatePath } from '../../shared/buddy-paths.js'
-import {
-  heading,
-  success,
-  error,
-  warn,
-  bullet,
-  label,
-  closeSeparator,
-  dim,
-  bold,
-  orange,
-} from '../output.js'
+import { CliError, commandResult, type CommandResult, type ResultCheck } from '../result.js'
 
 // ── State file helpers ─────────────────────────────────────────────────────────
 // Minimal read/write of the buddy state JSON.
@@ -101,124 +95,211 @@ function saveActivePet(entry: PetEntry): void {
   fs.writeFileSync(filePath, JSON.stringify(updated, null, 2), 'utf8')
 }
 
-// ── Output helpers ─────────────────────────────────────────────────────────────
+// ── Machine-readable payloads ──────────────────────────────────────────────────
+// These shapes are the public `--json` contract for the pets commands.
 
-/** Source label text for a pet entry. */
-function sourceLabel(source: PetEntry['source']): string {
+/** One discovered, validated pet. */
+export interface PetSummary {
+  readonly id: string
+  readonly name: string
+  /** Raw discovery source, matching the `buddy status` vocabulary. */
+  readonly source: PetSource
+  readonly folder: string
+  readonly spritesheet: string
+  /** True when this pet is the stored selection. */
+  readonly active: boolean
+}
+
+/** One pet folder that failed validation and was skipped. */
+export interface InvalidPetSummary {
+  readonly folder: string
+  readonly source: PetSource
+  readonly reason: string
+}
+
+export interface PetsListData {
+  readonly pets: readonly PetSummary[]
+  readonly invalid: readonly InvalidPetSummary[]
+  /** Stored selection id, even when it no longer resolves. */
+  readonly active: string | null
+}
+
+export interface PetsCurrentData {
+  readonly active: string | null
+  /** True when `active` still resolves to a valid discovered pet. */
+  readonly resolved: boolean
+  readonly pet: PetSummary | null
+}
+
+/**
+ * `applied` is `next-start` until the live-selection CLI wiring ships, so the
+ * payload never claims a running pet changed.
+ */
+export interface PetsUseData {
+  readonly pet: PetSummary
+  readonly applied: 'next-start'
+}
+
+// ── Shaping helpers ────────────────────────────────────────────────────────────
+
+/** Human-facing source label for a pet entry. */
+function sourceLabel(source: PetSource): string {
   if (source === 'buddy') return 'buddy-managed'
   if (source === 'packaged') return 'packaged'
   return 'codex-compatible'
 }
 
-/** Render a single pet entry row. */
-function printPetRow(entry: PetEntry, activePetId: string | null): void {
-  const isActive = entry.id === activePetId
-  const activeMarker = isActive ? orange(' *') : '  '
-  const src = dim(`[${sourceLabel(entry.source)}]`)
-  process.stdout.write(`${activeMarker} ${bold(entry.id)}  ${entry.name}  ${src}\n`)
-  process.stdout.write(`     ${dim(entry.folderPath)}\n`)
+function toSummary(entry: PetEntry, activePetId: string | null): PetSummary {
+  return {
+    id: entry.id,
+    name: entry.name,
+    source: entry.source,
+    folder: entry.folderPath,
+    spritesheet: entry.spritesheetPath,
+    active: entry.id === activePetId,
+  }
 }
+
+function toInvalidSummary(entry: InvalidPetEntry): InvalidPetSummary {
+  return { folder: entry.folderPath, source: entry.source, reason: entry.reason }
+}
+
+/** `Name (source)` plus the active marker, used for one human list row. */
+function petRowValue(pet: PetSummary): string {
+  const marker = pet.active ? '  *active' : ''
+  return `${pet.name} (${sourceLabel(pet.source)})${marker}`
+}
+
+const PETS_DIR_HINT =
+  'Add pets under the buddy pets directory, this package’s pets/, or %USERPROFILE%\\.codex\\pets'
 
 // ── Command implementations ────────────────────────────────────────────────────
 
 /**
  * buddy pets list
  *
- * Enumerate all valid pets from buddy-managed, packaged, and Codex-compatible directories.
- * Marks the currently active pet with an asterisk.
+ * Enumerate all valid pets from buddy-managed, packaged, and Codex-compatible
+ * directories. The active selection is marked, and invalid folders are counted
+ * in normal output with their reasons kept for `--verbose` and `--json`.
  */
-export function runPetsList(): void {
-  heading('buddy pets list')
-
+export function runPetsList(): CommandResult<PetsListData> {
   const { valid, invalid } = discoverPets()
   const activePetId = readActivePetId()
 
-  if (valid.length === 0 && invalid.length === 0) {
-    warn('No pet folders found.')
-    process.stdout.write(
-      dim(
-        '  Add pets to %USERPROFILE%\\.petdex-win\\pets, this package\\pets, or %USERPROFILE%\\.codex\\pets\n',
-      ),
-    )
-    closeSeparator()
-    return
+  const pets = valid.map((entry) => toSummary(entry, activePetId))
+  const invalidPets = invalid.map(toInvalidSummary)
+  const data: PetsListData = { pets, invalid: invalidPets, active: activePetId }
+
+  const verboseDetails = [
+    ...pets.map((pet) => `${pet.id}: ${pet.folder}`),
+    ...invalidPets.map((entry) => `skipped ${entry.folder} — ${entry.reason}`),
+  ]
+
+  if (pets.length === 0) {
+    return commandResult('pets.list', data, {
+      summary:
+        invalidPets.length > 0
+          ? `No valid pets found; ${invalidPets.length} invalid folder(s) skipped.`
+          : 'No pet folders found.',
+      hint: PETS_DIR_HINT,
+      verboseDetails,
+    })
   }
 
-  if (valid.length > 0) {
-    for (const entry of valid) {
-      printPetRow(entry, activePetId)
-    }
-  } else {
-    warn('No valid pets found.')
+  const details = pets.map((pet) => ({ label: pet.id, value: petRowValue(pet) }))
+  if (invalidPets.length > 0) {
+    details.push({
+      label: 'Skipped',
+      value: `${invalidPets.length} invalid folder(s) — run with --verbose for reasons`,
+    })
   }
 
-  if (invalid.length > 0) {
-    process.stdout.write('\n')
-    process.stdout.write(dim(`  ${invalid.length} invalid folder(s) skipped:\n`))
-    for (const inv of invalid) {
-      process.stdout.write(dim(`    ${inv.folderPath}  — ${inv.reason}\n`))
-    }
-  }
-
-  closeSeparator()
-
-  if (valid.length > 0) {
-    if (activePetId) {
-      process.stdout.write(dim(`  Active: ${activePetId}  (use 'buddy pets use <id>' to change)\n`))
-    } else {
-      process.stdout.write(dim(`  No active pet set. Use 'buddy pets use <id>' to select one.\n`))
-    }
-  }
+  return commandResult('pets.list', data, {
+    summary: `${pets.length} pet(s) available.`,
+    details,
+    hint: activePetId
+      ? `Active: ${activePetId} — change it with: buddy pets use <id>`
+      : "No active pet set. Select one with: buddy pets use <id>",
+    verboseDetails,
+  })
 }
 
 /**
- * buddy pets show
+ * buddy pets current  (alias: buddy pets show)
  *
- * Print the currently selected pet id and folder path.
+ * Report the stored selection. A missing or unresolvable selection is a
+ * degraded read, not a failure, so the command still exits zero with an
+ * actionable hint.
  */
-export function runPetsShow(): void {
-  heading('buddy pets show')
-
+export function runPetsCurrent(): CommandResult<PetsCurrentData> {
   const activePetId = readActivePetId()
 
   if (!activePetId) {
-    warn('No active pet selected.')
-    process.stdout.write(dim("  Use 'buddy pets use <id>' to select a pet.\n"))
-    closeSeparator()
-    return
-  }
-
-  // Find the active pet in discovered pets to get full details.
-  const { valid } = discoverPets()
-  const entry = valid.find((p) => p.id === activePetId)
-
-  label('Active pet', activePetId)
-
-  if (entry) {
-    label('Name', entry.name)
-    label('Source', sourceLabel(entry.source))
-    label('Folder', entry.folderPath)
-    label('Spritesheet', entry.spritesheetPath)
-  } else {
-    // The stored id no longer resolves to a valid pet.
-    warn(`Stored pet id '${activePetId}' no longer resolves to a valid pet.`)
-    process.stdout.write(
-      dim("  Run 'buddy pets list' to see available pets, then 'buddy pets use <id>' to reselect.\n"),
+    return commandResult(
+      'pets.current',
+      { active: null, resolved: false, pet: null },
+      {
+        summary: 'No active pet selected.',
+        hint: "Select one with: buddy pets use <id>",
+      },
     )
   }
 
-  closeSeparator()
+  const { valid } = discoverPets()
+  const entry = valid.find((p) => p.id === activePetId)
+
+  if (!entry) {
+    // The stored id no longer resolves to a valid pet; Electron falls back to
+    // the packaged default until a new selection is made.
+    return commandResult(
+      'pets.current',
+      { active: activePetId, resolved: false, pet: null },
+      {
+        checks: [
+          {
+            label: `Stored pet id '${activePetId}' no longer resolves to a valid pet.`,
+            status: 'warn',
+            detail: 'buddy falls back to the packaged default pet until you reselect.',
+          },
+        ],
+        summary: `Active pet '${activePetId}' is unresolved.`,
+        hint: "Run 'buddy pets list', then reselect with: buddy pets use <id>",
+      },
+    )
+  }
+
+  const pet = toSummary(entry, activePetId)
+  return commandResult(
+    'pets.current',
+    { active: activePetId, resolved: true, pet },
+    {
+      summary: `Active pet: ${pet.name}.`,
+      details: [
+        { label: 'Id', value: pet.id },
+        { label: 'Name', value: pet.name },
+        { label: 'Source', value: sourceLabel(pet.source) },
+        { label: 'Folder', value: pet.folder },
+      ],
+      verboseDetails: [`Spritesheet: ${pet.spritesheet}`],
+    },
+  )
 }
 
 /**
  * buddy pets use <id>
  *
- * Validate the requested pet and persist the selection.
+ * Validate the requested pet and persist the selection to buddy-owned state.
+ *
+ * Applying the selection to a running app is deliberately out of scope here
+ * (see the live-selection task): the result states that the saved pet takes
+ * effect on the next start.
  */
-export function runPetsUse(id: string): void {
+export function runPetsUse(id: string): CommandResult<PetsUseData> {
   if (!id || id.trim() === '') {
-    error('Pet id is required.', "Usage: buddy pets use <id>")
-    process.exit(1)
+    throw new CliError('Pet id is required.', {
+      code: 'pets.id_required',
+      hint: 'Usage: buddy pets use <id>',
+    })
   }
 
   const petId = id.trim()
@@ -228,50 +309,64 @@ export function runPetsUse(id: string): void {
   const entry = valid.find((p) => p.id === petId)
 
   if (!entry) {
-    // Check if the id exists in invalid entries for a better error message.
+    // A folder with that name may exist but have failed validation — say so.
     const invalidEntry = invalid.find((inv) => path.basename(inv.folderPath) === petId)
     if (invalidEntry) {
-      error(
-        `Pet '${petId}' exists but failed validation.`,
-        `Reason: ${invalidEntry.reason}`,
-      )
-    } else {
-      const available = valid.map((p) => p.id)
-      const hint =
+      throw new CliError(`Pet '${petId}' exists but failed validation.`, {
+        code: 'pets.invalid',
+        hint: `Reason: ${invalidEntry.reason}`,
+        data: { id: petId, reason: invalidEntry.reason, folder: invalidEntry.folderPath },
+      })
+    }
+
+    const available = valid.map((p) => p.id)
+    throw new CliError(`Pet '${petId}' not found.`, {
+      code: 'pets.not_found',
+      hint:
         available.length > 0
           ? `Available pets: ${available.join(', ')}`
-          : "Run 'buddy pets list' to see available pets."
-      error(`Pet '${petId}' not found.`, hint)
-    }
-    process.exit(1)
+          : "Run 'buddy pets list' to see available pets.",
+      data: { id: petId, available },
+    })
   }
 
-  // Persist the selection.
   try {
     saveActivePet(entry)
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err)
-    error(`Failed to save pet selection: ${msg}`)
-    process.exit(1)
+    throw new CliError(
+      `Failed to save pet selection: ${err instanceof Error ? err.message : String(err)}`,
+      { code: 'pets.save_failed', hint: 'Check write access to the buddy data directory.', cause: err },
+    )
   }
 
-  success(`Active pet set to '${entry.id}'.`)
-  label('Name', entry.name)
-  label('Source', sourceLabel(entry.source))
-  label('Folder', entry.folderPath)
+  const pet = toSummary(entry, entry.id)
 
-  const activePetId = readActivePetId()
-  if (activePetId !== entry.id) {
-    warn('Selection may not have persisted correctly — verify with: buddy pets show')
-  }
-}
+  // Read back so a silently unwritten selection is reported instead of claimed.
+  const checks: ResultCheck[] =
+    readActivePetId() === entry.id
+      ? []
+      : [
+          {
+            label: 'Saved selection did not read back.',
+            status: 'warn',
+            detail: "Verify with: buddy pets current",
+          },
+        ]
 
-/**
- * Print help for the pets subcommand group.
- * Called when `buddy pets --help` or `buddy pets` (no subcommand) is used.
- */
-export function runPetsHelp(): void {
-  bullet('buddy pets list        — list valid buddy-managed, packaged, and Codex-compatible pets')
-  bullet('buddy pets show        — print the currently selected pet and its source path')
-  bullet('buddy pets use <id>    — validate and persist a pet selection')
+  return commandResult(
+    'pets.use',
+    { pet, applied: 'next-start' },
+    {
+      ...(checks.length > 0 ? { checks } : {}),
+      summary: `Active pet set to '${pet.id}'.`,
+      details: [
+        { label: 'Name', value: pet.name },
+        { label: 'Source', value: sourceLabel(pet.source) },
+        { label: 'Folder', value: pet.folder },
+        { label: 'Applies', value: 'on the next buddy start' },
+      ],
+      hint: 'Restart to see it: buddy stop, then buddy start',
+      verboseDetails: [`Selection stored in ${stateFilePath()}`],
+    },
+  )
 }

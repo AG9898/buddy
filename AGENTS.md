@@ -375,5 +375,17 @@ redirects to interop commands.
 Check rows are `pass`/`warn`/`fail`, where `warn` is degraded-but-present (partial hook
 coverage) and never relaxes an exit code on its own.
 
+### 2026-07-28 - Commander aliases are the cheapest way to keep a renamed command
+`buddy pets current` is registered with `.alias('show')`, so both spellings run one
+implementation and record one `pets.current` result; help renders the term as
+`current|show`. Assert on that combined term, not on `show` alone, and remember the alias
+does not get its own entry in `cmd.commands` (so `addGlobalOutputOptionsDeep` covers it).
+
+### 2026-07-28 - Mock command modules in program.test.ts, not just status
+`program.test.ts` now mocks `./commands/pets.js` as well, because routing tests for
+`pets current` / `pets show` would otherwise scan real pet directories and read the user's
+`state.json`. Any new command whose action performs I/O needs the same treatment before it
+is exercised from a program-level test.
+
 ### 2026-07-28 - The root action now performs I/O, so program tests must mock it
 Bare `buddy` renders the operational overview, so `program.test.ts` mocks `./commands/status.js`; without that, every bare-invocation test would hit the real sidecar and read `~/.claude/settings.json`. Note also that the `preAction` hook calls `configureOutput()`, replacing any test-installed output stream with `process.stdout` — spy on `process.stdout.write` to assert banner behavior in program tests.

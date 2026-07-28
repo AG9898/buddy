@@ -137,7 +137,7 @@ buddy <command> [options]
 | `buddy doctor` | Health check: process, sidecar, token, and hook status. |
 | `buddy hatch <prompt>` | Generate a personal pet via Codex CLI image generation. |
 | `buddy pets list` | List all valid buddy-managed and Codex-compatible pets. |
-| `buddy pets show` | Print the currently active pet and its path. |
+| `buddy pets current` | Print the currently active pet and its path (`buddy pets show` is an alias). |
 | `buddy pets use <id>` | Select and persist an active pet by ID. |
 
 ### Options
@@ -220,7 +220,7 @@ lives at a non-standard path.
 
 ```sh
 buddy pets list          # enumerate valid pets from all sources
-buddy pets show          # print the active selection
+buddy pets current       # print the active selection (alias: buddy pets show)
 buddy pets use orange-cat
 ```
 

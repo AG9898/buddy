@@ -2,39 +2,38 @@
  * Unit tests for src/cli/commands/pets.ts
  *
  * Acceptance criteria covered:
- *   - runPetsList() shows valid pets with source labels
- *   - runPetsList() marks the currently active pet with an asterisk
- *   - runPetsList() shows invalid folder reasons
- *   - runPetsShow() prints the active pet id and path
- *   - runPetsShow() warns when no active pet is set
- *   - runPetsShow() warns when stored pet id no longer resolves
- *   - runPetsUse() validates and persists selection
- *   - runPetsUse() exits non-zero for unknown pet ids
- *   - runPetsUse() exits non-zero for invalid (failed-validation) pet ids
+ *   - runPetsList() returns a typed result: valid pets with source labels and the active marker
+ *   - runPetsList() reports invalid folders (count in normal output, reasons under --verbose)
+ *   - runPetsList() degrades to a "no pet folders" result instead of failing
+ *   - runPetsCurrent() reports the active pet id, name, source, and folder
+ *   - runPetsCurrent() reports "no active pet" and unresolved stored ids without failing
+ *   - runPetsUse() validates, persists, and states that the pet applies on the next start
+ *   - runPetsUse() throws typed CliErrors (code + exit 1) for empty, unknown, and invalid ids
  *   - runPetsUse() never writes to Codex state files
+ *   - All three honor --json, --quiet, and --verbose through the shared renderer
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import path from 'path'
 import os from 'os'
+import {
+  configureOutput,
+  renderFailure,
+  renderResult,
+  resetOutputContext,
+  type OutputContextOptions,
+} from '../output.js'
 
 /* ── Hoisted mocks ─────────────────────────────────────────────────────────── */
 
-const {
-  mockReadFileSync,
-  mockWriteFileSync,
-  mockMkdirSync,
-  mockReaddirSync,
-  mockExistsSync,
-  mockProcessExit,
-} = vi.hoisted(() => ({
-  mockReadFileSync: vi.fn(),
-  mockWriteFileSync: vi.fn(),
-  mockMkdirSync: vi.fn(),
-  mockReaddirSync: vi.fn(),
-  mockExistsSync: vi.fn(),
-  mockProcessExit: vi.fn(),
-}))
+const { mockReadFileSync, mockWriteFileSync, mockMkdirSync, mockReaddirSync, mockExistsSync } =
+  vi.hoisted(() => ({
+    mockReadFileSync: vi.fn(),
+    mockWriteFileSync: vi.fn(),
+    mockMkdirSync: vi.fn(),
+    mockReaddirSync: vi.fn(),
+    mockExistsSync: vi.fn(),
+  }))
 
 vi.mock('fs', () => ({
   default: {
@@ -51,33 +50,32 @@ vi.mock('fs', () => ({
   existsSync: mockExistsSync,
 }))
 
-// process.exit spy is re-established in beforeEach after vi.resetAllMocks().
-
 /* ── Helpers ────────────────────────────────────────────────────────────────── */
 
-function captureOutput(): { stdout: string[]; stderr: string[]; restore: () => void } {
+interface CapturedOutput {
+  readonly stdout: string[]
+  readonly stderr: string[]
+}
+
+/** Install a test output context so the shared renderer writes into arrays. */
+function captureOutput(
+  options: Omit<OutputContextOptions, 'stdout' | 'stderr'> = {},
+): CapturedOutput {
   const stdout: string[] = []
   const stderr: string[] = []
-  const origOut = process.stdout.write.bind(process.stdout)
-  const origErr = process.stderr.write.bind(process.stderr)
+  configureOutput({
+    color: false,
+    ...options,
+    stdout: { write: (chunk: string) => stdout.push(chunk) },
+    stderr: { write: (chunk: string) => stderr.push(chunk) },
+  })
+  return { stdout, stderr }
+}
 
-  process.stdout.write = (chunk: unknown) => {
-    stdout.push(String(chunk))
-    return true
-  }
-  process.stderr.write = (chunk: unknown) => {
-    stderr.push(String(chunk))
-    return true
-  }
-
-  return {
-    stdout,
-    stderr,
-    restore: () => {
-      process.stdout.write = origOut
-      process.stderr.write = origErr
-    },
-  }
+/** Parse the single JSON payload written to stdout in `--json` mode. */
+function parsePayload(captured: CapturedOutput): Record<string, unknown> {
+  expect(captured.stdout).toHaveLength(1)
+  return JSON.parse(captured.stdout.join('')) as Record<string, unknown>
 }
 
 /* ── Test fixtures ──────────────────────────────────────────────────────────── */
@@ -125,6 +123,34 @@ function expectedStatePath(): string {
   return path.join(base, '.petdex-win', 'state.json')
 }
 
+/**
+ * Wire fs mocks so state.json reads reflect the most recent write.
+ * `runPetsUse` reads the selection back after saving it.
+ */
+function withPersistedState(initialState: string | null, petJson: unknown): void {
+  let stateJson = initialState
+  mockWriteFileSync.mockImplementation((filePath: unknown, contents: unknown) => {
+    if (String(filePath).endsWith('state.json')) stateJson = String(contents)
+  })
+  mockReadFileSync.mockImplementation((filePath: unknown) => {
+    const p = filePath as string
+    if (p.endsWith('state.json')) {
+      if (stateJson === null) throw new Error('ENOENT')
+      return stateJson
+    }
+    return JSON.stringify(petJson)
+  })
+}
+
+/** Only the buddy-managed pets directory contains the named folders. */
+function withBuddyPetFolders(...names: string[]): void {
+  mockReaddirSync.mockImplementation((dirPath: unknown) => {
+    const p = dirPath as string
+    if (p.includes('.petdex-win')) return names.map((name) => ({ name, isDirectory: () => true }))
+    return []
+  })
+}
+
 /* ── Shared setup ───────────────────────────────────────────────────────────── */
 
 beforeEach(() => {
@@ -134,16 +160,11 @@ beforeEach(() => {
   vi.stubEnv('USERPROFILE', '/fake/userprofile')
 
   vi.resetAllMocks()
-
-  // Re-establish process.exit spy after resetAllMocks (which clears previous spy implementations).
-  vi.spyOn(process, 'exit').mockImplementation((code?: string | number | null) => {
-    mockProcessExit(typeof code === 'number' ? code : Number(code ?? 0))
-    throw new Error(`process.exit(${code ?? ''})`)
-  })
 })
 
 afterEach(() => {
   vi.unstubAllEnvs()
+  resetOutputContext()
 })
 
 /* ── runPetsList() ──────────────────────────────────────────────────────────── */
@@ -166,11 +187,15 @@ describe('runPetsList()', () => {
     mockExistsSync.mockReturnValue(true)
 
     const { runPetsList } = await import('./pets.js')
-    const cap = captureOutput()
-    runPetsList()
-    cap.restore()
+    const captured = captureOutput()
+    const result = runPetsList()
+    renderResult(result)
 
-    const out = cap.stdout.join('')
+    expect(result.command).toBe('pets.list')
+    expect(result.data.active).toBeNull()
+    expect(result.data.pets.map((pet) => pet.id)).toEqual(['buddy-ragdoll', 'codex-dragon'])
+
+    const out = captured.stdout.join('')
     expect(out).toContain('buddy-ragdoll')
     expect(out).toContain('buddy-managed')
     expect(out).toContain('codex-dragon')
@@ -193,22 +218,17 @@ describe('runPetsList()', () => {
     mockExistsSync.mockReturnValue(true)
 
     const { runPetsList } = await import('./pets.js')
-    const cap = captureOutput()
-    runPetsList()
-    cap.restore()
+    const captured = captureOutput()
+    renderResult(runPetsList())
 
-    const out = cap.stdout.join('')
+    const out = captured.stdout.join('')
     expect(out).toContain('default')
     expect(out).toContain('packaged')
     expect(out).not.toContain('No pet folders found')
   })
 
-  it('marks the currently active pet with an asterisk', async () => {
-    mockReaddirSync.mockImplementation((dirPath: unknown) => {
-      const p = dirPath as string
-      if (p.includes('.petdex-win')) return [{ name: 'test-cat', isDirectory: () => true }]
-      return []
-    })
+  it('marks the currently active pet', async () => {
+    withBuddyPetFolders('test-cat')
     mockReadFileSync.mockImplementation((filePath: unknown) => {
       const p = filePath as string
       if (p.endsWith('state.json')) return makeStateJson('test-cat')
@@ -217,37 +237,39 @@ describe('runPetsList()', () => {
     mockExistsSync.mockReturnValue(true)
 
     const { runPetsList } = await import('./pets.js')
-    const cap = captureOutput()
-    runPetsList()
-    cap.restore()
+    const captured = captureOutput()
+    const result = runPetsList()
+    renderResult(result)
 
-    const out = cap.stdout.join('')
-    expect(out).toContain('*')
+    expect(result.data.active).toBe('test-cat')
+    expect(result.data.pets[0]?.active).toBe(true)
+
+    const out = captured.stdout.join('')
+    expect(out).toContain('active')
     expect(out).toContain('test-cat')
   })
 
-  it('shows invalid folder reasons when folders fail validation', async () => {
-    mockReaddirSync.mockImplementation((dirPath: unknown) => {
-      const p = dirPath as string
-      if (p.includes('.petdex-win')) return [{ name: 'broken', isDirectory: () => true }]
-      return []
-    })
+  it('counts invalid folders and keeps their reasons for --verbose and --json', async () => {
+    withBuddyPetFolders('broken')
     mockReadFileSync.mockImplementation(() => {
       throw new Error('ENOENT')
     })
     mockExistsSync.mockReturnValue(false)
 
     const { runPetsList } = await import('./pets.js')
-    const cap = captureOutput()
-    runPetsList()
-    cap.restore()
+    const captured = captureOutput({ mode: 'verbose' })
+    const result = runPetsList()
+    renderResult(result)
 
-    const out = cap.stdout.join('')
+    expect(result.data.invalid).toHaveLength(1)
+    expect(result.data.invalid[0]?.reason).toContain('pet.json')
+
+    const out = captured.stdout.join('')
     expect(out).toContain('invalid')
     expect(out).toContain('skipped')
   })
 
-  it('shows a warning when no pet folders exist', async () => {
+  it('reports an empty environment without failing', async () => {
     mockReaddirSync.mockImplementation(() => {
       throw new Error('ENOENT')
     })
@@ -256,24 +278,16 @@ describe('runPetsList()', () => {
     })
 
     const { runPetsList } = await import('./pets.js')
-    const cap = captureOutput()
-    runPetsList()
-    cap.restore()
+    const captured = captureOutput()
+    const result = runPetsList()
+    renderResult(result)
 
-    const out = cap.stdout.join('')
-    expect(out).toContain('No pet folders found')
+    expect(result.data.pets).toHaveLength(0)
+    expect(captured.stdout.join('')).toContain('No pet folders found')
   })
-})
 
-/* ── runPetsShow() ──────────────────────────────────────────────────────────── */
-
-describe('runPetsShow()', () => {
-  it('prints the active pet id, name, source, and folder path', async () => {
-    mockReaddirSync.mockImplementation((dirPath: unknown) => {
-      const p = dirPath as string
-      if (p.includes('.petdex-win')) return [{ name: 'test-cat', isDirectory: () => true }]
-      return []
-    })
+  it('emits one JSON payload with the full discovery data', async () => {
+    withBuddyPetFolders('test-cat')
     mockReadFileSync.mockImplementation((filePath: unknown) => {
       const p = filePath as string
       if (p.endsWith('state.json')) return makeStateJson('test-cat')
@@ -281,35 +295,68 @@ describe('runPetsShow()', () => {
     })
     mockExistsSync.mockReturnValue(true)
 
-    const { runPetsShow } = await import('./pets.js')
-    const cap = captureOutput()
-    runPetsShow()
-    cap.restore()
+    const { runPetsList } = await import('./pets.js')
+    const captured = captureOutput({ json: true })
+    renderResult(runPetsList())
 
-    const out = cap.stdout.join('')
+    const payload = parsePayload(captured) as {
+      ok: boolean
+      command: string
+      data: { active: string; pets: Array<{ id: string; source: string; active: boolean }> }
+    }
+    expect(payload.ok).toBe(true)
+    expect(payload.command).toBe('pets.list')
+    expect(payload.data.active).toBe('test-cat')
+    expect(payload.data.pets[0]).toMatchObject({ id: 'test-cat', source: 'buddy', active: true })
+  })
+})
+
+/* ── runPetsCurrent() ───────────────────────────────────────────────────────── */
+
+describe('runPetsCurrent()', () => {
+  it('prints the active pet id, name, source, and folder path', async () => {
+    withBuddyPetFolders('test-cat')
+    mockReadFileSync.mockImplementation((filePath: unknown) => {
+      const p = filePath as string
+      if (p.endsWith('state.json')) return makeStateJson('test-cat')
+      return JSON.stringify(VALID_PET_JSON)
+    })
+    mockExistsSync.mockReturnValue(true)
+
+    const { runPetsCurrent } = await import('./pets.js')
+    const captured = captureOutput()
+    const result = runPetsCurrent()
+    renderResult(result)
+
+    expect(result.command).toBe('pets.current')
+    expect(result.data).toMatchObject({ active: 'test-cat', resolved: true })
+
+    const out = captured.stdout.join('')
     expect(out).toContain('test-cat')
     expect(out).toContain('Test Cat')
     expect(out).toContain('buddy-managed')
   })
 
-  it('warns when no active pet is set', async () => {
+  it('reports when no active pet is set', async () => {
     mockReaddirSync.mockReturnValue([])
     mockReadFileSync.mockImplementation(() => {
       throw new Error('ENOENT')
     })
     mockExistsSync.mockReturnValue(false)
 
-    const { runPetsShow } = await import('./pets.js')
-    const cap = captureOutput()
-    runPetsShow()
-    cap.restore()
+    const { runPetsCurrent } = await import('./pets.js')
+    const captured = captureOutput()
+    const result = runPetsCurrent()
+    renderResult(result)
 
-    const out = cap.stdout.join('')
+    expect(result.data).toEqual({ active: null, resolved: false, pet: null })
+
+    const out = captured.stdout.join('')
     expect(out).toContain('No active pet selected')
-    expect(out).toContain("buddy pets use")
+    expect(out).toContain('buddy pets use')
   })
 
-  it('warns when stored pet id no longer resolves', async () => {
+  it('warns when the stored pet id no longer resolves', async () => {
     mockReaddirSync.mockReturnValue([])
     mockReadFileSync.mockImplementation((filePath: unknown) => {
       const p = filePath as string
@@ -318,14 +365,38 @@ describe('runPetsShow()', () => {
     })
     mockExistsSync.mockReturnValue(false)
 
-    const { runPetsShow } = await import('./pets.js')
-    const cap = captureOutput()
-    runPetsShow()
-    cap.restore()
+    const { runPetsCurrent } = await import('./pets.js')
+    const captured = captureOutput()
+    const result = runPetsCurrent()
+    renderResult(result)
 
-    const out = cap.stdout.join('')
+    expect(result.data).toMatchObject({ active: 'old-pet-id', resolved: false, pet: null })
+
+    const out = captured.stdout.join('')
     expect(out).toContain('old-pet-id')
     expect(out).toContain('no longer resolves')
+  })
+
+  it('returns the same data through the pets.current JSON payload', async () => {
+    withBuddyPetFolders('test-cat')
+    mockReadFileSync.mockImplementation((filePath: unknown) => {
+      const p = filePath as string
+      if (p.endsWith('state.json')) return makeStateJson('test-cat')
+      return JSON.stringify(VALID_PET_JSON)
+    })
+    mockExistsSync.mockReturnValue(true)
+
+    const { runPetsCurrent } = await import('./pets.js')
+    const captured = captureOutput({ json: true })
+    renderResult(runPetsCurrent())
+
+    const payload = parsePayload(captured) as {
+      command: string
+      data: { active: string; resolved: boolean; pet: { id: string; name: string } }
+    }
+    expect(payload.command).toBe('pets.current')
+    expect(payload.data.resolved).toBe(true)
+    expect(payload.data.pet).toMatchObject({ id: 'test-cat', name: 'Test Cat' })
   })
 })
 
@@ -333,24 +404,15 @@ describe('runPetsShow()', () => {
 
 describe('runPetsUse()', () => {
   it('persists the pet selection to state.json for a valid pet', async () => {
-    mockReaddirSync.mockImplementation((dirPath: unknown) => {
-      const p = dirPath as string
-      if (p.includes('.petdex-win')) return [{ name: 'test-cat', isDirectory: () => true }]
-      return []
-    })
-    mockReadFileSync.mockImplementation((filePath: unknown) => {
-      const p = filePath as string
-      if (p.endsWith('state.json')) throw new Error('ENOENT') // no prior state
-      return JSON.stringify(VALID_PET_JSON)
-    })
+    withBuddyPetFolders('test-cat')
+    withPersistedState(null, VALID_PET_JSON)
     mockExistsSync.mockReturnValue(true)
 
     const { runPetsUse } = await import('./pets.js')
-    const cap = captureOutput()
-    runPetsUse('test-cat')
-    cap.restore()
+    const captured = captureOutput()
+    const result = runPetsUse('test-cat')
+    renderResult(result)
 
-    // Verify writeFileSync was called with the state file path and updated pet id.
     expect(mockWriteFileSync).toHaveBeenCalled()
     const callArgs = mockWriteFileSync.mock.calls[0] as [string, string, string]
     expect(callArgs[0]).toBe(expectedStatePath())
@@ -358,8 +420,27 @@ describe('runPetsUse()', () => {
     const written = JSON.parse(callArgs[1]) as { pet: { id: string } }
     expect(written.pet.id).toBe('test-cat')
 
-    const out = cap.stdout.join('')
-    expect(out).toContain("Active pet set to 'test-cat'")
+    expect(result.command).toBe('pets.use')
+    expect(result.checks ?? []).toHaveLength(0)
+    expect(captured.stdout.join('')).toContain("Active pet set to 'test-cat'")
+  })
+
+  it('states that the saved pet applies on the next start', async () => {
+    withBuddyPetFolders('test-cat')
+    withPersistedState(null, VALID_PET_JSON)
+    mockExistsSync.mockReturnValue(true)
+
+    const { runPetsUse } = await import('./pets.js')
+    const captured = captureOutput()
+    const result = runPetsUse('test-cat')
+    renderResult(result)
+
+    expect(result.data.applied).toBe('next-start')
+
+    const out = captured.stdout.join('')
+    expect(out).toContain('next buddy start')
+    // Never claims the running pet changed until live selection ships.
+    expect(out).not.toContain('applied live')
   })
 
   it('preserves existing state fields when persisting pet selection', async () => {
@@ -370,22 +451,13 @@ describe('runPetsUse()', () => {
       byResolution: { '1920x1080': { x: 200, y: 300, width: 356, height: 320 } },
     }
 
-    mockReaddirSync.mockImplementation((dirPath: unknown) => {
-      const p = dirPath as string
-      if (p.includes('.petdex-win')) return [{ name: 'test-cat', isDirectory: () => true }]
-      return []
-    })
-    mockReadFileSync.mockImplementation((filePath: unknown) => {
-      const p = filePath as string
-      if (p.endsWith('state.json')) return JSON.stringify(existingState)
-      return JSON.stringify(VALID_PET_JSON)
-    })
+    withBuddyPetFolders('test-cat')
+    withPersistedState(JSON.stringify(existingState), VALID_PET_JSON)
     mockExistsSync.mockReturnValue(true)
 
     const { runPetsUse } = await import('./pets.js')
-    const cap = captureOutput()
+    captureOutput()
     runPetsUse('test-cat')
-    cap.restore()
 
     const callArgs = mockWriteFileSync.mock.calls[0] as [string, string, string]
     const written = JSON.parse(callArgs[1]) as {
@@ -402,7 +474,7 @@ describe('runPetsUse()', () => {
     expect(written.pet.id).toBe('test-cat')
   })
 
-  it('exits non-zero with actionable error for an unknown pet id', async () => {
+  it('fails with an actionable typed error for an unknown pet id', async () => {
     mockReaddirSync.mockImplementation(() => [])
     mockReadFileSync.mockImplementation(() => {
       throw new Error('ENOENT')
@@ -410,66 +482,92 @@ describe('runPetsUse()', () => {
     mockExistsSync.mockReturnValue(false)
 
     const { runPetsUse } = await import('./pets.js')
-    const cap = captureOutput()
-    expect(() => runPetsUse('ghost-pet')).toThrow('process.exit')
-    cap.restore()
+    const captured = captureOutput()
+    let exitCode = 0
+    try {
+      runPetsUse('ghost-pet')
+    } catch (err) {
+      exitCode = renderFailure(err, 'pets.use')
+    }
 
-    expect(mockProcessExit).toHaveBeenCalledWith(1)
-    const err = cap.stderr.join('')
-    expect(err).toContain("ghost-pet")
-    expect(err).toContain("not found")
+    expect(exitCode).toBe(1)
+    expect(mockWriteFileSync).not.toHaveBeenCalled()
+    const err = captured.stderr.join('')
+    expect(err).toContain('ghost-pet')
+    expect(err).toContain('not found')
   })
 
-  it('exits non-zero with validation reason for an invalid pet folder', async () => {
-    mockReaddirSync.mockImplementation((dirPath: unknown) => {
-      const p = dirPath as string
-      if (p.includes('.petdex-win')) return [{ name: 'bad-cat', isDirectory: () => true }]
-      return []
-    })
+  it('fails with the validation reason for an invalid pet folder', async () => {
+    withBuddyPetFolders('bad-cat')
     mockReadFileSync.mockImplementation(() => {
       throw new Error('ENOENT')
     })
     mockExistsSync.mockReturnValue(false)
 
     const { runPetsUse } = await import('./pets.js')
-    const cap = captureOutput()
-    expect(() => runPetsUse('bad-cat')).toThrow('process.exit')
-    cap.restore()
+    const captured = captureOutput()
+    let exitCode = 0
+    try {
+      runPetsUse('bad-cat')
+    } catch (err) {
+      exitCode = renderFailure(err, 'pets.use')
+    }
 
-    expect(mockProcessExit).toHaveBeenCalledWith(1)
-    const err = cap.stderr.join('')
+    expect(exitCode).toBe(1)
+    expect(mockWriteFileSync).not.toHaveBeenCalled()
+    const err = captured.stderr.join('')
     expect(err).toContain('bad-cat')
     expect(err).toContain('validation')
   })
 
-  it('exits non-zero with empty id', async () => {
+  it('fails with an empty id', async () => {
     const { runPetsUse } = await import('./pets.js')
-    const cap = captureOutput()
-    expect(() => runPetsUse('')).toThrow('process.exit')
-    cap.restore()
+    const captured = captureOutput()
+    let exitCode = 0
+    try {
+      runPetsUse('')
+    } catch (err) {
+      exitCode = renderFailure(err, 'pets.use')
+    }
 
-    expect(mockProcessExit).toHaveBeenCalledWith(1)
-    const err = cap.stderr.join('')
-    expect(err).toContain('required')
+    expect(exitCode).toBe(1)
+    expect(captured.stderr.join('')).toContain('required')
+  })
+
+  it('emits the failure as the single JSON stdout payload', async () => {
+    mockReaddirSync.mockImplementation(() => [])
+    mockReadFileSync.mockImplementation(() => {
+      throw new Error('ENOENT')
+    })
+    mockExistsSync.mockReturnValue(false)
+
+    const { runPetsUse } = await import('./pets.js')
+    const captured = captureOutput({ json: true })
+    try {
+      runPetsUse('ghost-pet')
+    } catch (err) {
+      renderFailure(err, 'pets.use')
+    }
+
+    const payload = parsePayload(captured) as {
+      ok: boolean
+      command: string
+      error: { code: string; data: { id: string } }
+    }
+    expect(payload.ok).toBe(false)
+    expect(payload.command).toBe('pets.use')
+    expect(payload.error.code).toBe('pets.not_found')
+    expect(payload.error.data.id).toBe('ghost-pet')
   })
 
   it('never writes to Codex internal state paths', async () => {
-    mockReaddirSync.mockImplementation((dirPath: unknown) => {
-      const p = dirPath as string
-      if (p.includes('.petdex-win')) return [{ name: 'test-cat', isDirectory: () => true }]
-      return []
-    })
-    mockReadFileSync.mockImplementation((filePath: unknown) => {
-      const p = filePath as string
-      if (p.endsWith('state.json')) throw new Error('ENOENT')
-      return JSON.stringify(VALID_PET_JSON)
-    })
+    withBuddyPetFolders('test-cat')
+    withPersistedState(null, VALID_PET_JSON)
     mockExistsSync.mockReturnValue(true)
 
     const { runPetsUse } = await import('./pets.js')
-    const cap = captureOutput()
+    captureOutput()
     runPetsUse('test-cat')
-    cap.restore()
 
     // Verify no writes went to a .codex path.
     for (const callArgs of mockWriteFileSync.mock.calls) {
@@ -479,22 +577,13 @@ describe('runPetsUse()', () => {
   })
 
   it('writes to .petdex-win/state.json (buddy-owned path)', async () => {
-    mockReaddirSync.mockImplementation((dirPath: unknown) => {
-      const p = dirPath as string
-      if (p.includes('.petdex-win')) return [{ name: 'test-cat', isDirectory: () => true }]
-      return []
-    })
-    mockReadFileSync.mockImplementation((filePath: unknown) => {
-      const p = filePath as string
-      if (p.endsWith('state.json')) throw new Error('ENOENT')
-      return JSON.stringify(VALID_PET_JSON)
-    })
+    withBuddyPetFolders('test-cat')
+    withPersistedState(null, VALID_PET_JSON)
     mockExistsSync.mockReturnValue(true)
 
     const { runPetsUse } = await import('./pets.js')
-    const cap = captureOutput()
+    captureOutput()
     runPetsUse('test-cat')
-    cap.restore()
 
     const callArgs = mockWriteFileSync.mock.calls[0] as [string, string, string]
     expect(callArgs[0]).toContain('.petdex-win')
@@ -502,25 +591,35 @@ describe('runPetsUse()', () => {
   })
 
   it('writes selected pet state under BUDDY_DATA_DIR when configured', async () => {
-    vi.stubEnv('BUDDY_DATA_DIR', '/mnt/c/Users/TestUser/.petdex-win')
-    mockReaddirSync.mockImplementation((dirPath: unknown) => {
-      const p = dirPath as string
-      if (p.includes('.petdex-win')) return [{ name: 'test-cat', isDirectory: () => true }]
-      return []
-    })
-    mockReadFileSync.mockImplementation((filePath: unknown) => {
-      const p = filePath as string
-      if (p.endsWith('state.json')) throw new Error('ENOENT')
-      return JSON.stringify(VALID_PET_JSON)
-    })
+    const dataDir = path.join(path.sep, 'mnt', 'c', 'Users', 'TestUser', '.petdex-win')
+    vi.stubEnv('BUDDY_DATA_DIR', dataDir)
+    withBuddyPetFolders('test-cat')
+    withPersistedState(null, VALID_PET_JSON)
     mockExistsSync.mockReturnValue(true)
 
     const { runPetsUse } = await import('./pets.js')
-    const cap = captureOutput()
+    captureOutput()
     runPetsUse('test-cat')
-    cap.restore()
 
     const callArgs = mockWriteFileSync.mock.calls[0] as [string, string, string]
-    expect(callArgs[0]).toBe(path.join('/mnt/c/Users/TestUser/.petdex-win', 'state.json'))
+    expect(callArgs[0]).toBe(path.join(dataDir, 'state.json'))
+  })
+
+  it('keeps the selection result quiet-safe and verbose-aware', async () => {
+    withBuddyPetFolders('test-cat')
+    withPersistedState(null, VALID_PET_JSON)
+    mockExistsSync.mockReturnValue(true)
+
+    const { runPetsUse } = await import('./pets.js')
+
+    const quiet = captureOutput({ mode: 'quiet' })
+    renderResult(runPetsUse('test-cat'))
+    const quietOut = quiet.stdout.join('')
+    expect(quietOut).toContain("Active pet set to 'test-cat'")
+    expect(quietOut).not.toContain('buddy stop, then buddy start')
+
+    const verbose = captureOutput({ mode: 'verbose' })
+    renderResult(runPetsUse('test-cat'))
+    expect(verbose.stdout.join('')).toContain('Selection stored in')
   })
 })

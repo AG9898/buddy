@@ -22,7 +22,7 @@ import {
   runHatch,
   validatePetId,
 } from './commands/hatch.js'
-import { runPetsList, runPetsShow, runPetsUse } from './commands/pets.js'
+import { runPetsCurrent, runPetsList, runPetsUse } from './commands/pets.js'
 import { runSize } from './commands/size.js'
 import { runOverview, runStatus } from './commands/status.js'
 import {
@@ -309,7 +309,7 @@ export function createProgram(): CommandType {
     .description('List and select pets')
     .addHelpText(
       'after',
-      examples('buddy pets list', 'buddy pets show', 'buddy pets use penguin'),
+      examples('buddy pets list', 'buddy pets current', 'buddy pets use penguin'),
     )
     .action(() => {
       pets.outputHelp()
@@ -319,21 +319,27 @@ export function createProgram(): CommandType {
     .command('list')
     .description('List buddy-managed, packaged, and Codex-compatible pets')
     .action(() => {
-      runPetsList()
+      recordCommand('pets.list')
+      recordResult(runPetsList())
     })
 
+  // `show` is the original name, kept as a Commander alias so both spellings
+  // run the same implementation and help renders `current|show`.
   pets
-    .command('show')
+    .command('current')
+    .alias('show')
     .description('Print the selected pet and its source path')
     .action(() => {
-      runPetsShow()
+      recordCommand('pets.current')
+      recordResult(runPetsCurrent())
     })
 
   pets
     .command('use <id>')
     .description('Validate and persist a pet selection')
     .action((id: string) => {
-      runPetsUse(id)
+      recordCommand('pets.use')
+      recordResult(runPetsUse(id))
     })
 
   // ── buddy hatch ─────────────────────────────────────────────────────────────

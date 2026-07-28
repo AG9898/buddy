@@ -1035,7 +1035,7 @@
       "id": "FEAT-21",
       "title": "Unify pet command output and add pets current alias",
       "description": "Migrate pets list, current/show, and use onto the typed CLI result renderer, keeping discovery and state persistence behavior unchanged. Add buddy pets current as the canonical current-selection command while retaining pets show as a documented compatibility alias. Live application of a selection is explicitly deferred to the dedicated live-selection tasks.",
-      "status": "todo",
+      "status": "done",
       "priority": "medium",
       "group_id": "FEAT",
       "depends_on": [

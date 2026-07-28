@@ -23,14 +23,25 @@ import { createProgram, resolveCliVersion } from './program.js'
 import { getOutputContext, resetOutputContext, type OutputContext } from './output.js'
 import { takeResult, clearResult } from './result.js'
 
-const { mockRunOverview, mockRunStatus } = vi.hoisted(() => ({
-  mockRunOverview: vi.fn(),
-  mockRunStatus: vi.fn(),
-}))
+const { mockRunOverview, mockRunStatus, mockRunPetsCurrent, mockRunPetsList, mockRunPetsUse } =
+  vi.hoisted(() => ({
+    mockRunOverview: vi.fn(),
+    mockRunStatus: vi.fn(),
+    mockRunPetsCurrent: vi.fn(),
+    mockRunPetsList: vi.fn(),
+    mockRunPetsUse: vi.fn(),
+  }))
 
 vi.mock('./commands/status.js', () => ({
   runOverview: mockRunOverview,
   runStatus: mockRunStatus,
+}))
+
+// Pet commands read the filesystem, so routing tests use doubles instead.
+vi.mock('./commands/pets.js', () => ({
+  runPetsCurrent: mockRunPetsCurrent,
+  runPetsList: mockRunPetsList,
+  runPetsUse: mockRunPetsUse,
 }))
 
 const OVERVIEW_RESULT = {
@@ -38,6 +49,12 @@ const OVERVIEW_RESULT = {
   data: { version: '1.0.2', app: { running: false, visible: false } },
   summary: 'buddy is not running.',
   nextSteps: ['buddy start', 'buddy --help'],
+}
+
+const PETS_CURRENT_RESULT = {
+  command: 'pets.current',
+  data: { active: 'default', resolved: true, pet: null },
+  summary: 'Active pet: Default.',
 }
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..')
@@ -83,7 +100,23 @@ describe('createProgram', () => {
     mockRunStatus.mockReset()
     mockRunOverview.mockResolvedValue(OVERVIEW_RESULT)
     mockRunStatus.mockResolvedValue({ ...OVERVIEW_RESULT, nextSteps: undefined })
+    mockRunPetsCurrent.mockReset()
+    mockRunPetsList.mockReset()
+    mockRunPetsUse.mockReset()
+    mockRunPetsCurrent.mockReturnValue(PETS_CURRENT_RESULT)
+    mockRunPetsList.mockReturnValue({ command: 'pets.list', data: { pets: [] } })
+    mockRunPetsUse.mockReturnValue({ command: 'pets.use', data: { applied: 'next-start' } })
     clearResult()
+  })
+
+  it('routes pets current and its show alias to the same result', async () => {
+    expect((await run(['pets', 'current'])).code).toBeNull()
+    expect(takeResult()).toMatchObject({ command: 'pets.current' })
+
+    expect((await run(['pets', 'show'])).code).toBeNull()
+    expect(takeResult()).toMatchObject({ command: 'pets.current' })
+
+    expect(mockRunPetsCurrent).toHaveBeenCalledTimes(2)
   })
 
   afterEach(() => {
@@ -173,6 +206,8 @@ describe('createProgram', () => {
     expect(petsHelp.stdout).toContain('buddy pets')
     expect(petsHelp.stdout).toContain('list')
     expect(petsHelp.stdout).toContain('use [options] <id>')
+    // `show` stays available and help marks it as an alias of `current`.
+    expect(petsHelp.stdout).toContain('current|show')
     expect(petsHelp.stdout).toContain('Examples')
 
     const installHelp = await run(['hooks', 'install', '--help'])
