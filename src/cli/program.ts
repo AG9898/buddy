@@ -12,7 +12,7 @@
 import { Command, Help, Option, type Command as CommandType } from 'commander'
 import { runStart } from './commands/start.js'
 import { runStop } from './commands/stop.js'
-import { runHooksInstall } from './commands/hooks.js'
+import { runHooksInstall, runHooksStatus, runHooksUninstall } from './commands/hooks.js'
 import { runState } from './commands/state.js'
 import { runDoctor } from './commands/doctor.js'
 import {
@@ -392,7 +392,10 @@ export function createProgram(): CommandType {
   const hooks = program
     .command('hooks')
     .description('Manage Claude Code and Codex CLI hooks')
-    .addHelpText('after', examples('buddy hooks install'))
+    .addHelpText(
+      'after',
+      examples('buddy hooks install', 'buddy hooks status', 'buddy hooks uninstall'),
+    )
     .action(() => {
       hooks.outputHelp()
     })
@@ -405,6 +408,24 @@ export function createProgram(): CommandType {
       const opts = this.opts() as { rc?: string }
       recordCommand('hooks.install')
       recordResult(runHooksInstall(opts.rc))
+    })
+
+  hooks
+    .command('status')
+    .description('Report hook coverage per assistant and event (read-only)')
+    .action(() => {
+      recordCommand('hooks.status')
+      recordResult(runHooksStatus())
+    })
+
+  // Destructive, so it only ever runs on this explicit invocation — `doctor`
+  // and `hooks status` never remove anything.
+  hooks
+    .command('uninstall')
+    .description('Remove only the hook entries buddy owns')
+    .action(() => {
+      recordCommand('hooks.uninstall')
+      recordResult(runHooksUninstall())
     })
 
   // ── buddy state ─────────────────────────────────────────────────────────────

@@ -21,6 +21,8 @@ The npm package is named `@ag9898/buddy`, but the installed command remains `bud
 | `buddy stop` | Terminate the running Electron pet app. |
 | `buddy state <name>` | Send a pet state change to the local sidecar. |
 | `buddy hooks install [--rc <path>]` | Install Claude Code and Codex CLI hook entries. |
+| `buddy hooks status` | Report Claude Code and Codex CLI hook coverage per assistant and event. Read-only. |
+| `buddy hooks uninstall` | Remove only the hook entries buddy owns, preserving unrelated configuration. |
 | `buddy doctor` | Print a health checklist for process, sidecar, token, and hooks. |
 | `buddy hatch <prompt> [--id <id> | --output <dir> | --package-preset <id>] [--verbose]` | Generate a personal pet by default; bundled presets require explicit maintainer opt-in. |
 | `buddy pets list` | List valid buddy-managed, packaged, and Codex-compatible pets. |
@@ -30,21 +32,14 @@ The npm package is named `@ag9898/buddy`, but the installed command remains `bud
 
 ---
 
-## Accepted CLI UX Refresh (Planned)
+## Accepted CLI UX Refresh
 
-The next CLI iteration improves discoverability, output consistency, automation support,
-and lifecycle safety without removing the existing top-level commands. Until the matching
-workboard tasks are complete, this section is a forward-looking contract rather than a
-description of shipped behavior.
-
-The planned command surface adds:
-
-| Command | Purpose |
-|---|---|
-| `buddy hooks status` | Report Claude Code and Codex CLI hook coverage without changing configuration. |
-| `buddy hooks uninstall` | Remove only buddy-owned hook entries after explicit command invocation, preserving unrelated configuration. |
-
-Existing commands retain their current names.
+The CLI UX refresh improves discoverability, output consistency, automation support, and
+lifecycle safety without removing or renaming any existing top-level command. Its command
+surface is complete: the hook lifecycle commands `buddy hooks status` and
+`buddy hooks uninstall` shipped alongside `buddy hooks install` and appear in the catalog
+above. Remaining refresh work is presentational only and is called out inline in the
+sections it affects.
 
 ---
 
@@ -310,7 +305,21 @@ are mutually exclusive. If environment-driven debug output changes, document it 
 
 ---
 
-## Hook Installation
+## Hook Lifecycle
+
+`buddy hooks` owns the full lifecycle: `install` writes entries, `status` reports coverage,
+and `uninstall` removes them. All three share one ownership and detection model, and only
+`install` and `uninstall` ever modify configuration.
+
+### Ownership
+
+A hook entry belongs to buddy when a mapped hook event carries a command of exactly
+`buddy state <name>` or `petdex-bridge state <name>` for that event's pet state. Ownership
+follows the command, not the shell the invocation happens to run in, so entries written
+from Windows and from WSL are both recognised. Nothing else in an assistant's configuration
+is ever treated as buddy-owned.
+
+### `buddy hooks install`
 
 `buddy hooks install` configures both supported assistant CLIs in the current host
 environment:
@@ -337,11 +346,54 @@ After installing Codex hooks, users may need to open `/hooks` inside Codex CLI t
 and trust the new command hooks before Codex will execute them; the command prints that as
 its next-step hint whenever it writes new Codex entries.
 
-The planned `buddy hooks status` command reuses the same detection logic as `buddy doctor`.
-The planned `buddy hooks uninstall` command removes only entries owned by buddy, is
-idempotent, preserves unrelated JSON content, and reports exactly which entries were
-removed or already absent. Invoking `uninstall` is the explicit authorization to modify
-the hook configuration; it must not be performed automatically by `doctor`.
+### `buddy hooks status`
+
+`buddy hooks status` runs the same detection `buddy doctor` and `buddy status` use and
+opens no file for writing. It reports one row per assistant with its installed/total count
+and an indented row per hook event:
+
+```text
+buddy hooks status
+────────────────────────────────────────────────
+  ✔  claude-code
+       5/5 installed
+       ✔  UserPromptSubmit
+       ✔  PreToolUse
+  ⚠  codex-cli
+       3/5 installed
+       ✔  UserPromptSubmit
+       ✖  PreToolUse
+────────────────────────────────────────────────
+✔ Hook coverage is partial (8/10 installed).
+  → Install the missing hooks: buddy hooks install
+```
+
+Rows use the shared vocabulary: `✔` complete for that assistant, `⚠` partial, `✖` none.
+Like `buddy status`, this is a report rather than a verdict — incomplete coverage exits `0`
+with the install hint. Use `buddy doctor` when a non-zero exit for an unhealthy install is
+wanted. The `hooks.status` JSON payload carries `runtime`, `installed`, `total`, a
+`coverage` value of `none` / `partial` / `complete`, and the per-assistant `targets` array
+with each target's `events`. Only buddy's own event names and counts appear; assistant
+configuration content never does.
+
+### `buddy hooks uninstall`
+
+`buddy hooks uninstall` removes only buddy-owned entries. Unrelated commands that share an
+entry, unrelated entries, unrelated events, and every other key in the file are preserved.
+An entry is deleted only when buddy owned all of its commands, and an event key is deleted
+only when it has no entries left.
+
+Invoking `uninstall` is the explicit authorization to modify hook configuration. Nothing
+else performs it: `buddy doctor` and `buddy hooks status` stay read-only.
+
+The command is idempotent. A run that finds nothing to remove writes no file at all, so
+untouched configuration stays byte-for-byte identical and a repeated uninstall is a success
+reporting every event as already absent (`No buddy hook entries were present.`). A file
+that does not parse as JSON is reported as a failure row and left unchanged rather than
+rewritten. Any failure ends the run with the `hooks.uninstall_failed` code and a non-zero
+exit; a target that removed some entries and then failed is a warning row. The
+`hooks.uninstall` JSON payload carries `runtime`, the `removed` / `skipped` / `failed`
+counts, and the per-target breakdown.
 
 ## Hatch Workflow Output
 
@@ -561,6 +613,11 @@ CLI changes should include focused tests or smoke checks for:
   non-zero exit and the checks rendered before a failure message.
 - `buddy hooks install` complete install, idempotent re-run, partial per-target coverage,
   and write failures.
+- `buddy hooks status` complete, partial, and empty coverage, plus proof that it never
+  installs or removes anything.
+- `buddy hooks uninstall` buddy-owned removal, preservation of unrelated configuration,
+  the idempotent no-op re-run, malformed JSON left unchanged, and Windows/WSL command
+  targets.
 - Non-TTY/plain output behavior when styling is disabled or unsupported.
 - Styled output behavior when styling is supported.
 - Global `--verbose`, `--quiet`, `--json`, and `--no-color` behavior, including stdout and

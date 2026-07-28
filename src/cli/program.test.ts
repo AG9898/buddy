@@ -214,6 +214,14 @@ describe('createProgram', () => {
     expect(installHelp.code).toBe('commander.helpDisplayed')
     expect(installHelp.stdout).toContain('buddy hooks install')
     expect(installHelp.stdout).toContain('--rc <path>')
+
+    // The full hook lifecycle is discoverable from the group help.
+    const hooksHelp = await run(['hooks', '--help'])
+    expect(hooksHelp.code).toBe('commander.helpDisplayed')
+    for (const name of ['install', 'status', 'uninstall']) {
+      expect(hooksHelp.stdout).toContain(name)
+    }
+    expect(hooksHelp.stdout).toContain('buddy hooks uninstall')
   })
 
   it('prints help without a banner when stdout is not a TTY', async () => {

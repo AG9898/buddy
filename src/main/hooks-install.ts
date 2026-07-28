@@ -78,18 +78,41 @@ interface ClaudeSettings {
   [key: string]: unknown
 }
 
-function loadClaudeSettings(): ClaudeSettings {
-  const filePath = claudeSettingsPath()
+/** Outcome of reading one hook configuration file. */
+interface HookFileRead {
+  /** Parsed object, or `{}` when the file is missing or unparseable. */
+  readonly settings: HookSettings
+  /** The file exists but does not parse into a JSON object. */
+  readonly malformed: boolean
+}
+
+/**
+ * Read a hook configuration file without ever throwing.
+ *
+ * Install treats a missing and a malformed file the same way (start fresh);
+ * uninstall must not, because rewriting a file it could not understand would
+ * destroy unrelated configuration. `malformed` keeps the two cases separable.
+ */
+function readHookFile(filePath: string): HookFileRead {
+  let raw: string
   try {
-    const raw = fs.readFileSync(filePath, 'utf8')
+    raw = fs.readFileSync(filePath, 'utf8')
+  } catch {
+    return { settings: {}, malformed: false }
+  }
+  try {
     const parsed: unknown = JSON.parse(raw)
     if (typeof parsed === 'object' && parsed !== null) {
-      return parsed as ClaudeSettings
+      return { settings: parsed as HookSettings, malformed: false }
     }
   } catch {
-    // File missing or invalid — start fresh.
+    // Fall through — a non-object or unparseable body is malformed.
   }
-  return {}
+  return { settings: {}, malformed: true }
+}
+
+function loadClaudeSettings(): ClaudeSettings {
+  return readHookFile(claudeSettingsPath()).settings as ClaudeSettings
 }
 
 function saveClaudeSettings(settings: ClaudeSettings): void {
@@ -99,17 +122,7 @@ function saveClaudeSettings(settings: ClaudeSettings): void {
 }
 
 function loadCodexHooks(): HookSettings {
-  const filePath = codexHooksPath()
-  try {
-    const raw = fs.readFileSync(filePath, 'utf8')
-    const parsed: unknown = JSON.parse(raw)
-    if (typeof parsed === 'object' && parsed !== null) {
-      return parsed as HookSettings
-    }
-  } catch {
-    // File missing or invalid — start fresh.
-  }
-  return {}
+  return readHookFile(codexHooksPath()).settings
 }
 
 function saveCodexHooks(settings: HookSettings): void {
@@ -326,6 +339,128 @@ export function getHooksStatus(options: HookInstallOptions = {}): Record<string,
 
     return status
   })
+}
+
+// ── uninstallHooks ─────────────────────────────────────────────────────────────
+
+export interface HookUninstallResult {
+  /** `"<target>:<event>"` entries whose buddy command was removed on this run. */
+  removed: string[]
+  /** `"<target>:<event>"` entries that carried no buddy command to begin with. */
+  skipped: string[]
+  errors: string[]
+}
+
+/**
+ * Every command string buddy itself writes for one hook event.
+ *
+ * Both runtimes are listed on purpose: ownership is a property of the command,
+ * not of the shell the uninstall happens to run in, so a Windows-installed and a
+ * WSL-installed entry are both recognised and removed.
+ */
+function buddyCommandsFor(event: string): string[] {
+  const petState = HOOK_EVENT_MAP[event]
+  if (!petState) return []
+  return [stateCommand(petState, 'windows'), stateCommand(petState, 'wsl')]
+}
+
+/** Whether a hook command under `event` is one buddy wrote. */
+export function isBuddyHookCommand(command: unknown, event: string): boolean {
+  return typeof command === 'string' && buddyCommandsFor(event).includes(command.trim())
+}
+
+/**
+ * Remove buddy-owned commands for one event from a parsed settings object.
+ *
+ * Returns `true` only when something was actually removed, so a caller can skip
+ * the write entirely and leave an untouched file byte-for-byte identical.
+ * Unrelated commands inside a shared entry, unrelated entries, unrelated events,
+ * and every other top-level key survive unchanged.
+ */
+function pruneBuddyHooks(settings: HookSettings, event: string): boolean {
+  const hooks = settings.hooks
+  const entries = hooks?.[event]
+  if (!hooks || !Array.isArray(entries)) return false
+
+  let changed = false
+  const kept: HookEntry[] = []
+
+  for (const entry of entries) {
+    const commands = Array.isArray(entry?.hooks) ? entry.hooks : []
+    const keptCommands = commands.filter(
+      (command) => !(command?.type === 'command' && isBuddyHookCommand(command.command, event)),
+    )
+    if (keptCommands.length === commands.length) {
+      kept.push(entry)
+      continue
+    }
+    changed = true
+    // Keep an entry that also carried commands buddy does not own.
+    if (keptCommands.length > 0) kept.push({ ...entry, hooks: keptCommands })
+  }
+
+  if (!changed) return false
+  if (kept.length > 0) {
+    hooks[event] = kept
+  } else {
+    delete hooks[event]
+  }
+  return true
+}
+
+/** Remove buddy-owned entries from one target's configuration file. */
+function uninstallTarget(
+  target: string,
+  filePath: string,
+  save: (settings: HookSettings) => void,
+  result: HookUninstallResult,
+): void {
+  try {
+    const file = readHookFile(filePath)
+    if (file.malformed) {
+      // Never rewrite a file buddy could not parse — unrelated settings live there.
+      result.errors.push(`${target}: ${filePath} is not valid JSON; left unchanged`)
+      return
+    }
+
+    let changed = false
+    for (const event of HOOK_EVENTS) {
+      if (pruneBuddyHooks(file.settings, event)) {
+        result.removed.push(`${target}:${event}`)
+        changed = true
+      } else {
+        result.skipped.push(`${target}:${event}`)
+      }
+    }
+
+    if (changed) save(file.settings)
+  } catch (err) {
+    result.errors.push(`${target}: ${err instanceof Error ? err.message : String(err)}`)
+  }
+}
+
+/**
+ * Remove Claude Code CLI and/or Codex CLI hook entries buddy owns.
+ *
+ * This is a destructive operation on user configuration, so it runs only when
+ * the user explicitly invokes `buddy hooks uninstall`. Nothing else in this
+ * codebase may call it: `getHooksStatus()` and `buddy doctor` stay read-only.
+ *
+ * A run that finds nothing to remove writes no file at all, which makes repeated
+ * uninstalls a successful no-op and leaves untouched configuration byte-for-byte
+ * unchanged. Like `installHooks`, this function contains no Electron imports.
+ */
+export function uninstallHooks(options: HookInstallOptions = {}): HookUninstallResult {
+  const result: HookUninstallResult = { removed: [], skipped: [], errors: [] }
+
+  if (options.claudeCode) {
+    uninstallTarget('claude-code', claudeSettingsPath(), saveClaudeSettings, result)
+  }
+  if (options.codexCli) {
+    uninstallTarget('codex-cli', codexHooksPath(), saveCodexHooks, result)
+  }
+
+  return result
 }
 
 // ── Tray integration helper ────────────────────────────────────────────────────

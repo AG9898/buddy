@@ -140,9 +140,10 @@ checks cover missing token and stopped-sidecar error output.
 correctly, state persists across restart, tray Show/Hide/Quit work.
 
 **Main-process unit tests:** State persistence, active-pet asset resolution and live-selection
-persistence, token-authenticated sidecar validation, bounded operational status snapshots, and hook installation/status. Hook tests
+persistence, token-authenticated sidecar validation, bounded operational status snapshots, and the hook install/status/uninstall lifecycle. Hook tests
 cover Claude Code `settings.json`, Codex CLI `hooks.json`, Windows `buddy state` commands,
-WSL `petdex-bridge state` commands, idempotency, and missing-hook status.
+WSL `petdex-bridge state` commands, idempotency, missing-hook status, buddy-owned removal
+with unrelated configuration preserved, and a malformed configuration file left unwritten.
 
 **CLI tests:** Command help and changed command behavior, non-TTY/plain output, styled
 output when supported, expected error messages and exit codes, hatch progress output that
@@ -180,7 +181,7 @@ integration (requires Electron E2E).
 | `src/renderer/PetSprite.test.ts` | Renderer sprite fallback | New-manifest spritesheet replacement and missing-state idle fallback |
 | `src/cli/env.test.ts` | CLI environment | isWSL() detection, buddyPort() defaults and overrides, sidecarBaseUrl() |
 | `src/shared/buddy-paths.test.ts` | Shared paths | buddy data root defaults, `BUDDY_DATA_DIR` override, and derived state/token/pet paths |
-| `src/main/hooks-install.test.ts` | Hook installation | installHooks idempotency, getHooksStatus, Claude Code settings, Codex hooks.json, Windows and WSL command targets |
+| `src/main/hooks-install.test.ts` | Hook lifecycle | installHooks idempotency, getHooksStatus, Claude Code settings, Codex hooks.json, Windows and WSL command targets, uninstallHooks removing only buddy-owned commands while preserving unrelated keys/entries/events, the write-nothing idempotent no-op, malformed JSON left unchanged, write-failure reporting, and the isBuddyHookCommand ownership predicate |
 | `src/cli/output.test.ts` | CLI output layer | status/success/warn/error helpers, NO_COLOR plain mode, check/checkRow pass-warn-fail rows with sub-items/subCheck/bullet/label, banner text, separator, output modes (normal/quiet/verbose/JSON) with stdout+stderr separation, single-payload JSON success and failure rendering, color resolution for TTY/redirected/FORCE_COLOR/`--no-color` |
 | `src/cli/commands/hatch.test.ts` | Hatch command | Normal mode suppresses raw subprocess output, verbose flag/env shows subprocess detail, skill-missing error, incomplete packaging error, success summary with pet id and next-step hint |
 | `src/cli/pets.test.ts` | Pet discovery | isValidPetJson schema validation, validatePetFolder for valid/missing/invalid entries, discoverPets buddy+codex sources, invalid folder reasons, buddyPetsDir/codexPetsDir path resolution and overrides |
@@ -190,9 +191,9 @@ integration (requires Electron E2E).
 | `src/cli/commands/start.test.ts` | Start command | Typed Windows and WSL startup results, missing Electron runtime, child spawn errors, non-zero WSL interop exits, and shared output-mode rendering |
 | `src/cli/commands/stop.test.ts` | Stop command | Authenticated graceful shutdown, authorization rejection, idempotent already-stopped handling, Windows/WSL verified-PID fallback, and normal/quiet/verbose/JSON output |
 | `src/cli/commands/doctor.test.ts` | Doctor command | Healthy checklist result, partial hook coverage as a warning row, typed `doctor.checks_failed` failure with the first recovery hint, missing Electron runtime, WSL probe/runtime detection, and normal/quiet/JSON rendering including checks shown before a failure message |
-| `src/cli/commands/hooks.test.ts` | Hooks install command | Complete install for both assistants, idempotent re-run, partial per-target coverage as a warning, typed `hooks.install_failed` failure with one JSON payload, WSL runtime and deprecated `--rc` pass-through, and normal/quiet/JSON rendering |
+| `src/cli/commands/hooks.test.ts` | Hooks lifecycle commands | Complete install for both assistants, idempotent re-run, partial per-target coverage as a warning, typed `hooks.install_failed` failure with one JSON payload, WSL runtime and deprecated `--rc` pass-through; read-only `hooks.status` complete/partial/none coverage with per-event rows and no install or uninstall calls; `hooks.uninstall` buddy-owned removal, idempotent no-op, partial-removal warning, typed `hooks.uninstall_failed` failure; and normal/quiet/JSON rendering for each |
 | `src/cli/commands/status.test.ts` | Status command and root overview | Running snapshot with pet/window/hook coverage, stopped and missing-token degradation without leaking the token path, partial-hook per-assistant counts, WSL environment, snapshot validation, normal/quiet/verbose/JSON rendering, and overview suggestions sharing the `app.status` payload |
-| `src/cli/program.test.ts` | CLI program structure | Bare invocation recording the `app.status` overview with the banner limited to interactive terminals, `status` registered under diagnostics, `--version` matching package.json, grouped root help with examples, nested `pets`/`hooks install` help including the `current|show` alias term, `pets current` and `pets show` routing to the same `pets.current` result, banner suppressed for non-TTY, unknown-command suggestion, missing-argument and unknown-option exit codes, global output options inherited by nested commands in either position, `--quiet`/`--verbose` conflict rejected same-command and split across the chain |
+| `src/cli/program.test.ts` | CLI program structure | Bare invocation recording the `app.status` overview with the banner limited to interactive terminals, `status` registered under diagnostics, `--version` matching package.json, grouped root help with examples, nested `pets`/`hooks install` help including the `current|show` alias term, the `hooks` group help listing install/status/uninstall, `pets current` and `pets show` routing to the same `pets.current` result, banner suppressed for non-TTY, unknown-command suggestion, missing-argument and unknown-option exit codes, global output options inherited by nested commands in either position, `--quiet`/`--verbose` conflict rejected same-command and split across the chain |
 | `src/cli/runtime.test.ts` | CLI runtime launch | package-root walking from built CLI output and missing-Electron detection for installed package layouts |
 | `petdex-bridge/src/main.rs` | WSL bridge | CLI parsing, state payload construction, loopback URL construction, token path override, and empty-state validation |
 

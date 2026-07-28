@@ -48,6 +48,8 @@ vi.mock('os', () => ({
 import {
   installHooks,
   getHooksStatus,
+  isBuddyHookCommand,
+  uninstallHooks,
   HOOK_EVENT_MAP,
 } from './hooks-install'
 
@@ -277,6 +279,185 @@ describe('getHooksStatus', () => {
     for (const event of HOOK_EVENTS) {
       expect(status[`codex-cli:${event}`]).toBe(true)
     }
+  })
+})
+
+// ── uninstallHooks ─────────────────────────────────────────────────────────
+
+/** Capture the single JSON document a run writes, if it writes one. */
+function captureWrite(): { path: () => string; json: () => string } {
+  let writtenPath = ''
+  let written = ''
+  mockWriteFileSync.mockImplementation((p: unknown, data: unknown) => {
+    writtenPath = p as string
+    written = data as string
+  })
+  return { path: () => writtenPath, json: () => written }
+}
+
+describe('uninstallHooks', () => {
+  it('removes every buddy-owned Claude Code entry it installed', () => {
+    const installed = captureWrite()
+    installHooks({ claudeCode: true })
+    const afterInstall = installed.json()
+
+    mockReadFileSync.mockReturnValue(afterInstall)
+    const removed = captureWrite()
+    const result = uninstallHooks({ claudeCode: true })
+
+    expect(result.errors).toHaveLength(0)
+    expect(result.removed).toHaveLength(5)
+    expect(result.skipped).toHaveLength(0)
+    for (const event of HOOK_EVENTS) {
+      expect(result.removed).toContain(`claude-code:${event}`)
+    }
+    expect(removed.path()).toBe(CLAUDE_SETTINGS)
+    const saved = JSON.parse(removed.json()) as { hooks: Record<string, unknown[]> }
+    expect(Object.keys(saved.hooks)).toHaveLength(0)
+  })
+
+  it('removes Codex entries from ~/.codex/hooks.json', () => {
+    const installed = captureWrite()
+    installHooks({ codexCli: true })
+
+    mockReadFileSync.mockReturnValue(installed.json())
+    const removed = captureWrite()
+    const result = uninstallHooks({ codexCli: true })
+
+    expect(result.removed).toHaveLength(5)
+    expect(removed.path()).toBe(CODEX_HOOKS)
+  })
+
+  it('removes WSL petdex-bridge commands regardless of the current runtime', () => {
+    const installed = captureWrite()
+    installHooks({ claudeCode: true, runtime: 'wsl' })
+
+    mockReadFileSync.mockReturnValue(installed.json())
+    const removed = captureWrite()
+    // Ownership follows the command, not the shell the uninstall runs in.
+    const result = uninstallHooks({ claudeCode: true, runtime: 'windows' })
+
+    expect(result.removed).toHaveLength(5)
+    const saved = JSON.parse(removed.json()) as { hooks: Record<string, unknown[]> }
+    expect(Object.keys(saved.hooks)).toHaveLength(0)
+  })
+
+  it('preserves unrelated keys, events, and entries', () => {
+    const existing = {
+      model: 'opus',
+      hooks: {
+        PreToolUse: [
+          { matcher: '', hooks: [{ type: 'command', command: 'buddy state running' }] },
+          { matcher: 'Bash', hooks: [{ type: 'command', command: 'my-linter --check' }] },
+        ],
+        SessionStart: [{ matcher: '', hooks: [{ type: 'command', command: 'echo hello' }] }],
+      },
+    }
+    mockReadFileSync.mockReturnValue(JSON.stringify(existing))
+    const removed = captureWrite()
+
+    const result = uninstallHooks({ claudeCode: true })
+
+    expect(result.removed).toEqual(['claude-code:PreToolUse'])
+    expect(result.skipped).toHaveLength(4)
+
+    const saved = JSON.parse(removed.json()) as typeof existing
+    expect(saved.model).toBe('opus')
+    expect(saved.hooks.SessionStart).toEqual(existing.hooks.SessionStart)
+    expect(saved.hooks.PreToolUse).toEqual([
+      { matcher: 'Bash', hooks: [{ type: 'command', command: 'my-linter --check' }] },
+    ])
+  })
+
+  it('keeps unrelated commands that share an entry with a buddy command', () => {
+    mockReadFileSync.mockReturnValue(
+      JSON.stringify({
+        hooks: {
+          Stop: [
+            {
+              matcher: '',
+              hooks: [
+                { type: 'command', command: 'buddy state waving' },
+                { type: 'command', command: 'notify-send done' },
+              ],
+            },
+          ],
+        },
+      }),
+    )
+    const removed = captureWrite()
+
+    const result = uninstallHooks({ claudeCode: true })
+
+    expect(result.removed).toEqual(['claude-code:Stop'])
+    const saved = JSON.parse(removed.json()) as {
+      hooks: Record<string, { matcher: string; hooks: { command: string }[] }[]>
+    }
+    expect(saved.hooks['Stop']).toEqual([
+      { matcher: '', hooks: [{ type: 'command', command: 'notify-send done' }] },
+    ])
+  })
+
+  it('is an idempotent no-op that writes nothing when no buddy entries exist', () => {
+    // No settings.json at all: readFileSync throws ENOENT by default.
+    const result = uninstallHooks({ claudeCode: true, codexCli: true })
+
+    expect(result.errors).toHaveLength(0)
+    expect(result.removed).toHaveLength(0)
+    expect(result.skipped).toHaveLength(10)
+    expect(mockWriteFileSync).not.toHaveBeenCalled()
+  })
+
+  it('leaves a malformed configuration file untouched and reports it', () => {
+    mockReadFileSync.mockReturnValue('{ not json')
+
+    const result = uninstallHooks({ claudeCode: true })
+
+    expect(result.removed).toHaveLength(0)
+    expect(result.skipped).toHaveLength(0)
+    expect(result.errors).toHaveLength(1)
+    expect(result.errors[0]).toContain('claude-code:')
+    expect(result.errors[0]).toContain('not valid JSON')
+    expect(mockWriteFileSync).not.toHaveBeenCalled()
+  })
+
+  it('reports a write failure without throwing', () => {
+    const installed = captureWrite()
+    installHooks({ claudeCode: true })
+    mockReadFileSync.mockReturnValue(installed.json())
+    mockWriteFileSync.mockImplementation(() => {
+      throw Object.assign(new Error('EACCES: permission denied'), { code: 'EACCES' })
+    })
+
+    const result = uninstallHooks({ claudeCode: true })
+
+    expect(result.errors).toEqual(['claude-code: EACCES: permission denied'])
+  })
+
+  it('only touches the targets it was asked to clean', () => {
+    const installed = captureWrite()
+    installHooks({ codexCli: true })
+    mockReadFileSync.mockReturnValue(installed.json())
+    captureWrite()
+
+    const result = uninstallHooks({ claudeCode: true })
+
+    expect(result.removed.every((entry) => entry.startsWith('claude-code:'))).toBe(true)
+    expect(result.removed.some((entry) => entry.startsWith('codex-cli:'))).toBe(false)
+  })
+})
+
+describe('isBuddyHookCommand', () => {
+  it('recognises both runtime command forms for a mapped event', () => {
+    expect(isBuddyHookCommand('buddy state running', 'PreToolUse')).toBe(true)
+    expect(isBuddyHookCommand('petdex-bridge state running', 'PreToolUse')).toBe(true)
+  })
+
+  it('rejects another event’s state, unrelated commands, and unmapped events', () => {
+    expect(isBuddyHookCommand('buddy state waving', 'PreToolUse')).toBe(false)
+    expect(isBuddyHookCommand('buddy start', 'PreToolUse')).toBe(false)
+    expect(isBuddyHookCommand('buddy state running', 'SessionStart')).toBe(false)
+    expect(isBuddyHookCommand(undefined, 'PreToolUse')).toBe(false)
   })
 })
 

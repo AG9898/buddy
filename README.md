@@ -134,6 +134,8 @@ buddy <command> [options]
 | `buddy stop` | Quit the running pet app. |
 | `buddy state <name>` | Manually push a state (`idle`, `running`, `waiting`, …). |
 | `buddy hooks install` | Write Claude Code + Codex CLI hook entries. |
+| `buddy hooks status` | Report hook coverage per assistant and event (read-only). |
+| `buddy hooks uninstall` | Remove only the hook entries buddy owns. |
 | `buddy doctor` | Health check: process, sidecar, token, and hook status. |
 | `buddy hatch <prompt>` | Generate a personal pet via Codex CLI image generation. |
 | `buddy pets list` | List all valid buddy-managed and Codex-compatible pets. |
@@ -237,7 +239,14 @@ host environment:
 - WSL hooks call `petdex-bridge state <name>`
 
 After installing Codex hooks, open `/hooks` in Codex CLI if prompted and trust the new
-buddy command hooks. The event pipeline from there:
+buddy command hooks.
+
+`buddy hooks status` reports coverage per assistant and per event without changing
+anything. `buddy hooks uninstall` removes only the entries buddy wrote — unrelated hooks,
+events, and settings in those files are preserved, repeated runs are no-ops, and a file
+buddy cannot parse is reported instead of rewritten.
+
+The event pipeline from there:
 
 ```
 [ Claude Code / Codex CLI hook fires ]

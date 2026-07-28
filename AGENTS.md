@@ -394,5 +394,18 @@ active. Only `sidecar.token_missing`, `sidecar.unreachable`, `sidecar.timeout`, 
 `sidecar.connection_error` mean "not running" and defer to the next start; every other
 sidecar failure is a rejection.
 
+### 2026-07-28 - Hook ownership follows the command, not the runtime
+`uninstallHooks()` removes both `buddy state <name>` and `petdex-bridge state <name>` for a
+mapped event, so a WSL-installed entry is still recognised from Windows and vice versa. It
+writes nothing when nothing matched — that is what makes a repeat run a no-op and leaves
+untouched files byte-for-byte identical — and it refuses to rewrite a configuration file
+that does not parse, because unrelated user settings live there.
+
+### 2026-07-28 - Command modules must not import each other at runtime
+`buddy hooks status` needs the `HookCoverage` vocabulary from `commands/status.ts`, but
+`program.test.ts` mocks `./commands/status.js`, so a runtime import would resolve to a mock
+missing that export whenever the program is constructed. Use `import type` for anything
+shared between command modules and keep runtime helpers in `src/main/` or a neutral module.
+
 ### 2026-07-28 - The root action now performs I/O, so program tests must mock it
 Bare `buddy` renders the operational overview, so `program.test.ts` mocks `./commands/status.js`; without that, every bare-invocation test would hit the real sidecar and read `~/.claude/settings.json`. Note also that the `preAction` hook calls `configureOutput()`, replacing any test-installed output stream with `process.stdout` — spy on `process.stdout.write` to assert banner behavior in program tests.

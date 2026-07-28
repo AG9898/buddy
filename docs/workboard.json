@@ -1199,7 +1199,7 @@
       "id": "FEAT-26",
       "title": "Complete the hook CLI lifecycle",
       "description": "Add buddy hooks status and buddy hooks uninstall using the existing hook ownership and detection model. Uninstall removes only buddy-owned Claude Code and Codex CLI entries, preserves unrelated configuration byte-for-byte where practical, is idempotent, and runs only when the user explicitly invokes it. Keep doctor read-only and reuse shared status data rather than duplicating detection logic.",
-      "status": "todo",
+      "status": "done",
       "priority": "medium",
       "group_id": "FEAT",
       "depends_on": [
