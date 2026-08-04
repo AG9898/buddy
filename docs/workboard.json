@@ -1329,7 +1329,7 @@
       "id": "FEAT-30",
       "title": "Complete the CLI UX contract and package smoke matrix",
       "description": "Run a final focused integration pass after the CLI refresh tasks land: verify every public command against the shared output modes, close command-help and built-entry coverage gaps, remove planned qualifiers from docs for shipped behavior, and smoke-test the packaged CLI. Fix only small integration inconsistencies; record any newly discovered feature-sized work as separate tasks rather than expanding this task.",
-      "status": "todo",
+      "status": "done",
       "priority": "high",
       "group_id": "FEAT",
       "depends_on": [

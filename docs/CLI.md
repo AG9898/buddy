@@ -39,8 +39,7 @@ The CLI UX refresh improves discoverability, output consistency, automation supp
 lifecycle safety without removing or renaming any existing top-level command. Its command
 surface is complete: the hook lifecycle commands `buddy hooks status` and
 `buddy hooks uninstall` shipped alongside `buddy hooks install` and appear in the catalog
-above. Remaining refresh work is presentational only and is called out inline in the
-sections it affects.
+above.
 
 ---
 
@@ -610,8 +609,7 @@ Because a Commander action handler cannot return a value, commands publish their
 with `recordResult()` and the entry boundary drains it after parsing. Diagnostic commands
 describe checklist rows as data (`checks` on the result or on the thrown `CliError`) so the
 entry boundary renders pass/warn/fail rows for both outcomes. Migrating each command family
-onto typed results is tracked as follow-up work; commands not yet migrated still print
-through the shared output helpers.
+onto typed results is complete; commands render through the shared output helpers.
 
 ---
 

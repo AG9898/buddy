@@ -322,4 +322,21 @@ describe('global output options', () => {
       expect(result.stdout).toContain(flag)
     }
   })
+
+  it('exposes every output mode on each public command surface', () => {
+    const program = createProgram()
+    const surfaces: Command[] = [program]
+
+    for (let index = 0; index < surfaces.length; index += 1) {
+      surfaces.push(...surfaces[index]!.commands)
+    }
+
+    expect(surfaces).toHaveLength(17)
+    for (const surface of surfaces) {
+      const flags = surface.options.map((option) => option.flags)
+      for (const flag of ['--verbose', '--quiet', '--json', '--no-color']) {
+        expect(flags).toContain(flag)
+      }
+    }
+  })
 })

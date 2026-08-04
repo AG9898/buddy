@@ -1,12 +1,12 @@
 # PRD — buddy
 
-> **Status** (2026-05-22)
+> **Status** (2026-08-04)
 >
 > | Track | State |
 > |---|---|
-> | Shipped | Nothing shipped yet. |
-> | In Progress | See docs/workboard.json. |
-> | Planned | Phase 1 MVP — see Scope below. |
+> | Shipped | Windows desktop runtime, CLI UX/output contract, and npm package layout described below. |
+> | In Progress | Release smoke and platform-dependent validation tracked in `docs/workboard.json`. |
+> | Planned | No additional product scope is committed outside the workboard. |
 
 ---
 

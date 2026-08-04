@@ -22,6 +22,8 @@ npm pack --dry-run
 # Smoke-test the packed package as an installed dependency
 npm pack
 npm install --omit=dev --prefix <temp-dir> ./ag9898-buddy-<version>.tgz
+NO_COLOR=1 <temp-dir>/node_modules/.bin/buddy --version
+NO_COLOR=1 <temp-dir>/node_modules/.bin/buddy --help
 
 # Run a single test file
 npm test -- src/renderer/PetSprite.test.ts
@@ -98,6 +100,7 @@ one WSL distribution:
 |---|---|
 | npm package | `npm pack --dry-run` contains only intended runtime/docs assets and excludes agent skill folders and source-only working files. |
 | install | `npm install -g @ag9898/buddy` installs the `buddy` command and the npm-managed Electron runtime dependency used by `buddy start`. |
+| installed CLI | A production-only install of the packed tarball reports its package version and renders `NO_COLOR=1 buddy --help` without ANSI output. |
 | launch | `buddy start` launches the Windows Electron app and returns control to the terminal. |
 | rendering | The default packaged pet renders, animates, drags, resizes visually, and survives restart. |
 | selected pets | `buddy pets list`, `buddy pets use <id>`, restart, main-process active-pet fallback diagnostics, and selected-pet render are verified from Windows; WSL path-sharing behavior is verified separately. |
@@ -195,7 +198,7 @@ integration (requires Electron E2E).
 | `src/cli/commands/doctor.test.ts` | Doctor command | Healthy checklist result, partial hook coverage as a warning row, typed `doctor.checks_failed` failure with the first recovery hint, missing Electron runtime, WSL probe/runtime detection, and normal/quiet/JSON rendering including checks shown before a failure message |
 | `src/cli/commands/hooks.test.ts` | Hooks lifecycle commands | Complete install for both assistants, idempotent re-run, partial per-target coverage as a warning, typed `hooks.install_failed` failure with one JSON payload, WSL runtime and deprecated `--rc` pass-through; read-only `hooks.status` complete/partial/none coverage with per-event rows and no install or uninstall calls; `hooks.uninstall` buddy-owned removal, idempotent no-op, partial-removal warning, typed `hooks.uninstall_failed` failure; and normal/quiet/JSON rendering for each |
 | `src/cli/commands/status.test.ts` | Status command and root overview | Running snapshot with pet/window/hook coverage, stopped and missing-token degradation without leaking the token path, partial-hook per-assistant counts, WSL environment, snapshot validation, normal/quiet/verbose/JSON rendering, and overview suggestions sharing the `app.status` payload |
-| `src/cli/program.test.ts` | CLI program structure | Bare invocation recording the `app.status` overview with the banner limited to interactive terminals, `status` registered under diagnostics, `--version` matching package.json, grouped root help with examples, nested `pets`/`hooks install` help including the `current|show` alias term, the `hooks` group help listing install/status/uninstall, `pets current` and `pets show` routing to the same `pets.current` result, banner suppressed for non-TTY, unknown-command suggestion, missing-argument and unknown-option exit codes, global output options inherited by nested commands in either position, `--quiet`/`--verbose` conflict rejected same-command and split across the chain |
+| `src/cli/program.test.ts` | CLI program structure | Bare invocation recording the `app.status` overview with the banner limited to interactive terminals, `status` registered under diagnostics, `--version` matching package.json, grouped root help with examples, nested `pets`/`hooks install` help including the `current|show` alias term, the `hooks` group help listing install/status/uninstall, `pets current` and `pets show` routing to the same `pets.current` result, banner suppressed for non-TTY, unknown-command suggestion, missing-argument and unknown-option exit codes, and all public command surfaces exposing the shared global output options with `--quiet`/`--verbose` conflict rejection both same-command and split across the chain |
 | `src/cli/runtime.test.ts` | CLI runtime launch | package-root walking from built CLI output and missing-Electron detection for installed package layouts |
 | `petdex-bridge/src/main.rs` | WSL bridge | CLI parsing, state payload construction, loopback URL construction, token path override, and empty-state validation |
 

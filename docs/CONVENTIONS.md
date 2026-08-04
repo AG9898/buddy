@@ -108,6 +108,8 @@ These apply across every stack in this project.
 - Commander has no true global options: register shared flags on every command in the tree
   and resolve them from `getOptionValueSource(key) === 'cli'` across the command chain.
   Do not use `optsWithGlobals()` for this — ancestor defaults overwrite child values.
+- Every public Commander command surface must expose all four shared output flags. Keep the
+  command-tree contract test current when adding, removing, or nesting commands.
 - The large Buddy banner and animated progress are interactive-TTY affordances. Suppress
   them for redirected output, CI, quiet mode, and JSON mode.
 - Source the CLI version from package metadata rather than duplicating a version literal in
