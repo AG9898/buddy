@@ -1,4 +1,4 @@
-"""Remove disposable hatch-pet run artifacts after a successful package."""
+"""Remove only allowlisted disposable hatch-pet run artifacts."""
 
 from __future__ import annotations
 
@@ -98,13 +98,19 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--run-dir", required=True, type=Path)
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument(
+        "--interrupted",
+        action="store_true",
+        help="clean an interrupted run without requiring completed kept artifacts",
+    )
     args = parser.parse_args()
 
     run_dir = args.run_dir.resolve()
     if not run_dir.is_dir():
         raise SystemExit(f"run dir does not exist: {run_dir}")
 
-    validate_kept_outputs(run_dir)
+    if not args.interrupted:
+        validate_kept_outputs(run_dir)
     for rel in sorted(REMOVE_PATHS):
         remove_path(resolve_inside(run_dir, rel), args.dry_run)
     remove_empty_parents(run_dir, args.dry_run)

@@ -349,6 +349,7 @@ export function createProgram(): CommandType {
     .option('--id <id>', 'Name the buddy-managed pet (default: derived from the prompt)')
     .option('--output <dir>', 'Explicit output directory for pet.json and the spritesheet')
     .option('--package-preset <id>', 'Maintainer-only: write to this checkout’s pets/<id> preset')
+    .option('--yes', 'Replace existing destination content without prompting')
     .addHelpText(
       'after',
       examples(
@@ -360,7 +361,7 @@ export function createProgram(): CommandType {
     .action(
       async (
         prompt: string,
-        options: { output?: string; id?: string; packagePreset?: string },
+        options: { output?: string; id?: string; packagePreset?: string; yes?: boolean },
       ) => {
         recordCommand('pets.hatch')
         if (options.output && options.id) {
@@ -385,7 +386,9 @@ export function createProgram(): CommandType {
 
         // Verbosity now comes from the global --verbose flag resolved into the
         // shared output context, so hatch keeps no command-specific debug flag.
-        recordResult(await runHatch(prompt, outputDir, getOutputContext().mode === 'verbose'))
+        recordResult(
+          await runHatch(prompt, outputDir, getOutputContext().mode === 'verbose', options.yes),
+        )
       },
     )
 

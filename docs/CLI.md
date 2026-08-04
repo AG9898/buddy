@@ -24,7 +24,7 @@ The npm package is named `@ag9898/buddy`, but the installed command remains `bud
 | `buddy hooks status` | Report Claude Code and Codex CLI hook coverage per assistant and event. Read-only. |
 | `buddy hooks uninstall` | Remove only the hook entries buddy owns, preserving unrelated configuration. |
 | `buddy doctor` | Print a health checklist for process, sidecar, token, and hooks. |
-| `buddy hatch <prompt> [--id <id> | --output <dir> | --package-preset <id>] [--verbose]` | Generate a personal pet by default; bundled presets require explicit maintainer opt-in. |
+| `buddy hatch <prompt> [--id <id> | --output <dir> | --package-preset <id>] [--yes] [--verbose]` | Generate a personal pet by default; bundled presets require explicit maintainer opt-in. |
 | `buddy pets list` | List valid buddy-managed, packaged, and Codex-compatible pets. |
 | `buddy pets current` | Print the currently selected pet and its source path. `buddy pets show` is a compatibility alias. |
 | `buddy pets use <id>` | Validate the pet, apply it to a running app, and persist the active selection. |
@@ -412,10 +412,10 @@ Interactive presentation renders these as stable numbered stages, includes elaps
 long-running work, and uses an in-place spinner only when stdout is a TTY. Plain and quiet
 output keep deterministic stage/result lines without terminal control characters; JSON emits
 one final `pets.hatch` result payload and routes verbose Codex subprocess detail to stderr.
-Ctrl+C should terminate the child
-Codex process and clean only known disposable run artifacts. Existing destination content
-must not be overwritten without explicit confirmation in a TTY or `--yes` in an automated
-run.
+If the destination is populated, hatch asks for explicit TTY confirmation; non-TTY runs fail
+before Codex is checked or launched unless `--yes` is supplied. Ctrl+C terminates the child
+Codex process, then invokes the hatch-pet allowlist cleanup only for the destination's
+`.hatch-run` workspace, preserving packaged pet assets and retained QA artifacts.
 
 Raw Codex/imagegen output is hidden during normal runs. Pass `--verbose` (or set
 `BUDDY_LOG_LEVEL=debug` / `BUDDY_VERBOSE=1`) to expose raw subprocess output for
@@ -425,6 +425,7 @@ troubleshooting.
 buddy hatch "a small orange cat"
 buddy hatch "a small orange cat" --id marmalade
 buddy hatch "a small orange cat" --verbose
+buddy hatch "a small orange cat" --yes
 buddy hatch "a small orange cat" --output C:\\art\\my-cat
 buddy hatch "a small orange cat" --package-preset penguin
 ```
@@ -439,7 +440,8 @@ and writes to `<buddy data dir>\\pets\\<id>` (normally
 user and makes them immediately discoverable by `buddy pets`. Use `--id <id>` to choose the
 folder name. `--output <dir>` is an explicit custom destination. `--package-preset <id>` is
 for maintainers working in a source checkout who intentionally want to replace a bundled
-`pets/<id>` asset; packaged pets are otherwise read-only for end users.
+`pets/<id>` asset; packaged pets are otherwise read-only for end users. `--yes` bypasses only
+the populated-destination confirmation and should be used for intentional automated replaces.
 
 ---
 

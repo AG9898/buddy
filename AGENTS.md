@@ -412,3 +412,6 @@ shared between command modules and keep runtime helpers in `src/main/` or a neut
 
 ### 2026-07-28 - The root action now performs I/O, so program tests must mock it
 Bare `buddy` renders the operational overview, so `program.test.ts` mocks `./commands/status.js`; without that, every bare-invocation test would hit the real sidecar and read `~/.claude/settings.json`. Note also that the `preAction` hook calls `configureOutput()`, replacing any test-installed output stream with `process.stdout` — spy on `process.stdout.write` to assert banner behavior in program tests.
+
+### 2026-08-04 - Interrupted hatch cleanup is restricted to the run workspace
+`buddy hatch` stores intermediate work under the selected destination's `.hatch-run` folder. On Ctrl+C it kills Codex before running `cleanup_run.py --interrupted`, which removes only that script's allowlisted disposable paths and leaves completed pet assets and retained QA outputs intact.

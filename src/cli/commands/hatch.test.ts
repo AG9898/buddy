@@ -18,10 +18,12 @@ import type { ChildProcess, SpawnOptions } from 'child_process'
 
 /* ── Hoisted mocks ─────────────────────────────────────────────────────────── */
 
-const { mockSpawnSync, mockSpawn, mockExistsSync } = vi.hoisted(() => ({
+const { mockSpawnSync, mockSpawn, mockExistsSync, mockReaddirSync, mockCreateInterface } = vi.hoisted(() => ({
   mockSpawnSync: vi.fn(),
   mockSpawn: vi.fn(),
   mockExistsSync: vi.fn(),
+  mockReaddirSync: vi.fn(),
+  mockCreateInterface: vi.fn(),
 }))
 
 vi.mock('child_process', () => ({
@@ -32,8 +34,14 @@ vi.mock('child_process', () => ({
 vi.mock('fs', () => ({
   default: {
     existsSync: mockExistsSync,
+    readdirSync: mockReaddirSync,
   },
   existsSync: mockExistsSync,
+  readdirSync: mockReaddirSync,
+}))
+
+vi.mock('readline/promises', () => ({
+  createInterface: mockCreateInterface,
 }))
 
 /* ── Helpers ──────────────────────────────────────────────────────────────── */
@@ -94,6 +102,28 @@ function makeFakeChild(exitCode: number, stdoutData = '', stderrData = ''): Chil
   return child as unknown as ChildProcess
 }
 
+function makeControllableChild(): {
+  child: ChildProcess
+  finish: (exitCode: number | null, signal: NodeJS.Signals | null) => void
+  kill: ReturnType<typeof vi.fn>
+} {
+  const child = new EventEmitter()
+  const kill = vi.fn()
+
+  Object.defineProperties(child, {
+    stdin: { value: { end: vi.fn() }, writable: true },
+    stdout: { value: new EventEmitter(), writable: true },
+    stderr: { value: new EventEmitter(), writable: true },
+    kill: { value: kill, writable: true },
+  })
+
+  return {
+    child: child as unknown as ChildProcess,
+    finish: (exitCode, signal) => child.emit('exit', exitCode, signal),
+    kill,
+  }
+}
+
 async function renderHatch(prompt: string, outputDir: string, verbose = false): Promise<void> {
   const { runHatch } = await import('./hatch.js')
   const { renderResult } = await import('../output.js')
@@ -115,10 +145,18 @@ function setStdoutTTY(value: boolean): () => void {
   }
 }
 
+function setStdinTTY(value: boolean): () => void {
+  Object.defineProperty(process.stdin, 'isTTY', { configurable: true, value })
+  return () => {
+    delete (process.stdin as { isTTY?: boolean }).isTTY
+  }
+}
+
 /* ── Shared setup ────────────────────────────────────────────────────────── */
 
 beforeEach(() => {
   vi.resetModules()
+  vi.clearAllMocks()
   vi.stubEnv('NO_COLOR', '1') // Disable ANSI for easier string matching
   vi.stubEnv('BUDDY_LOG_LEVEL', '')
   vi.stubEnv('BUDDY_VERBOSE', '')
@@ -136,6 +174,7 @@ beforeEach(() => {
     }
     return { status: 0, stdout: '', stderr: '', error: null }
   })
+  mockReaddirSync.mockReturnValue([])
 })
 
 afterEach(() => {
@@ -286,6 +325,93 @@ describe('runHatch — normal mode', () => {
 
     const { runHatch } = await import('./hatch.js')
     await expect(runHatch('cat', 'pets/default')).rejects.toThrow('--verbose')
+  })
+})
+
+describe('runHatch — overwrite and interruption safety', () => {
+  it('rejects a populated destination in a non-TTY before checking or launching Codex', async () => {
+    mockExistsSync.mockImplementation((p: string) => {
+      return String(p).endsWith('SKILL.md') || String(p) === '/fake/repo/pets/existing'
+    })
+    mockReaddirSync.mockReturnValue(['pet.json'])
+
+    const { runHatch } = await import('./hatch.js')
+    await expect(runHatch('a cat', 'pets/existing')).rejects.toThrow('Use --yes')
+
+    expect(mockSpawn).not.toHaveBeenCalled()
+    expect(mockSpawnSync).not.toHaveBeenCalledWith('codex', expect.anything(), expect.anything())
+  })
+
+  it('requires TTY confirmation and leaves the destination unchanged when declined', async () => {
+    mockExistsSync.mockImplementation((p: string) => {
+      return String(p).endsWith('SKILL.md') || String(p) === '/fake/repo/pets/existing'
+    })
+    mockReaddirSync.mockReturnValue(['pet.json'])
+    const close = vi.fn()
+    const question = vi.fn().mockResolvedValue('n')
+    mockCreateInterface.mockReturnValue({ close, question })
+    const restoreInTTY = setStdinTTY(true)
+    const restoreOutTTY = setStdoutTTY(true)
+
+    const { runHatch } = await import('./hatch.js')
+    await expect(runHatch('a cat', 'pets/existing')).rejects.toThrow('left unchanged')
+
+    restoreInTTY()
+    restoreOutTTY()
+    expect(question).toHaveBeenCalled()
+    expect(close).toHaveBeenCalled()
+    expect(mockSpawn).not.toHaveBeenCalled()
+  })
+
+  it('allows an intentional populated-destination replacement with --yes', async () => {
+    mockExistsSync.mockImplementation((p: string) => {
+      return (
+        String(p).endsWith('SKILL.md') ||
+        String(p) === '/fake/repo/pets/existing' ||
+        String(p).endsWith('spritesheet.webp') ||
+        String(p).endsWith('pet.json')
+      )
+    })
+    mockReaddirSync.mockReturnValue(['pet.json'])
+    mockSpawn.mockImplementation(() => makeFakeChild(0))
+
+    const { runHatch } = await import('./hatch.js')
+    await expect(runHatch('a cat', 'pets/existing', false, true)).resolves.toMatchObject({
+      command: 'pets.hatch',
+    })
+
+    expect(mockCreateInterface).not.toHaveBeenCalled()
+    expect(mockSpawn).toHaveBeenCalled()
+  })
+
+  it('terminates Codex before allowlisted interruption cleanup', async () => {
+    mockExistsSync.mockImplementation((p: string) => {
+      if (String(p).endsWith('SKILL.md')) return true
+      if (String(p).endsWith('spritesheet.webp')) return true
+      if (String(p).endsWith('pet.json')) return true
+      return false
+    })
+    const controlled = makeControllableChild()
+    mockSpawn.mockReturnValue(controlled.child)
+
+    const { runHatch } = await import('./hatch.js')
+    const hatch = runHatch('a cat', 'pets/cancelled')
+    await Promise.resolve()
+    process.emit('SIGINT')
+    expect(controlled.kill).toHaveBeenCalledWith('SIGTERM')
+    controlled.finish(null, 'SIGTERM')
+
+    await expect(hatch).rejects.toThrow('Hatch cancelled')
+    expect(mockSpawnSync).toHaveBeenCalledWith(
+      'python',
+      [
+        expect.stringMatching(/cleanup_run\.py$/),
+        '--run-dir',
+        path.join('/fake/repo', 'pets', 'cancelled', '.hatch-run'),
+        '--interrupted',
+      ],
+      expect.anything(),
+    )
   })
 })
 

@@ -12,6 +12,7 @@ import { spawn, spawnSync } from 'child_process'
 import fs from 'fs'
 import os from 'os'
 import path from 'path'
+import { createInterface } from 'readline/promises'
 import { fileURLToPath } from 'url'
 import { buddyManagedPetsDir } from '../../shared/buddy-paths.js'
 import {
@@ -28,6 +29,7 @@ const __dirname = path.dirname(__filename)
 const DEFAULT_CODEX_COMMAND = 'codex'
 const CODEX_COMMAND_ENV = 'BUDDY_CODEX_COMMAND'
 const PET_ID_PATTERN = /^[a-z0-9][a-z0-9-]{0,47}$/
+const HATCH_RUN_DIR = '.hatch-run'
 
 function isVerbose(): boolean {
   return (
@@ -122,6 +124,7 @@ function runCodexCheck(command: string, args: string[], failureMessage: string):
 
 function buildCodexPrompt(prompt: string, root: string, skillDir: string, outputDir: string): string {
   const absoluteOutputDir = path.resolve(root, outputDir)
+  const runDir = path.join(absoluteOutputDir, HATCH_RUN_DIR)
   const spritesheetPath = path.join(absoluteOutputDir, 'spritesheet.webp')
   const petJsonPath = path.join(absoluteOutputDir, 'pet.json')
 
@@ -136,12 +139,68 @@ Runtime constraints:
 - Generate visuals through Codex $imagegen. Do not call Anthropic SDKs or ask buddy for image-provider secrets.
 - Keep deterministic packaging in the hatch-pet scripts.
 - Use ${path.join(skillDir, 'scripts/package_for_buddy.py')} for buddy packaging.
+- Use ${runDir} as the hatch-pet run directory. Keep intermediate artifacts there and package final pet assets into ${absoluteOutputDir}.
 - Write pet assets to: ${absoluteOutputDir}
 - Required final files:
   - ${spritesheetPath}
   - ${petJsonPath}
 - Stream concise progress and stop with a clear error if any required output cannot be produced.
 `
+}
+
+function destinationHasContent(outputDir: string): boolean {
+  if (!fs.existsSync(outputDir)) return false
+
+  try {
+    return fs.readdirSync(outputDir).length > 0
+  } catch {
+    // An unreadable path could contain assets, so never risk overwriting it.
+    return true
+  }
+}
+
+async function confirmDestination(outputDir: string, yes: boolean): Promise<void> {
+  if (!destinationHasContent(outputDir) || yes) return
+
+  if (process.stdin.isTTY !== true || process.stdout.isTTY !== true) {
+    throw new Error(
+      `Destination already contains content: ${outputDir}\n` +
+        'Use --yes to replace it in a non-interactive run.',
+    )
+  }
+
+  const prompt = createInterface({ input: process.stdin, output: process.stderr })
+  try {
+    const answer = await prompt.question(
+      `Destination already contains content: ${outputDir}\nReplace it? [y/N] `,
+    )
+    if (!/^y(?:es)?$/i.test(answer.trim())) {
+      throw new Error('Hatch cancelled; existing destination content was left unchanged.')
+    }
+  } finally {
+    prompt.close()
+  }
+}
+
+function cleanupInterruptedRun(skillDir: string, outputDir: string): void {
+  const result = spawnSync(
+    'python',
+    [
+      path.join(skillDir, 'scripts', 'cleanup_run.py'),
+      '--run-dir',
+      path.join(outputDir, HATCH_RUN_DIR),
+      '--interrupted',
+    ],
+    {
+      cwd: process.cwd(),
+      encoding: 'utf8',
+      shell: process.platform === 'win32',
+    },
+  )
+
+  if (result.status !== 0) {
+    verboseRaw(`Hatch cancellation cleanup could not complete: ${result.stderr || result.stdout}`)
+  }
 }
 
 /**
@@ -164,6 +223,7 @@ export async function runHatch(
   prompt: string,
   outputDir: string,
   verbose = false,
+  yes = false,
 ): Promise<CommandResult<HatchCommandData>> {
   const startedAt = Date.now()
   const output = getOutputContext()
@@ -181,6 +241,9 @@ export async function runHatch(
         'Install or sync the canonical hatch-pet skill into .codex/skills/hatch-pet before running buddy hatch.',
     )
   }
+
+  // This runs before any Codex process is checked or launched, preserving existing assets.
+  await confirmDestination(absoluteOutputDir, yes)
 
   runCodexCheck(
     command,
@@ -211,61 +274,78 @@ export async function runHatch(
 
   const spinner = startProgressSpinner('Generating visual assets with Codex', startedAt)
   let generated = false
+  let interrupted = false
   try {
     await new Promise<void>((resolve, reject) => {
-    const child = spawn(command, args, {
-      cwd: root,
-      stdio: [
-        'pipe',
-        verboseMode && !output.json ? 'inherit' : 'pipe',
-        verboseMode && !output.json ? 'inherit' : 'pipe',
-      ],
-      shell: process.platform === 'win32',
-    })
-
-    if (verboseMode && output.json) {
-      // JSON reserves stdout for its one final payload; verbose child detail is diagnostic stderr.
-      child.stdout?.on('data', (chunk: Buffer) => verboseRaw(chunk.toString()))
-      child.stderr?.on('data', (chunk: Buffer) => verboseRaw(chunk.toString()))
-    } else if (!verboseMode) {
-      // Capture output silently — available for error reporting.
-      child.stdout?.on('data', (chunk: Buffer) => {
-        codexOutput += chunk.toString()
+      const child = spawn(command, args, {
+        cwd: root,
+        stdio: [
+          'pipe',
+          verboseMode && !output.json ? 'inherit' : 'pipe',
+          verboseMode && !output.json ? 'inherit' : 'pipe',
+        ],
+        shell: process.platform === 'win32',
       })
-      child.stderr?.on('data', (chunk: Buffer) => {
-        codexOutput += chunk.toString()
-      })
-    }
-
-    child.on('error', (err) => {
-      reject(
-        new Error(
-          `Failed to start Codex CLI: ${err.message}\n` +
-            `Set ${CODEX_COMMAND_ENV} to the full Codex executable path if needed.`,
-        ),
-      )
-    })
-    child.on('exit', (code, signal) => {
-      if (code === 0) {
-        resolve()
-        return
+      const onInterrupt = () => {
+        interrupted = true
+        child.kill('SIGTERM')
       }
-      const detail = codexOutput.trim()
-      const suffix = detail
-        ? `\n\nCodex output:\n${detail}`
-        : verboseMode
-          ? ''
-          : '\n\nRe-run with --verbose to see subprocess output.'
-      reject(
-        new Error(
-          `Codex hatch run failed${signal ? ` with signal ${signal}` : ` with exit code ${code}`}.${suffix}`,
-        ),
-      )
-    })
+      const removeInterruptHandler = () => process.off('SIGINT', onInterrupt)
 
-    child.stdin?.end(codexPrompt)
+      process.once('SIGINT', onInterrupt)
+
+      if (verboseMode && output.json) {
+        // JSON reserves stdout for its one final payload; verbose child detail is diagnostic stderr.
+        child.stdout?.on('data', (chunk: Buffer) => verboseRaw(chunk.toString()))
+        child.stderr?.on('data', (chunk: Buffer) => verboseRaw(chunk.toString()))
+      } else if (!verboseMode) {
+        // Capture output silently — available for error reporting.
+        child.stdout?.on('data', (chunk: Buffer) => {
+          codexOutput += chunk.toString()
+        })
+        child.stderr?.on('data', (chunk: Buffer) => {
+          codexOutput += chunk.toString()
+        })
+      }
+
+      child.on('error', (err) => {
+        removeInterruptHandler()
+        reject(
+          new Error(
+            `Failed to start Codex CLI: ${err.message}\n` +
+              `Set ${CODEX_COMMAND_ENV} to the full Codex executable path if needed.`,
+          ),
+        )
+      })
+      child.on('exit', (code, signal) => {
+        removeInterruptHandler()
+        if (interrupted) {
+          reject(new Error('Hatch cancelled.'))
+          return
+        }
+        if (code === 0) {
+          resolve()
+          return
+        }
+        const detail = codexOutput.trim()
+        const suffix = detail
+          ? `\n\nCodex output:\n${detail}`
+          : verboseMode
+            ? ''
+            : '\n\nRe-run with --verbose to see subprocess output.'
+        reject(
+          new Error(
+            `Codex hatch run failed${signal ? ` with signal ${signal}` : ` with exit code ${code}`}.${suffix}`,
+          ),
+        )
+      })
+
+      child.stdin?.end(codexPrompt)
     })
     generated = true
+  } catch (error) {
+    if (interrupted) cleanupInterruptedRun(skillDir, absoluteOutputDir)
+    throw error
   } finally {
     spinner.stop(generated ? 'complete' : 'failed')
   }

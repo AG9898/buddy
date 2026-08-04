@@ -1296,7 +1296,7 @@
       "id": "FEAT-29",
       "title": "Make hatch overwrite and cancellation safe",
       "description": "Add destination preflight and interruption handling to buddy hatch. Existing content requires explicit TTY confirmation or --yes, automated non-TTY runs fail safely without --yes, and Ctrl+C terminates the child Codex process before cleaning only hatch-pet paths explicitly classified as disposable. Preserve completed pet assets and never use broad recursive cleanup.",
-      "status": "todo",
+      "status": "done",
       "priority": "high",
       "group_id": "FEAT",
       "depends_on": [
