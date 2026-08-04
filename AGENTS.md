@@ -415,3 +415,6 @@ Bare `buddy` renders the operational overview, so `program.test.ts` mocks `./com
 
 ### 2026-08-04 - Interrupted hatch cleanup is restricted to the run workspace
 `buddy hatch` stores intermediate work under the selected destination's `.hatch-run` folder. On Ctrl+C it kills Codex before running `cleanup_run.py --interrupted`, which removes only that script's allowlisted disposable paths and leaves completed pet assets and retained QA outputs intact.
+
+### 2026-08-04 - Explicit npm updates use the platform executable without a shell
+`buddy update` must invoke `npm.cmd` on Windows and `npm` elsewhere through `spawn` with `shell: false`. Keep the install arguments fixed rather than composing a command string so package updates cannot be altered through shell interpolation.

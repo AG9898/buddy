@@ -132,6 +132,7 @@ buddy <command> [options]
 |---|---|
 | `buddy start` | Launch the Electron pet window, return control to the terminal. |
 | `buddy stop` | Quit the running pet app. |
+| `buddy update` | Explicitly update the globally installed package to the latest npm release. |
 | `buddy state <name>` | Manually push a state (`idle`, `running`, `waiting`, …). |
 | `buddy hooks install` | Write Claude Code + Codex CLI hook entries. |
 | `buddy hooks status` | Report hook coverage per assistant and event (read-only). |
@@ -151,6 +152,19 @@ buddy <command> [options]
 | `--package-preset <id>` | `hatch` | Maintainer-only: replace a bundled source-checkout preset. |
 | `--verbose` | `hatch` | Show raw Codex subprocess output. |
 | `--rc <path>` | `hooks install` | Deprecated compatibility flag; ignored. |
+
+---
+
+### Updating
+
+Run `buddy update` when you choose to update the globally npm-installed package:
+
+```sh
+buddy update
+```
+
+buddy never checks for or installs updates in the background. If npm reports a permission
+error, rerun from an account that can update global npm packages.
 
 ---
 

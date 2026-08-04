@@ -148,7 +148,8 @@ with unrelated configuration preserved, and a malformed configuration file left 
 **CLI tests:** Command help and changed command behavior, non-TTY/plain output, styled
 output when supported, expected error messages and exit codes, hatch's numbered stages,
 TTY-only spinner, quiet/JSON routing, and raw-subprocess suppression, pet discovery/selection
-behavior, and runtime path resolution for installed npm package layouts.
+behavior, runtime path resolution for installed npm package layouts, and explicit npm update
+argument construction plus unavailable, permission, and non-zero npm failures.
 
 **CLI UX contract coverage:** A testable command factory covers bare `buddy`,
 root and nested help, package-derived version output, global output modes, stdout/stderr
@@ -189,6 +190,7 @@ integration (requires Electron E2E).
 | `src/cli/commands/state.test.ts` | State command | Active-manifest state validation and packaged-default fallback, invalid-state choices/suggestions with no sidecar request, typed state result, POST `/state` payload/token, shared missing-token and HTTP errors, plus normal/verbose/no-color/JSON rendering |
 | `src/cli/commands/size.test.ts` | Size command | parseSizeInput scale factor/explicit WxH/invalid input, validateBounds min/max enforcement, typed validation/sidecar errors, POST `/resize` payload/token, bounded shared-client timeout, and quiet/no-color/JSON rendering |
 | `src/cli/commands/start.test.ts` | Start command | Typed Windows and WSL startup results, missing Electron runtime, child spawn errors, non-zero WSL interop exits, and shared output-mode rendering |
+| `src/cli/commands/update.test.ts` | Update command | Fixed npm global-install arguments without shell interpolation; unavailable npm, permission, and non-zero failures; human, quiet, and JSON result rendering |
 | `src/cli/commands/stop.test.ts` | Stop command | Authenticated graceful shutdown, authorization rejection, idempotent already-stopped handling, Windows/WSL verified-PID fallback, and normal/quiet/verbose/JSON output |
 | `src/cli/commands/doctor.test.ts` | Doctor command | Healthy checklist result, partial hook coverage as a warning row, typed `doctor.checks_failed` failure with the first recovery hint, missing Electron runtime, WSL probe/runtime detection, and normal/quiet/JSON rendering including checks shown before a failure message |
 | `src/cli/commands/hooks.test.ts` | Hooks lifecycle commands | Complete install for both assistants, idempotent re-run, partial per-target coverage as a warning, typed `hooks.install_failed` failure with one JSON payload, WSL runtime and deprecated `--rc` pass-through; read-only `hooks.status` complete/partial/none coverage with per-event rows and no install or uninstall calls; `hooks.uninstall` buddy-owned removal, idempotent no-op, partial-removal warning, typed `hooks.uninstall_failed` failure; and normal/quiet/JSON rendering for each |

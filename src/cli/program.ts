@@ -24,6 +24,7 @@ import {
 } from './commands/hatch.js'
 import { runPetsCurrent, runPetsList, runPetsUse } from './commands/pets.js'
 import { runSize } from './commands/size.js'
+import { runUpdate } from './commands/update.js'
 import { runOverview, runStatus } from './commands/status.js'
 import {
   bannerText,
@@ -51,7 +52,7 @@ interface CommandGroup {
 }
 
 const COMMAND_GROUPS: readonly CommandGroup[] = [
-  { title: 'App lifecycle', commands: ['start', 'stop', 'size'] },
+  { title: 'App lifecycle', commands: ['start', 'stop', 'update', 'size'] },
   { title: 'Pet management', commands: ['pets', 'hatch'] },
   { title: 'Integrations', commands: ['hooks', 'state'] },
   { title: 'Diagnostics', commands: ['status', 'doctor'] },
@@ -59,6 +60,7 @@ const COMMAND_GROUPS: readonly CommandGroup[] = [
 
 const ROOT_EXAMPLES = [
   'buddy start',
+  'buddy update',
   'buddy status',
   'buddy pets use penguin',
   'buddy hatch "a small orange cat"',
@@ -291,6 +293,16 @@ export function createProgram(): CommandType {
     .action(async () => {
       recordCommand('app.stop')
       recordResult(await runStop())
+    })
+
+  // ── buddy update ────────────────────────────────────────────────────────────
+  program
+    .command('update')
+    .description('Update buddy to the latest npm release')
+    .addHelpText('after', examples('buddy update'))
+    .action(async () => {
+      recordCommand('app.update')
+      recordResult(await runUpdate())
     })
 
   // ── buddy size ──────────────────────────────────────────────────────────────

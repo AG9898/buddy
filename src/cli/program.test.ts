@@ -192,11 +192,12 @@ describe('createProgram', () => {
     expect(result.stdout).toContain('Pet management')
     expect(result.stdout).toContain('Integrations')
     expect(result.stdout).toContain('Diagnostics')
-    for (const name of ['start', 'stop', 'size', 'pets', 'hatch', 'hooks', 'state', 'status', 'doctor']) {
+    for (const name of ['start', 'stop', 'update', 'size', 'pets', 'hatch', 'hooks', 'state', 'status', 'doctor']) {
       expect(result.stdout).toContain(name)
     }
     expect(result.stdout).toContain('Launch the buddy pet window')
     expect(result.stdout).toContain('buddy hatch "a small orange cat"')
+    expect(result.stdout).toContain('buddy update')
     expect(result.stdout.match(/Usage: buddy/g)).toHaveLength(1)
   })
 
@@ -222,6 +223,10 @@ describe('createProgram', () => {
       expect(hooksHelp.stdout).toContain(name)
     }
     expect(hooksHelp.stdout).toContain('buddy hooks uninstall')
+
+    const updateHelp = await run(['update', '--help'])
+    expect(updateHelp.code).toBe('commander.helpDisplayed')
+    expect(updateHelp.stdout).toContain('buddy update')
   })
 
   it('prints help without a banner when stdout is not a TTY', async () => {

@@ -1506,7 +1506,7 @@
       "id": "FEAT-35",
       "title": "Add an explicit npm-backed buddy update command",
       "description": "Add buddy update as an explicit self-update command for npm-managed installations. It should invoke npm's global install of @ag9898/buddy@latest without shell interpolation, report actionable npm or permission failures through the shared output renderer, and document that it updates only when the user runs it; silent background update checks and automatic updates are out of scope.",
-      "status": "todo",
+      "status": "done",
       "priority": "medium",
       "group_id": "FEAT",
       "depends_on": [

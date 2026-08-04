@@ -19,6 +19,7 @@ The npm package is named `@ag9898/buddy`, but the installed command remains `bud
 | `buddy status` | Print version, app state, active pet, window size, and hook coverage. |
 | `buddy start` | Launch the Electron pet app detached and return control to the terminal. |
 | `buddy stop` | Terminate the running Electron pet app. |
+| `buddy update` | Explicitly install the latest globally published `@ag9898/buddy` package through npm. |
 | `buddy state <name>` | Send a pet state change to the local sidecar. |
 | `buddy hooks install [--rc <path>]` | Install Claude Code and Codex CLI hook entries. |
 | `buddy hooks status` | Report Claude Code and Codex CLI hook coverage per assistant and event. Read-only. |
@@ -218,6 +219,12 @@ quiet, verbose, JSON, and no-color rendering modes.
 When run from WSL, `buddy start` uses WSL interop to invoke the Windows-side app. It waits for
 the interop child to spawn and exit zero before reporting success. Missing `cmd.exe`, spawn
 failures, and a non-zero interop exit produce clear actionable typed errors.
+
+`buddy update` is the only self-update surface. It runs the platform-appropriate npm executable
+with the fixed arguments `install --global @ag9898/buddy@latest`, without shell interpolation.
+It runs only when explicitly invoked: buddy performs no background update checks or automatic
+updates. Success emits `app.update`; unavailable npm, permission failures, and non-zero npm
+exits are typed non-zero failures with recovery guidance in human, quiet, and JSON modes.
 
 Install examples should use `npm install -g @ag9898/buddy`. User-facing command examples
 should continue to use `buddy ...`.
