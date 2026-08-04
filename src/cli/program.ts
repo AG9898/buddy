@@ -362,6 +362,7 @@ export function createProgram(): CommandType {
         prompt: string,
         options: { output?: string; id?: string; packagePreset?: string },
       ) => {
+        recordCommand('pets.hatch')
         if (options.output && options.id) {
           throw new Error(
             'Use either --output or --id; --id names only the default buddy-managed destination.',
@@ -384,7 +385,7 @@ export function createProgram(): CommandType {
 
         // Verbosity now comes from the global --verbose flag resolved into the
         // shared output context, so hatch keeps no command-specific debug flag.
-        await runHatch(prompt, outputDir, getOutputContext().mode === 'verbose')
+        recordResult(await runHatch(prompt, outputDir, getOutputContext().mode === 'verbose'))
       },
     )
 

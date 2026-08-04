@@ -1265,7 +1265,7 @@
       "id": "FEAT-28",
       "title": "Add staged TTY-aware hatch progress",
       "description": "Migrate buddy hatch to the global output context and present its existing workflow as stable numbered stages with elapsed time. Use an in-place spinner only for interactive TTY output, keep redirected/quiet/JSON output deterministic, and preserve normal suppression plus verbose passthrough of Codex subprocess output. Overwrite policy and interrupt cleanup are handled separately.",
-      "status": "todo",
+      "status": "done",
       "priority": "medium",
       "group_id": "FEAT",
       "depends_on": [

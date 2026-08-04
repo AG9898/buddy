@@ -270,6 +270,9 @@ Do not reorganize or rewrite existing entries — append only.
 
 ## Discoveries
 
+### 2026-08-04 - JSON hatch output must pipe verbose child streams to stderr
+`buddy hatch --json --verbose` cannot inherit Codex stdout or stderr because the command result must remain the sole JSON stdout payload. Pipe both streams in that mode and route them through the output layer's verbose channel, which sends diagnostics to stderr; interactive verbose mode may still inherit the subprocess streams.
+
 ### 2026-05-22 — renderer-ready handshake: remove showInactive() from avatar-window.ts
 `createAvatarWindow()` originally called `win.showInactive()` unconditionally at the end, which would flash a blank transparent window before the Svelte renderer mounted. For FEAT-07, the call was moved to main.ts inside an `ipcMain.once(CH_RENDERER_READY)` handler; App.svelte calls `window.petApi.rendererReady()` on mount to trigger it. Always keep window display deferred to main.ts after the renderer-ready signal.
 

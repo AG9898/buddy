@@ -2,7 +2,7 @@
  * Unit tests for src/cli/commands/hatch.ts
  *
  * Verifies:
- *   - runHatch shows structured progress (heading, status lines) rather than raw subprocess dumps
+ *   - runHatch shows staged progress rather than raw subprocess dumps
  *   - Normal mode hides raw Codex output
  *   - Verbose mode (--verbose flag) shows subprocess detail
  *   - Verbose mode enabled via BUDDY_LOG_LEVEL=debug env var
@@ -94,6 +94,27 @@ function makeFakeChild(exitCode: number, stdoutData = '', stderrData = ''): Chil
   return child as unknown as ChildProcess
 }
 
+async function renderHatch(prompt: string, outputDir: string, verbose = false): Promise<void> {
+  const { runHatch } = await import('./hatch.js')
+  const { renderResult } = await import('../output.js')
+  renderResult(await runHatch(prompt, outputDir, verbose))
+}
+
+async function configureHatchOutput(options: {
+  mode?: 'quiet' | 'normal' | 'verbose'
+  json?: boolean
+}): Promise<void> {
+  const { configureOutput } = await import('../output.js')
+  configureOutput({ ...options, color: false, unicode: false })
+}
+
+function setStdoutTTY(value: boolean): () => void {
+  Object.defineProperty(process.stdout, 'isTTY', { configurable: true, value })
+  return () => {
+    delete (process.stdout as { isTTY?: boolean }).isTTY
+  }
+}
+
 /* ── Shared setup ────────────────────────────────────────────────────────── */
 
 beforeEach(() => {
@@ -146,7 +167,7 @@ describe('hatch destination helpers', () => {
 /* ── Tests ──────────────────────────────────────────────────────────────── */
 
 describe('runHatch — normal mode', () => {
-  it('shows structured progress headings and status lines', async () => {
+  it('shows stable numbered stages and a concise result', async () => {
     mockExistsSync.mockImplementation((p: string) => {
       if (String(p).endsWith('SKILL.md')) return true
       if (String(p).endsWith('spritesheet.webp')) return true
@@ -157,20 +178,38 @@ describe('runHatch — normal mode', () => {
       makeFakeChild(0),
     )
 
-    const { runHatch } = await import('./hatch.js')
     const cap = captureOutput()
-    await runHatch('a small orange cat', 'pets/my-cat')
+    await renderHatch('a small orange cat', 'pets/my-cat')
     cap.restore()
 
     const out = cap.stdout.join('')
-    expect(out).toContain('buddy hatch')
-    expect(out).toContain('Checking hatch-pet skill')
-    expect(out).toContain('Checking Codex CLI availability')
-    expect(out).toContain('Checking Codex CLI readiness')
-    expect(out).toContain('Running visual generation via Codex')
-    expect(out).toContain('Validating packaged assets')
+    expect(out).toMatch(/1\/5 Checking requirements \(\d+\.\ds\)/)
+    expect(out).toContain('2/5 Confirming concept and destination')
+    expect(out).toContain('3/5 Generating visual assets with Codex')
+    expect(out).toContain('4/5 Validating packaged assets')
+    expect(out).toContain('5/5 Finalizing your pet')
     expect(out).toContain('Pet hatched successfully')
     expect(out).toContain('my-cat')
+  })
+
+  it('uses an in-place spinner only for interactive TTY output and finishes its line', async () => {
+    mockExistsSync.mockImplementation((p: string) => {
+      if (String(p).endsWith('SKILL.md')) return true
+      if (String(p).endsWith('spritesheet.webp')) return true
+      if (String(p).endsWith('pet.json')) return true
+      return false
+    })
+    mockSpawn.mockImplementation(() => makeFakeChild(0))
+
+    const restoreTTY = setStdoutTTY(true)
+    const cap = captureOutput()
+    await renderHatch('a small orange cat', 'pets/my-cat')
+    cap.restore()
+    restoreTTY()
+
+    const out = cap.stdout.join('')
+    expect(out).toContain('\r| Generating visual assets with Codex')
+    expect(out).toContain('complete\n')
   })
 
   it('does NOT show raw Codex subprocess output in normal mode', async () => {
@@ -182,13 +221,55 @@ describe('runHatch — normal mode', () => {
     })
     mockSpawn.mockImplementation(() => makeFakeChild(0, 'CODEX_RAW_LOG: generating frame 1/72', ''))
 
-    const { runHatch } = await import('./hatch.js')
     const cap = captureOutput()
-    await runHatch('a small orange cat', 'pets/default')
+    await renderHatch('a small orange cat', 'pets/default')
     cap.restore()
 
     const out = cap.stdout.join('')
     expect(out).not.toContain('CODEX_RAW_LOG')
+  })
+
+  it('keeps quiet output deterministic by suppressing stages and spinner', async () => {
+    mockExistsSync.mockImplementation((p: string) => {
+      if (String(p).endsWith('SKILL.md')) return true
+      if (String(p).endsWith('spritesheet.webp')) return true
+      if (String(p).endsWith('pet.json')) return true
+      return false
+    })
+    mockSpawn.mockImplementation(() => makeFakeChild(0))
+
+    await configureHatchOutput({ mode: 'quiet' })
+    const cap = captureOutput()
+    await renderHatch('a small orange cat', 'pets/my-cat')
+    cap.restore()
+
+    const out = cap.stdout.join('')
+    expect(out).not.toContain('1/5')
+    expect(out).not.toContain('\r')
+    expect(out).toContain('Pet hatched successfully')
+  })
+
+  it('emits one final JSON result and sends verbose Codex detail to stderr', async () => {
+    mockExistsSync.mockImplementation((p: string) => {
+      if (String(p).endsWith('SKILL.md')) return true
+      if (String(p).endsWith('spritesheet.webp')) return true
+      if (String(p).endsWith('pet.json')) return true
+      return false
+    })
+    mockSpawn.mockImplementation(() => makeFakeChild(0, 'CODEX_VERBOSE_LOG\n'))
+
+    await configureHatchOutput({ mode: 'verbose', json: true })
+    const cap = captureOutput()
+    await renderHatch('a small orange cat', 'pets/my-cat', true)
+    cap.restore()
+
+    expect(cap.stdout).toHaveLength(1)
+    expect(JSON.parse(cap.stdout[0]!)).toMatchObject({
+      ok: true,
+      command: 'pets.hatch',
+      data: { pet: { id: 'my-cat' } },
+    })
+    expect(cap.stderr.join('')).toContain('CODEX_VERBOSE_LOG')
   })
 
   it('includes exit code in the failure message when Codex exits non-zero', async () => {
@@ -220,13 +301,13 @@ describe('runHatch — verbose mode', () => {
     // The fake child won't have listeners attached for them in that path.
     mockSpawn.mockImplementation(() => makeFakeChild(0))
 
-    const { runHatch } = await import('./hatch.js')
+    await configureHatchOutput({ mode: 'verbose' })
     const cap = captureOutput()
-    await runHatch('a dragon', 'pets/dragon', true)
+    await renderHatch('a dragon', 'pets/dragon', true)
     cap.restore()
 
     const out = cap.stdout.join('')
-    expect(out).toContain('verbose')
+    expect(out).toContain('Concept: a dragon')
     expect(out).toContain('Codex command')
   })
 
@@ -241,9 +322,9 @@ describe('runHatch — verbose mode', () => {
     })
     mockSpawn.mockImplementation(() => makeFakeChild(0))
 
-    const { runHatch } = await import('./hatch.js')
+    await configureHatchOutput({ mode: 'verbose' })
     const cap = captureOutput()
-    await runHatch('a dragon', 'pets/dragon')
+    await renderHatch('a dragon', 'pets/dragon')
     cap.restore()
 
     const out = cap.stdout.join('')
@@ -288,9 +369,8 @@ describe('runHatch — success summary', () => {
     })
     mockSpawn.mockImplementation(() => makeFakeChild(0))
 
-    const { runHatch } = await import('./hatch.js')
     const cap = captureOutput()
-    await runHatch('a unicorn', 'pets/unicorn')
+    await renderHatch('a unicorn', 'pets/unicorn')
     cap.restore()
 
     const out = cap.stdout.join('')
@@ -307,9 +387,8 @@ describe('runHatch — success summary', () => {
     })
     mockSpawn.mockImplementation(() => makeFakeChild(0))
 
-    const { runHatch } = await import('./hatch.js')
     const cap = captureOutput()
-    await runHatch('a bear', 'pets/default')
+    await renderHatch('a bear', 'pets/default')
     cap.restore()
 
     const out = cap.stdout.join('')

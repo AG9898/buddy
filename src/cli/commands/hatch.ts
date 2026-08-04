@@ -14,7 +14,13 @@ import os from 'os'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import { buddyManagedPetsDir } from '../../shared/buddy-paths.js'
-import { heading, status, success, warn, label, closeSeparator, dim } from '../output.js'
+import {
+  getOutputContext,
+  stage,
+  startProgressSpinner,
+  verboseRaw,
+} from '../output.js'
+import { commandResult, type CommandResult } from '../result.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -146,19 +152,29 @@ function petIdFromOutputDir(outputDir: string): string {
   return path.basename(outputDir)
 }
 
-export async function runHatch(prompt: string, outputDir: string, verbose = false): Promise<void> {
-  const verboseMode = verbose || isVerbose()
+export interface HatchCommandData {
+  readonly pet: {
+    readonly id: string
+    readonly outputDir: string
+  }
+  readonly elapsedMs: number
+}
+
+export async function runHatch(
+  prompt: string,
+  outputDir: string,
+  verbose = false,
+): Promise<CommandResult<HatchCommandData>> {
+  const startedAt = Date.now()
+  const output = getOutputContext()
+  const verboseMode = (verbose || isVerbose()) && output.mode !== 'quiet'
   const command = codexCommand()
   const root = repoRoot()
   const skillDir = resolveSkillDir(root)
   const skillMdPath = path.join(skillDir, 'SKILL.md')
   const absoluteOutputDir = path.resolve(root, outputDir)
 
-  heading('buddy hatch')
-
-  // ── 1. Pre-flight checks ───────────────────────────────────────────────────
-
-  status('Checking hatch-pet skill...')
+  stage(1, 5, 'Checking requirements', startedAt)
   if (!fs.existsSync(skillMdPath)) {
     throw new Error(
       `hatch-pet skill not found at ${skillMdPath}.\n` +
@@ -166,37 +182,20 @@ export async function runHatch(prompt: string, outputDir: string, verbose = fals
     )
   }
 
-  status('Checking Codex CLI availability...')
   runCodexCheck(
     command,
     ['--version'],
     'Codex CLI is not available for buddy hatch.',
   )
 
-  status('Checking Codex CLI readiness...')
   runCodexCheck(
     command,
     ['doctor', '--summary', '--ascii'],
     'Codex CLI is installed but not ready for buddy hatch.',
   )
 
-  // ── 2. Confirm intent ─────────────────────────────────────────────────────
-
-  label('Concept', prompt)
-  label('Output', absoluteOutputDir)
-  if (verboseMode) {
-    label('Codex command', command)
-    label('Skill dir', skillDir)
-  }
-
-  closeSeparator()
-
-  // ── 3. Run Codex visual generation ────────────────────────────────────────
-
-  status('Running visual generation via Codex...')
-  if (verboseMode) {
-    process.stdout.write(dim('  (verbose: subprocess output shown below)\n'))
-  }
+  stage(2, 5, 'Confirming concept and destination', startedAt)
+  stage(3, 5, 'Generating visual assets with Codex', startedAt)
 
   const codexPrompt = buildCodexPrompt(prompt, root, skillDir, outputDir)
   const args = [
@@ -210,14 +209,25 @@ export async function runHatch(prompt: string, outputDir: string, verbose = fals
 
   let codexOutput = ''
 
-  await new Promise<void>((resolve, reject) => {
+  const spinner = startProgressSpinner('Generating visual assets with Codex', startedAt)
+  let generated = false
+  try {
+    await new Promise<void>((resolve, reject) => {
     const child = spawn(command, args, {
       cwd: root,
-      stdio: ['pipe', verboseMode ? 'inherit' : 'pipe', verboseMode ? 'inherit' : 'pipe'],
+      stdio: [
+        'pipe',
+        verboseMode && !output.json ? 'inherit' : 'pipe',
+        verboseMode && !output.json ? 'inherit' : 'pipe',
+      ],
       shell: process.platform === 'win32',
     })
 
-    if (!verboseMode) {
+    if (verboseMode && output.json) {
+      // JSON reserves stdout for its one final payload; verbose child detail is diagnostic stderr.
+      child.stdout?.on('data', (chunk: Buffer) => verboseRaw(chunk.toString()))
+      child.stderr?.on('data', (chunk: Buffer) => verboseRaw(chunk.toString()))
+    } else if (!verboseMode) {
       // Capture output silently — available for error reporting.
       child.stdout?.on('data', (chunk: Buffer) => {
         codexOutput += chunk.toString()
@@ -254,11 +264,13 @@ export async function runHatch(prompt: string, outputDir: string, verbose = fals
     })
 
     child.stdin?.end(codexPrompt)
-  })
+    })
+    generated = true
+  } finally {
+    spinner.stop(generated ? 'complete' : 'failed')
+  }
 
-  // ── 4. Validate packaged assets ───────────────────────────────────────────
-
-  status('Validating packaged assets...')
+  stage(4, 5, 'Validating packaged assets', startedAt)
 
   const spritesheetPath = path.join(absoluteOutputDir, 'spritesheet.webp')
   const petJsonPath = path.join(absoluteOutputDir, 'pet.json')
@@ -277,14 +289,8 @@ export async function runHatch(prompt: string, outputDir: string, verbose = fals
     )
   }
 
-  // ── 5. Success summary ────────────────────────────────────────────────────
-
-  closeSeparator()
-
   const petId = petIdFromOutputDir(outputDir)
-  success(`Pet hatched successfully.`)
-  label('Pet id', petId)
-  label('Assets', absoluteOutputDir)
+  stage(5, 5, 'Finalizing your pet', startedAt)
 
   const relativeToManagedPets = path.relative(
     buddyManagedPetsDir(process.env, os.homedir()),
@@ -295,16 +301,27 @@ export async function runHatch(prompt: string, outputDir: string, verbose = fals
     !relativeToManagedPets.startsWith('..') &&
     !path.isAbsolute(relativeToManagedPets)
 
-  if (isBuddyManagedPet) {
-    process.stdout.write(`  buddy pets use ${petId}\n`)
-  } else if (outputDir !== 'pets/default') {
-    warn(`To activate this pet, copy or move it to a buddy-managed pets directory, then run:`)
-    process.stdout.write(`  buddy pets use ${petId}\n`)
-  } else {
-    process.stdout.write(
-      dim(`  (Assets written to the default pet slot — restart buddy to see changes.)\n`),
-    )
-  }
+  const hint = isBuddyManagedPet
+    ? `Activate it: buddy pets use ${petId}`
+    : outputDir !== 'pets/default'
+      ? `Move it to a buddy-managed pets directory, then run: buddy pets use ${petId}`
+      : 'Assets were written to the default pet slot; restart buddy to see changes.'
 
-  process.stdout.write('\n')
+  return commandResult(
+    'pets.hatch',
+    { pet: { id: petId, outputDir: absoluteOutputDir }, elapsedMs: Date.now() - startedAt },
+    {
+      summary: 'Pet hatched successfully.',
+      details: [
+        { label: 'Pet id', value: petId },
+        { label: 'Assets', value: absoluteOutputDir },
+      ],
+      hint,
+      verboseDetails: [
+        `Concept: ${prompt}`,
+        `Codex command: ${command}`,
+        `Skill dir: ${skillDir}`,
+      ],
+    },
+  )
 }

@@ -408,9 +408,11 @@ the user's terminal should see a streamlined progress flow:
 5. Print the generated pet id/path and the command to select it when selection commands
    exist.
 
-The planned interactive presentation renders these as stable numbered stages, includes
-elapsed time for long-running work, and uses an in-place spinner only when stdout is a TTY.
-Plain, quiet, and JSON modes must remain deterministic. Ctrl+C should terminate the child
+Interactive presentation renders these as stable numbered stages, includes elapsed time for
+long-running work, and uses an in-place spinner only when stdout is a TTY. Plain and quiet
+output keep deterministic stage/result lines without terminal control characters; JSON emits
+one final `pets.hatch` result payload and routes verbose Codex subprocess detail to stderr.
+Ctrl+C should terminate the child
 Codex process and clean only known disposable run artifacts. Existing destination content
 must not be overwritten without explicit confirmation in a TTY or `--yes` in an automated
 run.
@@ -428,7 +430,8 @@ buddy hatch "a small orange cat" --package-preset penguin
 ```
 
 Codex CLI failures produce a concise actionable error in normal mode. The `--verbose` hint
-is included in the failure message when no subprocess output was captured.
+is included in the failure message when no subprocess output was captured. Successful JSON
+output has `{ "ok": true, "command": "pets.hatch", "data": { "pet", "elapsedMs" } }`.
 
 Without a destination option, `buddy hatch` derives a short lowercase id from the prompt
 and writes to `<buddy data dir>\\pets\\<id>` (normally

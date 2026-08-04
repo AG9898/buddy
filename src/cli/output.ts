@@ -262,6 +262,56 @@ export function status(message: string): void {
   emit('progress', `${cyan(symbols().info)} ${message}\n`)
 }
 
+/** Format a duration for compact progress output. */
+export function elapsedTime(startedAt: number, now = Date.now()): string {
+  return `${((now - startedAt) / 1000).toFixed(1)}s`
+}
+
+/**
+ * Print one stable, numbered workflow stage. Stages use the progress channel so
+ * quiet and JSON output remain deterministic.
+ */
+export function stage(number: number, total: number, message: string, startedAt: number): void {
+  emit('progress', `${cyan(`${number}/${total}`)} ${message} ${dim(`(${elapsedTime(startedAt)})`)}\n`)
+}
+
+export interface ProgressSpinner {
+  stop(outcome?: string): void
+}
+
+/**
+ * Render an in-place progress spinner only when a human is watching a TTY.
+ * Every started spinner owns its final newline so later output never lands on
+ * a transient terminal line.
+ */
+export function startProgressSpinner(message: string, startedAt: number): ProgressSpinner {
+  const ctx = getOutputContext()
+  if (ctx.json || ctx.mode === 'quiet' || process.stdout.isTTY !== true) {
+    return { stop() {} }
+  }
+
+  const frames = ['|', '/', '-', '\\']
+  let index = 0
+  let stopped = false
+  const render = (): void => {
+    ctx.stdout.write(`\r${cyan(frames[index]!)} ${message} ${dim(`(${elapsedTime(startedAt)})`)}`)
+    index = (index + 1) % frames.length
+  }
+  render()
+  const timer = setInterval(render, 100)
+
+  return {
+    stop(outcome = 'complete'): void {
+      if (stopped) return
+      stopped = true
+      clearInterval(timer)
+      ctx.stdout.write(
+        `\r${green(symbols().success)} ${message} ${dim(`(${elapsedTime(startedAt)}`)} ${outcome}\n`,
+      )
+    },
+  }
+}
+
 /**
  * Print a success line.
  * Example: ✔ buddy started.
@@ -293,6 +343,11 @@ export function hint(message: string): void {
  */
 export function detail(message: string): void {
   emit('verbose', `  ${dim(message)}\n`)
+}
+
+/** Write raw child-process detail without allowing it to contaminate JSON stdout. */
+export function verboseRaw(text: string): void {
+  emit('verbose', text)
 }
 
 /**
