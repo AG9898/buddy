@@ -203,6 +203,43 @@ afterEach(() => {
   resetOutputContext()
 })
 
+describe('resolveActivePetStateNames()', () => {
+  it('uses states from the resolved active pet manifest', async () => {
+    mockReaddirSync.mockImplementation((dirPath: unknown) => {
+      const directory = String(dirPath)
+      if (directory.includes('.petdex-win')) return [{ name: 'custom-cat', isDirectory: () => true }]
+      if (directory.endsWith(`${path.sep}pets`)) return [{ name: 'default', isDirectory: () => true }]
+      return []
+    })
+    mockReadFileSync.mockImplementation((filePath: unknown) => {
+      const file = String(filePath)
+      if (file.endsWith('state.json')) return makeStateJson('custom-cat')
+      if (file.includes('custom-cat')) {
+        return JSON.stringify({ ...VALID_PET_JSON, id: 'custom-cat', states: { pouncing: VALID_PET_JSON.states.idle } })
+      }
+      return JSON.stringify({ ...VALID_PET_JSON, id: 'default' })
+    })
+    mockExistsSync.mockReturnValue(true)
+    const { resolveActivePetStateNames } = await import('./pets.js')
+
+    expect(resolveActivePetStateNames()).toEqual(['pouncing'])
+  })
+
+  it('falls back to the packaged default manifest when the active pet is unresolved', async () => {
+    mockReaddirSync.mockImplementation((dirPath: unknown) =>
+      String(dirPath).endsWith(`${path.sep}pets`) ? [{ name: 'default', isDirectory: () => true }] : [],
+    )
+    mockReadFileSync.mockImplementation((filePath: unknown) => {
+      if (String(filePath).endsWith('state.json')) return makeStateJson('missing-pet')
+      return JSON.stringify({ ...VALID_PET_JSON, id: 'default', states: { resting: VALID_PET_JSON.states.idle } })
+    })
+    mockExistsSync.mockReturnValue(true)
+    const { resolveActivePetStateNames } = await import('./pets.js')
+
+    expect(resolveActivePetStateNames()).toEqual(['resting'])
+  })
+})
+
 /* ── runPetsList() ──────────────────────────────────────────────────────────── */
 
 describe('runPetsList()', () => {

@@ -513,7 +513,9 @@ non-zero.
 
 `buddy state <name>` validates state names before sending them. Invalid names return valid
 choices and a close-match suggestion when available. State validation must use the active
-pet manifest when it is resolvable and the packaged default state set as the fallback.
+pet manifest when it is resolvable and the packaged default state set as the fallback. An
+invalid request exits non-zero with `state.invalid`; its JSON error data contains the requested
+state, `validStates`, and a nullable close-match `suggestion`.
 
 State and size requests use the same token-authenticated local sidecar client. It loads the
 runtime token, sends the request, parses JSON responses, applies a bounded timeout, and

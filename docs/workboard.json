@@ -1233,7 +1233,7 @@
       "id": "FEAT-27",
       "title": "Validate CLI state names with useful suggestions",
       "description": "Resolve valid state names from the active pet manifest when available, fall back to the packaged default manifest, and validate buddy state input before making an HTTP request. Invalid input should list valid names and provide a close-match suggestion without changing the hook event contract or the Rust bridge in this task.",
-      "status": "todo",
+      "status": "done",
       "priority": "medium",
       "group_id": "FEAT",
       "depends_on": [

@@ -70,6 +70,19 @@ function readActivePetId(): string | null {
   return null
 }
 
+/**
+ * Return state names from the resolved stored pet, or the packaged default
+ * manifest when the stored selection is missing or no longer valid.
+ */
+export function resolveActivePetStateNames(): readonly string[] {
+  const { valid } = discoverPets()
+  const activePetId = readActivePetId()
+  const activePet = activePetId ? valid.find((pet) => pet.id === activePetId) : undefined
+  const defaultPet = valid.find((pet) => pet.id === 'default' && pet.source === 'packaged')
+
+  return Object.keys((activePet ?? defaultPet)?.petJson.states ?? {})
+}
+
 /** Persist the selected pet id and spritesheet path to buddy-owned state.json. */
 function saveActivePet(entry: PetEntry): void {
   const filePath = stateFilePath()
